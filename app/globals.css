@@ -3,47 +3,63 @@
 /* ============================================================
    Markwise design tokens
 
-   Derived from the brand mark: its navy carries the text, its cyan
-   the accent. `--brand` is a darkened sibling of the logo cyan so
-   button and link text clears 4.5:1 — the bright logo cyan is kept
-   for graphics, where only 3:1 applies.
+   Light only, by design — `color-scheme: light` pins it regardless
+   of the operating system setting.
+
+   Typography and structure follow the Sluice reference: two type
+   roles carry the page (large display at tight negative tracking,
+   tiny mono caps at wide positive tracking), separation comes from
+   1px hairlines rather than elevation, and containers use large
+   soft radii.
+
+   Colour comes from the brand mark. Navy is structural — text and
+   primary actions. Cyan is the accent, darkened for anything
+   carrying text so it clears 4.5:1; the bright logo cyan is kept
+   for graphics, where the floor is 3:1.
    ============================================================ */
 
 :root {
-  /* brand mark — fixed, not theme-following */
+  color-scheme: light;
+
+  /* brand mark */
   --logo-navy: #0f1e3d;
   --logo-cyan: #17a3ba;
 
-  /* surfaces */
-  --ground: #f3f5f7;
+  /* surfaces — near-white ground, white cards, hairline separation */
+  --ground: #fbfcfd;
   --surface: #ffffff;
-  --surface-2: #eceff3;
-  --surface-3: #dfe4ea;
-  --border: #dde2e9;
-  --border-strong: #c0c8d3;
+  --surface-2: #f3f5f8;
+  --surface-3: #e8ecf1;
+  --border: #e7eaf0;
+  --border-strong: #d2d8e1;
 
   /* text */
   --ink: #0f1e3d;
-  --ink-2: #4e5a6e;
-  --ink-3: #808c9d;
+  --ink-2: #59647a;
+  --ink-3: #929cad;
 
-  /* brand */
-  --brand: #0e7e92;
+  /* primary action — the mark's navy */
+  --primary: #0f1e3d;
+  --primary-hover: #1d3159;
+  --on-primary: #ffffff;
+
+  /* accent — the mark's cyan, darkened for text */
+  --brand: #0c7c90;
   --brand-hover: #0a6274;
-  --brand-soft: #e0f1f4;
-  --brand-line: #a5d5de;
+  --brand-soft: #e7f4f7;
+  --brand-line: #b8dee6;
   --on-brand: #ffffff;
 
   /* semantic */
-  --warn: #a66300;
-  --warn-soft: #faeeda;
-  --warn-line: #e7c68c;
-  --crit: #b0243a;
-  --crit-soft: #fae4e8;
-  --crit-line: #e9aeb8;
-  --ok: #2e7d4f;
-  --ok-soft: #e2f0e8;
-  --ok-line: #a6cfb7;
+  --warn: #9a6207;
+  --warn-soft: #fdf3e4;
+  --warn-line: #f0ddba;
+  --crit: #ab2437;
+  --crit-soft: #fdebee;
+  --crit-line: #f4c8cf;
+  --ok: #1f7a52;
+  --ok-soft: #e7f4ef;
+  --ok-line: #b7ddcb;
 
   /* cluster categorical ramp */
   --c1: #0e8ca3;
@@ -52,58 +68,17 @@
   --c4: #7b4a93;
   --c5: #4f7a34;
   --c6: #a8324f;
-  --c0: #7e8a9b;
+  --c0: #93a0b0;
 
-  --shadow-sm: 0 1px 2px rgb(15 30 61 / 0.05);
-  --shadow-md: 0 1px 2px rgb(15 30 61 / 0.04), 0 6px 16px rgb(15 30 61 / 0.07);
-  --shadow-lg: 0 2px 4px rgb(15 30 61 / 0.05), 0 12px 32px rgb(15 30 61 / 0.11);
-}
+  /* radii */
+  --r-card: 20px;
+  --r-input: 12px;
+  --r-pill: 999px;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* the mark's navy inverts so it stays visible on a dark ground */
-    --logo-navy: #e4e9f0;
-    --logo-cyan: #35b8ce;
-
-    --ground: #0c1220;
-    --surface: #131a29;
-    --surface-2: #1a2333;
-    --surface-3: #242f44;
-    --border: #283346;
-    --border-strong: #3a465c;
-
-    --ink: #e4e9f0;
-    --ink-2: #a3aec0;
-    --ink-3: #7a8699;
-
-    --brand: #35b8ce;
-    --brand-hover: #58cadd;
-    --brand-soft: #0e2e38;
-    --brand-line: #1c4a58;
-    --on-brand: #04212a;
-
-    --warn: #d9a054;
-    --warn-soft: #2e2519;
-    --warn-line: #4a3b21;
-    --crit: #e4737e;
-    --crit-soft: #331d22;
-    --crit-line: #55292f;
-    --ok: #6fb47d;
-    --ok-soft: #16291d;
-    --ok-line: #2a452f;
-
-    --c1: #35b8ce;
-    --c2: #7e9ae0;
-    --c3: #d89a5f;
-    --c4: #b78ecc;
-    --c5: #93c06b;
-    --c6: #de7f96;
-    --c0: #909bac;
-
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.45);
-    --shadow-md: 0 1px 2px rgb(0 0 0 / 0.45), 0 6px 16px rgb(0 0 0 / 0.35);
-    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.45), 0 12px 32px rgb(0 0 0 / 0.5);
-  }
+  /* elevation is used once, for the mobile drawer */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 16px 48px rgb(15 30 61 / 0.14);
 }
 
 @theme inline {
@@ -117,6 +92,10 @@
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
 
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
@@ -134,18 +113,13 @@
   --color-ok-soft: var(--ok-soft);
   --color-ok-line: var(--ok-line);
 
-  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-source-serif), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-
-  --shadow-card: var(--shadow-sm);
-  --shadow-raised: var(--shadow-md);
-  --shadow-float: var(--shadow-lg);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
 }
 
 @layer base {
@@ -155,14 +129,16 @@
 
   html {
     -webkit-text-size-adjust: 100%;
+    color-scheme: light;
   }
 
   body {
     background: var(--ground);
     color: var(--ink);
-    font-family: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
-    font-size: 15px;
-    line-height: 1.55;
+    font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    letter-spacing: -0.006em;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -173,11 +149,10 @@
     text-wrap: balance;
   }
 
-  /* One visible focus treatment everywhere. */
   :focus-visible {
     outline: 2px solid var(--brand);
     outline-offset: 2px;
-    border-radius: 3px;
+    border-radius: 4px;
   }
 
   ::selection {
@@ -185,7 +160,6 @@
     color: var(--ink);
   }
 
-  /* Consistent, unobtrusive scrollbars in the dense panels. */
   .scroll-thin {
     scrollbar-width: thin;
     scrollbar-color: var(--border-strong) transparent;
@@ -196,7 +170,7 @@
   }
   .scroll-thin::-webkit-scrollbar-thumb {
     background: var(--border-strong);
-    border-radius: 8px;
+    border-radius: 999px;
   }
   .scroll-thin::-webkit-scrollbar-track {
     background: transparent;
@@ -204,21 +178,33 @@
 }
 
 @layer utilities {
+  /* Display role: tight negative tracking, the counterweight to the
+     wide-tracked mono caps. */
   .font-display {
-    font-family: var(--font-source-serif), Georgia, serif;
-    letter-spacing: -0.012em;
+    letter-spacing: -0.032em;
+    font-feature-settings: "ss01";
   }
 
+  /* Label role: small, mono, wide. Deliberately far from the display
+     role so the two never compete. */
   .label-caps {
     font-family: var(--font-plex-mono), ui-monospace, monospace;
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 500;
-    letter-spacing: 0.09em;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
+    line-height: 1.4;
   }
 
   .tnum {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Hairline rule, the site's primary separator. */
+  .rule {
+    border-color: var(--border);
+    border-width: 0;
+    border-top-width: 1px;
   }
 }
 

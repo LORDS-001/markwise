@@ -357,7 +357,7 @@ function FormatCard({
       onClick={onSelect}
       aria-pressed={active}
       className={cn(
-        "text-left rounded-[10px] border p-4 transition-colors",
+        "text-left rounded-[16px] border p-4 transition-colors",
         active
           ? "border-brand bg-brand-soft/50 ring-1 ring-[var(--brand-line)]"
           : "border-border bg-surface hover:border-border-strong hover:bg-surface-2",

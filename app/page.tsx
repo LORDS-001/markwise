@@ -294,7 +294,7 @@ export default function SetupPage() {
                     onClick={() => setCriteria((prev) => prev.filter((x) => x.id !== c.id))}
                     disabled={criteria.length === 1}
                     aria-label={`Remove criterion ${i + 1}`}
-                    className="grid place-items-center w-9 h-9 shrink-0 rounded-[6px] text-ink-3 hover:text-crit hover:bg-crit-soft disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                    className="grid place-items-center w-9 h-9 shrink-0 rounded-[10px] text-ink-3 hover:text-crit hover:bg-crit-soft disabled:opacity-30 disabled:pointer-events-none transition-colors"
                   >
                     <X size={16} strokeWidth={2} />
                   </button>
@@ -377,7 +377,7 @@ export default function SetupPage() {
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => fileRef.current?.click()}
-                className="flex flex-col items-center gap-2 border-2 border-dashed border-border-strong rounded-[10px] px-6 py-10 text-center hover:border-brand hover:bg-brand-soft/40 transition-colors"
+                className="flex flex-col items-center gap-2 border-2 border-dashed border-border-strong rounded-[16px] px-6 py-10 text-center hover:border-brand hover:bg-brand-soft/40 transition-colors"
               >
                 <Upload size={22} strokeWidth={1.7} className="text-ink-3" aria-hidden />
                 <span className="text-[14px] font-medium">Choose a CSV file</span>
@@ -408,7 +408,7 @@ export default function SetupPage() {
           ) : null}
 
           {mode === "photo" ? (
-            <div className="flex flex-col items-center gap-2 border border-dashed border-border-strong rounded-[10px] px-6 py-10 text-center">
+            <div className="flex flex-col items-center gap-2 border border-dashed border-border-strong rounded-[16px] px-6 py-10 text-center">
               <ImageIcon size={22} strokeWidth={1.7} className="text-ink-3" aria-hidden />
               <p className="text-[14px] font-medium">Handwritten scripts aren&apos;t supported yet</p>
               <p className="text-[13px] text-ink-2 max-w-[46ch]">

@@ -15,19 +15,17 @@ type Variant = "primary" | "secondary" | "ghost" | "danger" | "quiet";
 type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
-  primary:
-    "bg-brand text-on-brand hover:bg-brand-hover border border-transparent shadow-[var(--shadow-sm)]",
-  secondary:
-    "bg-surface text-ink border border-border-strong hover:bg-surface-2",
+  primary: "bg-primary text-on-primary hover:bg-primary-hover border border-transparent",
+  secondary: "bg-surface text-ink border border-border hover:border-border-strong hover:bg-surface-2",
   ghost: "bg-transparent text-ink-2 border border-transparent hover:bg-surface-2 hover:text-ink",
-  danger: "bg-crit-soft text-crit border border-crit-line hover:bg-crit hover:text-white",
+  danger: "bg-surface text-crit border border-crit-line hover:bg-crit-soft",
   quiet: "bg-surface-2 text-ink border border-transparent hover:bg-surface-3",
 };
 
 const SIZES: Record<Size, string> = {
-  sm: "h-8 px-3 text-[13px] gap-1.5 rounded-[6px]",
-  md: "h-10 px-4 text-sm gap-2 rounded-[6px]",
-  lg: "h-11 px-5 text-[15px] gap-2 rounded-[8px]",
+  sm: "h-8 px-3.5 text-[13px] gap-1.5 rounded-full",
+  md: "h-9.5 px-4.5 text-[13.5px] gap-2 rounded-full",
+  lg: "h-11 px-6 text-[14.5px] gap-2 rounded-full",
 };
 
 export function buttonClass(variant: Variant = "primary", size: Size = "md", extra?: string) {
@@ -59,7 +57,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "bg-surface border border-border rounded-[10px] shadow-[var(--shadow-sm)]",
+        "bg-surface border border-border rounded-[var(--r-card)]",
         className,
       )}
       {...rest}
@@ -83,13 +81,13 @@ export function CardHead({
   return (
     <div
       className={cn(
-        "flex items-start justify-between gap-4 px-5 py-4 border-b border-border",
+        "flex items-start justify-between gap-4 px-6 py-4.5 border-b border-border",
         className,
       )}
     >
       <div className="min-w-0">
-        <h2 className="font-display text-[17px] font-semibold leading-tight">{title}</h2>
-        {hint ? <p className="text-[13px] text-ink-2 mt-0.5">{hint}</p> : null}
+        <h2 className="font-display text-[16px] font-bold leading-tight">{title}</h2>
+        {hint ? <p className="text-[12.5px] text-ink-2 mt-1 leading-snug">{hint}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
@@ -120,7 +118,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 border rounded-[4px] px-1.5 py-0.5 text-[11.5px] font-medium leading-[1.4] whitespace-nowrap",
+        "inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-[11px] font-semibold leading-[1.5] whitespace-nowrap",
         TONES[tone],
         className,
       )}
@@ -146,14 +144,14 @@ export function Stat({
   tone?: "brand" | "warn" | "plain";
 }) {
   return (
-    <div className="bg-surface border border-border rounded-[10px] px-4 py-3 min-w-0">
+    <div className="bg-surface border border-border rounded-[var(--r-card)] px-5 py-4 min-w-0">
       <div className="flex items-center gap-1.5 text-ink-3">
         {icon}
         <span className="label-caps">{label}</span>
       </div>
       <div
         className={cn(
-          "font-display text-[24px] font-semibold leading-tight mt-1 tnum truncate",
+          "font-display text-[26px] font-extrabold leading-tight mt-1.5 tnum truncate",
           tone === "brand" && "text-brand",
           tone === "warn" && "text-warn",
         )}
@@ -208,7 +206,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex bg-surface-2 border border-border rounded-[7px] p-0.5 gap-0.5"
+      className="inline-flex bg-surface-2 border border-border rounded-full p-1 gap-1"
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -219,10 +217,10 @@ export function Segmented<T extends string>({
             aria-checked={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              "px-3 h-7 text-[13px] font-medium rounded-[5px] transition-colors",
+              "px-3.5 h-7 text-[12.5px] font-semibold rounded-full transition-colors",
               active
-                ? "bg-surface text-ink shadow-[var(--shadow-sm)]"
-                : "text-ink-2 hover:text-ink",
+                ? "bg-surface text-ink border border-border"
+                : "text-ink-2 hover:text-ink border border-transparent",
             )}
           >
             {o.label}
@@ -253,7 +251,7 @@ export function Field({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3">
-        <label htmlFor={htmlFor} className="text-[13.5px] font-semibold text-ink">
+        <label htmlFor={htmlFor} className="text-[13px] font-bold text-ink">
           {label}
           {required ? <span className="text-crit ml-1" aria-hidden>*</span> : null}
         </label>
@@ -266,8 +264,8 @@ export function Field({
 }
 
 const inputBase =
-  "w-full bg-surface border border-border-strong rounded-[6px] px-3 py-2 text-[14.5px] text-ink " +
-  "placeholder:text-ink-3 transition-colors hover:border-ink-3 focus:border-brand focus:outline-none " +
+  "w-full bg-surface border border-border rounded-[var(--r-input)] px-3.5 py-2.5 text-[14px] text-ink " +
+  "placeholder:text-ink-3 transition-colors hover:border-border-strong focus:border-brand focus:outline-none " +
   "focus:ring-2 focus:ring-[var(--brand-line)]";
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
@@ -298,7 +296,7 @@ export function EmptyState({
   return (
     <div className="flex flex-col items-center text-center gap-2 py-12 px-6">
       {icon ? <div className="text-ink-3">{icon}</div> : null}
-      <h3 className="font-display text-[17px] font-semibold">{title}</h3>
+      <h3 className="font-display text-[17px] font-bold">{title}</h3>
       {body ? <p className="text-[13.5px] text-ink-2 max-w-[46ch]">{body}</p> : null}
       {action ? <div className="pt-2">{action}</div> : null}
     </div>

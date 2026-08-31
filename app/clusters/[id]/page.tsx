@@ -278,7 +278,7 @@ export default function ClusterDetailPage() {
                   {others.map((o) => (
                     <label
                       key={o.id}
-                      className="flex items-center gap-2.5 text-[13.5px] cursor-pointer rounded-[6px] px-2 py-1.5 hover:bg-surface-2"
+                      className="flex items-center gap-2.5 text-[13.5px] cursor-pointer rounded-[10px] px-2 py-1.5 hover:bg-surface-2"
                     >
                       <input
                         type="radio"
@@ -522,7 +522,7 @@ function Highlighted({
     <>
       {text.slice(0, at)}
       <mark
-        className="rounded-[3px] px-0.5 font-medium"
+        className="rounded-[5px] px-0.5 font-medium"
         style={{
           background: `color-mix(in srgb, ${toneColor(tone)} 20%, transparent)`,
           color: "inherit",

@@ -89,22 +89,22 @@ function RailContent({ onNavigate }: { onNavigate?: () => void }) {
       <Link
         href="/"
         onClick={onNavigate}
-        className="flex items-center gap-2.5 px-4 h-16 shrink-0 border-b border-border"
+        className="flex items-center gap-2.5 px-5 h-[72px] shrink-0 border-b border-border"
       >
         <MarkwiseMark className="h-8 w-auto shrink-0" title="Markwise" />
         <span className="min-w-0">
-          <span className="block text-[17px] font-semibold tracking-[-0.02em] leading-tight">
+          <span className="font-display block text-[17px] font-extrabold leading-tight">
             Markwise
           </span>
-          <span className="block text-[11.5px] text-ink-3 leading-tight truncate">
+          <span className="block text-[11px] text-ink-3 leading-tight truncate mt-0.5">
             {SESSION.courseCode} · {SESSION.courseTitle}
           </span>
         </span>
       </Link>
 
-      <nav className="flex-1 overflow-y-auto scroll-thin px-2.5 py-3" aria-label="Session steps">
-        <p className="label-caps text-ink-3 px-2 pb-2">This session</p>
-        <ul className="flex flex-col gap-0.5">
+      <nav className="flex-1 overflow-y-auto scroll-thin px-3 py-5" aria-label="Session steps">
+        <p className="label-caps text-ink-3 px-3 pb-3">This session</p>
+        <ul className="flex flex-col gap-1">
           {STEPS.map((step) => {
             const active = resolveStep(pathname) === step.href;
             const state = stepState(step.href);
@@ -117,26 +117,20 @@ function RailContent({ onNavigate }: { onNavigate?: () => void }) {
                   onClick={onNavigate}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "group relative flex items-center gap-2.5 rounded-[7px] pl-2.5 pr-2 py-2 transition-colors",
+                    "group relative flex items-center gap-3 rounded-[14px] pl-3 pr-2.5 py-2.5 transition-colors",
                     active
                       ? "bg-brand-soft text-brand"
                       : "text-ink-2 hover:bg-surface-2 hover:text-ink",
                   )}
                 >
-                  {active ? (
-                    <span
-                      className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-brand"
-                      aria-hidden
-                    />
-                  ) : null}
                   <Icon size={17} strokeWidth={1.9} className="shrink-0" aria-hidden />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[13.5px] font-medium leading-tight truncate">
+                    <span className="block text-[13px] font-semibold leading-tight truncate">
                       {step.label}
                     </span>
                     <span
                       className={cn(
-                        "block text-[11.5px] leading-tight truncate",
+                        "block text-[11px] leading-tight truncate mt-0.5",
                         active ? "text-brand/70" : "text-ink-3",
                       )}
                     >
@@ -166,12 +160,12 @@ function RailContent({ onNavigate }: { onNavigate?: () => void }) {
         </ul>
       </nav>
 
-      <div className="shrink-0 border-t border-border px-2.5 py-2.5 flex flex-col gap-0.5">
-        <button className="flex items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-[13.5px] text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors">
+      <div className="shrink-0 border-t border-border px-3 py-3 flex flex-col gap-1">
+        <button className="flex items-center gap-3 rounded-[14px] px-3 py-2 text-[13px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors">
           <CircleHelp size={17} strokeWidth={1.9} aria-hidden />
           Help &amp; shortcuts
         </button>
-        <button className="flex items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-[13.5px] text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors">
+        <button className="flex items-center gap-3 rounded-[14px] px-3 py-2 text-[13px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors">
           <Settings size={17} strokeWidth={1.9} aria-hidden />
           Settings
         </button>
@@ -193,10 +187,10 @@ function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
   const isChild = isChildRoute(pathname);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-surface/90 backdrop-blur px-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-[72px] shrink-0 items-center gap-3 border-b border-border bg-surface/85 backdrop-blur px-4 sm:px-7">
       <button
         onClick={onOpenNav}
-        className="lg:hidden grid place-items-center w-9 h-9 -ml-1 rounded-[7px] text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
+        className="lg:hidden grid place-items-center w-9 h-9 -ml-1 rounded-[12px] text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
         aria-label="Open navigation"
       >
         <Menu size={20} strokeWidth={1.9} />
@@ -281,7 +275,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [navOpen]);
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[252px_minmax(0,1fr)]">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[268px_minmax(0,1fr)]">
       <aside className="hidden lg:block sticky top-0 h-dvh border-r border-border bg-surface">
         <RailContent />
       </aside>
@@ -309,7 +303,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           <button
             onClick={() => setNavOpen(false)}
-            className="absolute right-2 top-4 grid place-items-center w-9 h-9 rounded-[7px] text-ink-2 hover:bg-surface-2 z-10"
+            className="absolute right-2 top-4 grid place-items-center w-9 h-9 rounded-[12px] text-ink-2 hover:bg-surface-2 z-10"
             aria-label="Close navigation"
           >
             <X size={19} strokeWidth={1.9} />
@@ -346,15 +340,15 @@ export function Page({
   children: ReactNode;
 }) {
   return (
-    <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
+    <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between mb-8 lg:mb-10">
         <div className="min-w-0">
-          {eyebrow ? <div className="label-caps text-brand mb-1.5">{eyebrow}</div> : null}
-          <h1 className="font-display text-[26px] sm:text-[31px] font-semibold leading-[1.15]">
+          {eyebrow ? <div className="label-caps text-brand mb-3">{eyebrow}</div> : null}
+          <h1 className="font-display text-[30px] sm:text-[40px] font-extrabold leading-[1.06]">
             {title}
           </h1>
           {lead ? (
-            <p className="text-[14.5px] text-ink-2 mt-2 max-w-[68ch]">{lead}</p>
+            <p className="text-[14.5px] leading-relaxed text-ink-2 mt-3.5 max-w-[66ch]">{lead}</p>
           ) : null}
         </div>
         {actions ? (
@@ -363,12 +357,12 @@ export function Page({
       </div>
 
       {aside ? (
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_336px] xl:gap-6 items-start">
-          <div className="min-w-0 flex flex-col gap-5">{children}</div>
-          <aside className="min-w-0 flex flex-col gap-4 xl:sticky xl:top-[88px]">{aside}</aside>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-7 items-start">
+          <div className="min-w-0 flex flex-col gap-6">{children}</div>
+          <aside className="min-w-0 flex flex-col gap-5 xl:sticky xl:top-[96px]">{aside}</aside>
         </div>
       ) : (
-        <div className="flex flex-col gap-5">{children}</div>
+        <div className="flex flex-col gap-6">{children}</div>
       )}
     </div>
   );

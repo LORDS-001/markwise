@@ -33,7 +33,7 @@ type SortKey = "confidence" | "score" | "cluster";
 /** Shared by the header and every row so the columns can never drift apart.
  *  The criteria column has a floor rather than a bare 1fr — without it the
  *  column collapses at narrow widths and its chips get clipped to nothing. */
-const GRID_COLS = "132px 84px 112px minmax(140px,1fr) 96px 92px 24px";
+const GRID_COLS = "120px 78px 104px minmax(130px,1fr) 88px 88px 22px";
 
 export default function ScoresPage() {
   const {
@@ -125,7 +125,7 @@ export default function ScoresPage() {
 
               <div
                 className={cn(
-                  "flex items-center gap-2.5 rounded-[8px] px-3 py-2.5 border text-[13.5px]",
+                  "flex items-center gap-2.5 rounded-[12px] px-3 py-2.5 border text-[13.5px]",
                   needsAttention > 0
                     ? "bg-warn-soft border-warn-line text-warn"
                     : "bg-ok-soft border-ok-line text-ok",
@@ -221,9 +221,9 @@ export default function ScoresPage() {
 
         {/* ---------- Desktop table ---------- */}
         <div className="hidden lg:block overflow-x-auto scroll-thin">
-          <div className="min-w-[730px]">
+          <div className="min-w-[712px]">
             <div
-              className="grid items-center gap-2 px-5 py-2 border-b border-border bg-surface-2 label-caps text-ink-3"
+              className="grid items-center gap-2 px-4 py-2.5 border-b border-border bg-surface-2 label-caps text-ink-3"
               style={{ gridTemplateColumns: GRID_COLS }}
             >
               <span>Student</span>
@@ -284,7 +284,7 @@ function TableRow({ a, clusterOf, setScore, setStatus, open, setOpen }: RowProps
       )}
     >
       <div
-        className="grid items-center gap-2 px-5 py-2.5"
+        className="grid items-center gap-2 px-4 py-2.5"
         style={{ gridTemplateColumns: GRID_COLS }}
       >
         <div className="min-w-0">
@@ -321,7 +321,7 @@ function TableRow({ a, clusterOf, setScore, setStatus, open, setOpen }: RowProps
           onClick={() => setOpen(expanded ? null : a.id)}
           aria-expanded={expanded}
           aria-label={expanded ? "Collapse answer" : "Expand answer"}
-          className="grid place-items-center w-7 h-7 rounded-[6px] text-ink-3 hover:bg-surface-3 hover:text-ink transition-colors"
+          className="grid place-items-center w-7 h-7 rounded-[10px] text-ink-3 hover:bg-surface-3 hover:text-ink transition-colors"
         >
           <ChevronDown
             size={16}
@@ -405,7 +405,7 @@ function ScoreInput({ a, setScore }: { a: StudentAnswer; setScore: (id: string, 
         value={a.provisionalScore}
         onChange={(e) => setScore(a.id, Number(e.target.value))}
         aria-label={`Score for ${a.studentId}, out of ${a.maxScore}`}
-        className="w-[52px] h-8 text-center tnum text-[14px] font-semibold bg-surface border border-border rounded-[5px] hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--brand-line)]"
+        className="w-[52px] h-8 text-center tnum text-[14px] font-semibold bg-surface border border-border rounded-[9px] hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--brand-line)]"
       />
       <span className="text-[12.5px] text-ink-3 tnum">/{a.maxScore}</span>
     </div>
@@ -430,7 +430,7 @@ function CriteriaMeter({ a }: { a: StudentAnswer }) {
           <span
             key={i}
             className={cn(
-              "w-[9px] h-3.5 rounded-[2px]",
+              "w-[9px] h-3.5 rounded-[4px]",
               i < met ? "bg-ok" : "bg-surface-3 border border-border",
             )}
           />
@@ -456,7 +456,7 @@ function StatusCell({
       <div className="flex items-center gap-1">
         <button
           onClick={() => setStatus(a.id, "accepted")}
-          className="inline-flex items-center gap-1 h-7 px-2 rounded-[5px] border border-border-strong bg-surface text-[12px] font-medium hover:bg-brand hover:text-on-brand hover:border-brand transition-colors"
+          className="inline-flex items-center gap-1 h-7 px-2 rounded-[9px] border border-border-strong bg-surface text-[12px] font-medium hover:bg-brand hover:text-on-brand hover:border-brand transition-colors"
         >
           <Check size={13} strokeWidth={2.6} aria-hidden />
           Accept
@@ -465,7 +465,7 @@ function StatusCell({
           onClick={() => setStatus(a.id, "flagged")}
           aria-label="Flag for a second look"
           title="Flag for a second look"
-          className="grid place-items-center w-7 h-7 rounded-[5px] text-ink-3 hover:text-warn hover:bg-warn-soft transition-colors"
+          className="grid place-items-center w-7 h-7 rounded-[9px] text-ink-3 hover:text-warn hover:bg-warn-soft transition-colors"
         >
           <Flag size={13} strokeWidth={2.2} />
         </button>
@@ -492,7 +492,7 @@ function ExpandedPanel({ a }: { a: StudentAnswer }) {
     <div className="px-4 sm:px-5 pb-5 pt-1 grid gap-4 md:grid-cols-2 border-t border-border bg-surface">
       <div className="pt-4">
         <div className="label-caps text-ink-3 mb-2">The answer</div>
-        <p className="text-[13.5px] leading-relaxed text-ink-2 bg-surface-2 rounded-[8px] px-3.5 py-3">
+        <p className="text-[13.5px] leading-relaxed text-ink-2 bg-surface-2 rounded-[12px] px-3.5 py-3">
           {a.answer}
         </p>
         {a.errorSignature ? (
@@ -512,7 +512,7 @@ function ExpandedPanel({ a }: { a: StudentAnswer }) {
               <li
                 key={c.id}
                 className={cn(
-                  "flex items-center gap-2.5 text-[13px] rounded-[6px] px-2.5 py-1.5 border",
+                  "flex items-center gap-2.5 text-[13px] rounded-[10px] px-2.5 py-1.5 border",
                   met
                     ? "border-ok-line bg-ok-soft text-ink"
                     : "border-border bg-surface-2 text-ink-3",
@@ -520,7 +520,7 @@ function ExpandedPanel({ a }: { a: StudentAnswer }) {
               >
                 <span
                   className={cn(
-                    "grid place-items-center w-4 h-4 rounded-[3px] shrink-0 border",
+                    "grid place-items-center w-4 h-4 rounded-[5px] shrink-0 border",
                     met ? "bg-ok border-ok text-white" : "border-border-strong",
                   )}
                   aria-hidden

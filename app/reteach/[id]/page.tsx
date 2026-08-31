@@ -238,14 +238,14 @@ export default function ReteachPackPage() {
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 sm:pl-10">
-                  <div className="rounded-[8px] border border-crit-line bg-crit-soft px-4 py-3">
+                  <div className="rounded-[12px] border border-crit-line bg-crit-soft px-4 py-3">
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <CircleX size={14} strokeWidth={2.2} className="text-crit" aria-hidden />
                       <span className="label-caps text-crit">Still holds the belief</span>
                     </div>
                     <p className="text-[13px] text-ink-2 leading-relaxed">{d.holderAnswers}</p>
                   </div>
-                  <div className="rounded-[8px] border border-ok-line bg-ok-soft px-4 py-3">
+                  <div className="rounded-[12px] border border-ok-line bg-ok-soft px-4 py-3">
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <CircleCheck size={14} strokeWidth={2.2} className="text-ok" aria-hidden />
                       <span className="label-caps text-ok">Has corrected it</span>
