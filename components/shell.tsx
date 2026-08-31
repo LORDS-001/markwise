@@ -16,9 +16,11 @@ import {
   Network,
   Settings,
   Table2,
+  User,
   Waves,
   X,
 } from "lucide-react";
+import { useAuth } from "@/components/auth-provider";
 import { useSession } from "@/components/session-provider";
 import { MarkwiseMark } from "@/components/logo";
 import { SESSION, TOTAL_ANSWERS } from "@/lib/mock";
@@ -245,14 +247,41 @@ function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
           Demo class
         </Badge>
 
-        <span
-          className="grid place-items-center w-8 h-8 rounded-full bg-surface-3 text-ink-2 text-[12px] font-semibold border border-border"
-          title="Dr. A. Daniel"
-        >
-          AD
-        </span>
+        <AccountChip />
       </div>
     </header>
+  );
+}
+
+/** Shows whether this session is anonymous or attached to an email. The dot
+ *  is a status, not a nag — the ask itself lives on the export screen. */
+function AccountChip() {
+  const { status, email } = useAuth();
+  const saved = status === "linked" && !!email;
+  const initials = saved ? email!.slice(0, 2).toUpperCase() : null;
+
+  return (
+    <span
+      className="relative grid place-items-center w-8 h-8 rounded-full bg-surface-2 border border-border text-ink-2 text-[11px] font-bold"
+      title={
+        saved
+          ? `Saved to ${email}`
+          : status === "demo"
+            ? "Demo session — kept in this browser only"
+            : "Anonymous session — add an email at export to keep it"
+      }
+    >
+      {initials ?? <User size={15} strokeWidth={2} aria-hidden />}
+      {!saved && status !== "loading" ? (
+        <span
+          className="absolute -right-0.5 -top-0.5 w-2.5 h-2.5 rounded-full bg-warn border-2 border-surface"
+          aria-hidden
+        />
+      ) : null}
+      <span className="sr-only">
+        {saved ? `Signed in as ${email}` : "Anonymous session"}
+      </span>
+    </span>
   );
 }
 

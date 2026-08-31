@@ -22,6 +22,7 @@ import {
   buttonClass,
   cn,
 } from "@/components/ui";
+import { AccountLink } from "@/components/account-link";
 import { useSession } from "@/components/session-provider";
 import { SESSION, TOTAL_ANSWERS } from "@/lib/mock";
 import {
@@ -167,7 +168,7 @@ export default function ExportPage() {
               }
             />
             <div className="px-5 py-4 flex flex-col gap-3">
-              <label htmlFor="lecturer" className="text-[13.5px] font-semibold">
+              <label htmlFor="lecturer" className="text-[13px] font-bold">
                 Confirmed by
               </label>
               <Input
@@ -177,6 +178,8 @@ export default function ExportPage() {
                 disabled={confirmed}
                 placeholder="Your name as it should appear"
               />
+
+              <AccountLink />
 
               {confirmed ? (
                 <>

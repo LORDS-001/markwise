@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/components/auth-provider";
 import { SessionProvider } from "@/components/session-provider";
 import { AppShell } from "@/components/shell";
 
@@ -47,11 +48,13 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        <SessionProvider>
-          <AppShell>
-            <div id="main">{children}</div>
-          </AppShell>
-        </SessionProvider>
+        <AuthProvider>
+          <SessionProvider>
+            <AppShell>
+              <div id="main">{children}</div>
+            </AppShell>
+          </SessionProvider>
+        </AuthProvider>
       </body>
     </html>
   );
