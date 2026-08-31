@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { useSession } from "@/components/session-provider";
+import { MarkwiseMark } from "@/components/logo";
 import { SESSION, TOTAL_ANSWERS } from "@/lib/mock";
 import { Badge, cn } from "@/components/ui";
 
@@ -90,14 +91,9 @@ function RailContent({ onNavigate }: { onNavigate?: () => void }) {
         onClick={onNavigate}
         className="flex items-center gap-2.5 px-4 h-16 shrink-0 border-b border-border"
       >
-        <span
-          className="grid place-items-center w-8 h-8 rounded-[8px] bg-brand text-on-brand font-display text-[17px] font-semibold shrink-0"
-          aria-hidden
-        >
-          M
-        </span>
+        <MarkwiseMark className="h-8 w-auto shrink-0" title="Markwise" />
         <span className="min-w-0">
-          <span className="block font-display text-[16px] font-semibold leading-tight">
+          <span className="block text-[17px] font-semibold tracking-[-0.02em] leading-tight">
             Markwise
           </span>
           <span className="block text-[11.5px] text-ink-3 leading-tight truncate">

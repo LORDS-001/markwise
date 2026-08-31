@@ -2,96 +2,107 @@
 
 /* ============================================================
    Markwise design tokens
-   Calm, low-fatigue palette for long marking sessions.
-   Neutrals carry a slight green bias toward the teal brand.
+
+   Derived from the brand mark: its navy carries the text, its cyan
+   the accent. `--brand` is a darkened sibling of the logo cyan so
+   button and link text clears 4.5:1 — the bright logo cyan is kept
+   for graphics, where only 3:1 applies.
    ============================================================ */
 
 :root {
+  /* brand mark — fixed, not theme-following */
+  --logo-navy: #0f1e3d;
+  --logo-cyan: #17a3ba;
+
   /* surfaces */
-  --ground: #f4f6f3;
+  --ground: #f3f5f7;
   --surface: #ffffff;
-  --surface-2: #edf0eb;
-  --surface-3: #e2e7df;
-  --border: #dce1d9;
-  --border-strong: #c2cabf;
+  --surface-2: #eceff3;
+  --surface-3: #dfe4ea;
+  --border: #dde2e9;
+  --border-strong: #c0c8d3;
 
   /* text */
-  --ink: #13181a;
-  --ink-2: #555e62;
-  --ink-3: #838c92;
+  --ink: #0f1e3d;
+  --ink-2: #4e5a6e;
+  --ink-3: #808c9d;
 
   /* brand */
-  --brand: #0e6e63;
-  --brand-hover: #0a574e;
-  --brand-soft: #ddede9;
-  --brand-line: #a8d2ca;
+  --brand: #0e7e92;
+  --brand-hover: #0a6274;
+  --brand-soft: #e0f1f4;
+  --brand-line: #a5d5de;
   --on-brand: #ffffff;
 
   /* semantic */
   --warn: #a66300;
   --warn-soft: #faeeda;
   --warn-line: #e7c68c;
-  --crit: #af2330;
-  --crit-soft: #f9e4e6;
-  --crit-line: #e9adb3;
-  --ok: #3a7648;
-  --ok-soft: #e3efe3;
-  --ok-line: #a9cbad;
+  --crit: #b0243a;
+  --crit-soft: #fae4e8;
+  --crit-line: #e9aeb8;
+  --ok: #2e7d4f;
+  --ok-soft: #e2f0e8;
+  --ok-line: #a6cfb7;
 
   /* cluster categorical ramp */
-  --c1: #0e6e63;
-  --c2: #3f5c9e;
-  --c3: #a65b22;
-  --c4: #7a4a8c;
-  --c5: #5c7a2b;
-  --c6: #9c3a55;
-  --c0: #8a938f;
+  --c1: #0e8ca3;
+  --c2: #3a5ba8;
+  --c3: #b0621f;
+  --c4: #7b4a93;
+  --c5: #4f7a34;
+  --c6: #a8324f;
+  --c0: #7e8a9b;
 
-  --shadow-sm: 0 1px 2px rgb(19 24 26 / 0.05);
-  --shadow-md: 0 1px 2px rgb(19 24 26 / 0.04), 0 6px 16px rgb(19 24 26 / 0.06);
-  --shadow-lg: 0 2px 4px rgb(19 24 26 / 0.05), 0 12px 32px rgb(19 24 26 / 0.1);
+  --shadow-sm: 0 1px 2px rgb(15 30 61 / 0.05);
+  --shadow-md: 0 1px 2px rgb(15 30 61 / 0.04), 0 6px 16px rgb(15 30 61 / 0.07);
+  --shadow-lg: 0 2px 4px rgb(15 30 61 / 0.05), 0 12px 32px rgb(15 30 61 / 0.11);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ground: #101413;
-    --surface: #171c1b;
-    --surface-2: #1e2423;
-    --surface-3: #27302e;
-    --border: #2c3533;
-    --border-strong: #3d4744;
+    /* the mark's navy inverts so it stays visible on a dark ground */
+    --logo-navy: #e4e9f0;
+    --logo-cyan: #35b8ce;
 
-    --ink: #e5eae7;
-    --ink-2: #a3ada9;
-    --ink-3: #7b8783;
+    --ground: #0c1220;
+    --surface: #131a29;
+    --surface-2: #1a2333;
+    --surface-3: #242f44;
+    --border: #283346;
+    --border-strong: #3a465c;
 
-    --brand: #4bafa1;
-    --brand-hover: #63c0b2;
-    --brand-soft: #13312d;
-    --brand-line: #1e4a44;
-    --on-brand: #06211e;
+    --ink: #e4e9f0;
+    --ink-2: #a3aec0;
+    --ink-3: #7a8699;
+
+    --brand: #35b8ce;
+    --brand-hover: #58cadd;
+    --brand-soft: #0e2e38;
+    --brand-line: #1c4a58;
+    --on-brand: #04212a;
 
     --warn: #d9a054;
     --warn-soft: #2e2519;
     --warn-line: #4a3b21;
     --crit: #e4737e;
-    --crit-soft: #331d20;
+    --crit-soft: #331d22;
     --crit-line: #55292f;
     --ok: #6fb47d;
-    --ok-soft: #1a2b1d;
-    --ok-line: #2c452f;
+    --ok-soft: #16291d;
+    --ok-line: #2a452f;
 
-    --c1: #4bafa1;
-    --c2: #8098d8;
+    --c1: #35b8ce;
+    --c2: #7e9ae0;
     --c3: #d89a5f;
-    --c4: #b48cc4;
-    --c5: #9dbe63;
-    --c6: #de8298;
-    --c0: #98a29e;
+    --c4: #b78ecc;
+    --c5: #93c06b;
+    --c6: #de7f96;
+    --c0: #909bac;
 
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-md: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 16px rgb(0 0 0 / 0.3);
-    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.45);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.45);
+    --shadow-md: 0 1px 2px rgb(0 0 0 / 0.45), 0 6px 16px rgb(0 0 0 / 0.35);
+    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.45), 0 12px 32px rgb(0 0 0 / 0.5);
   }
 }
 
