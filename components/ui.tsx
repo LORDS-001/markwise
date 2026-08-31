@@ -1,0 +1,324 @@
+import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes } from "react";
+
+export function cn(...parts: (string | false | null | undefined)[]) {
+  return parts.filter(Boolean).join(" ");
+}
+
+/** Categorical colour for a cluster, driven by the token ramp. */
+export function toneColor(tone: number) {
+  return `var(--c${tone})`;
+}
+
+/* ---------------------------------- Button --------------------------------- */
+
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "quiet";
+type Size = "sm" | "md" | "lg";
+
+const VARIANTS: Record<Variant, string> = {
+  primary:
+    "bg-brand text-on-brand hover:bg-brand-hover border border-transparent shadow-[var(--shadow-sm)]",
+  secondary:
+    "bg-surface text-ink border border-border-strong hover:bg-surface-2",
+  ghost: "bg-transparent text-ink-2 border border-transparent hover:bg-surface-2 hover:text-ink",
+  danger: "bg-crit-soft text-crit border border-crit-line hover:bg-crit hover:text-white",
+  quiet: "bg-surface-2 text-ink border border-transparent hover:bg-surface-3",
+};
+
+const SIZES: Record<Size, string> = {
+  sm: "h-8 px-3 text-[13px] gap-1.5 rounded-[6px]",
+  md: "h-10 px-4 text-sm gap-2 rounded-[6px]",
+  lg: "h-11 px-5 text-[15px] gap-2 rounded-[8px]",
+};
+
+export function buttonClass(variant: Variant = "primary", size: Size = "md", extra?: string) {
+  return cn(
+    "inline-flex items-center justify-center font-medium transition-colors select-none",
+    "disabled:opacity-45 disabled:pointer-events-none whitespace-nowrap",
+    VARIANTS[variant],
+    SIZES[size],
+    extra,
+  );
+}
+
+export function Button({
+  variant = "primary",
+  size = "md",
+  className,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }) {
+  return <button className={buttonClass(variant, size, className)} {...props} />;
+}
+
+/* ----------------------------------- Card ---------------------------------- */
+
+export function Card({
+  className,
+  children,
+  ...rest
+}: { className?: string; children: ReactNode } & React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn(
+        "bg-surface border border-border rounded-[10px] shadow-[var(--shadow-sm)]",
+        className,
+      )}
+      {...rest}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function CardHead({
+  title,
+  hint,
+  action,
+  className,
+}: {
+  title: ReactNode;
+  hint?: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-start justify-between gap-4 px-5 py-4 border-b border-border",
+        className,
+      )}
+    >
+      <div className="min-w-0">
+        <h2 className="font-display text-[17px] font-semibold leading-tight">{title}</h2>
+        {hint ? <p className="text-[13px] text-ink-2 mt-0.5">{hint}</p> : null}
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </div>
+  );
+}
+
+/* ---------------------------------- Badge ---------------------------------- */
+
+type Tone = "neutral" | "brand" | "warn" | "crit" | "ok";
+
+const TONES: Record<Tone, string> = {
+  neutral: "bg-surface-2 text-ink-2 border-border",
+  brand: "bg-brand-soft text-brand border-brand-line",
+  warn: "bg-warn-soft text-warn border-warn-line",
+  crit: "bg-crit-soft text-crit border-crit-line",
+  ok: "bg-ok-soft text-ok border-ok-line",
+};
+
+export function Badge({
+  tone = "neutral",
+  children,
+  className,
+}: {
+  tone?: Tone;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 border rounded-[4px] px-1.5 py-0.5 text-[11.5px] font-medium leading-[1.4] whitespace-nowrap",
+        TONES[tone],
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/* --------------------------------- Stat tile -------------------------------- */
+
+export function Stat({
+  label,
+  value,
+  sub,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  icon?: ReactNode;
+  tone?: "brand" | "warn" | "plain";
+}) {
+  return (
+    <div className="bg-surface border border-border rounded-[10px] px-4 py-3 min-w-0">
+      <div className="flex items-center gap-1.5 text-ink-3">
+        {icon}
+        <span className="label-caps">{label}</span>
+      </div>
+      <div
+        className={cn(
+          "font-display text-[24px] font-semibold leading-tight mt-1 tnum truncate",
+          tone === "brand" && "text-brand",
+          tone === "warn" && "text-warn",
+        )}
+      >
+        {value}
+      </div>
+      {sub ? <div className="text-[12.5px] text-ink-2 mt-0.5 truncate">{sub}</div> : null}
+    </div>
+  );
+}
+
+/* --------------------------------- Progress -------------------------------- */
+
+export function Progress({
+  value,
+  tone = "brand",
+  className,
+}: {
+  value: number;
+  tone?: "brand" | "ok" | "warn";
+  className?: string;
+}) {
+  const pct = Math.max(0, Math.min(100, value));
+  const bg = tone === "ok" ? "bg-ok" : tone === "warn" ? "bg-warn" : "bg-brand";
+  return (
+    <div
+      className={cn("h-1.5 w-full rounded-full bg-surface-3 overflow-hidden", className)}
+      role="progressbar"
+      aria-valuenow={Math.round(pct)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <div className={cn("h-full transition-[width] duration-300", bg)} style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+/* -------------------------------- Segmented -------------------------------- */
+
+export function Segmented<T extends string>({
+  value,
+  onChange,
+  options,
+  label,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+  label?: string;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="inline-flex bg-surface-2 border border-border rounded-[7px] p-0.5 gap-0.5"
+    >
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={o.value}
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "px-3 h-7 text-[13px] font-medium rounded-[5px] transition-colors",
+              active
+                ? "bg-surface text-ink shadow-[var(--shadow-sm)]"
+                : "text-ink-2 hover:text-ink",
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------------------------------- Fields --------------------------------- */
+
+export function Field({
+  label,
+  hint,
+  required,
+  htmlFor,
+  children,
+  counter,
+}: {
+  label: string;
+  hint?: ReactNode;
+  required?: boolean;
+  htmlFor?: string;
+  children: ReactNode;
+  counter?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <label htmlFor={htmlFor} className="text-[13.5px] font-semibold text-ink">
+          {label}
+          {required ? <span className="text-crit ml-1" aria-hidden>*</span> : null}
+        </label>
+        {counter ? <span className="text-[12px] text-ink-3 tnum">{counter}</span> : null}
+      </div>
+      {hint ? <p className="text-[13px] text-ink-2 -mt-0.5">{hint}</p> : null}
+      {children}
+    </div>
+  );
+}
+
+const inputBase =
+  "w-full bg-surface border border-border-strong rounded-[6px] px-3 py-2 text-[14.5px] text-ink " +
+  "placeholder:text-ink-3 transition-colors hover:border-ink-3 focus:border-brand focus:outline-none " +
+  "focus:ring-2 focus:ring-[var(--brand-line)]";
+
+export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  return <input className={cn(inputBase, className)} {...props} />;
+}
+
+export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea className={cn(inputBase, "leading-relaxed resize-y", className)} {...props} />;
+}
+
+/* --------------------------------- Sundries -------------------------------- */
+
+export function Divider({ className }: { className?: string }) {
+  return <div className={cn("h-px bg-border", className)} />;
+}
+
+export function EmptyState({
+  icon,
+  title,
+  body,
+  action,
+}: {
+  icon?: ReactNode;
+  title: string;
+  body?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center text-center gap-2 py-12 px-6">
+      {icon ? <div className="text-ink-3">{icon}</div> : null}
+      <h3 className="font-display text-[17px] font-semibold">{title}</h3>
+      {body ? <p className="text-[13.5px] text-ink-2 max-w-[46ch]">{body}</p> : null}
+      {action ? <div className="pt-2">{action}</div> : null}
+    </div>
+  );
+}
+
+export function ConfidenceMeter({ value }: { value: number }) {
+  const pct = Math.round(value * 100);
+  const low = value < 0.7;
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className="w-12 h-1.5 rounded-full bg-surface-3 overflow-hidden shrink-0">
+        <span
+          className={cn("block h-full", low ? "bg-warn" : "bg-brand")}
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+      <span className={cn("tnum text-[12.5px]", low ? "text-warn font-semibold" : "text-ink-2")}>
+        {pct}%
+      </span>
+    </span>
+  );
+}

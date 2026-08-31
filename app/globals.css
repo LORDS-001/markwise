@@ -1,0 +1,222 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Markwise design tokens
+   Calm, low-fatigue palette for long marking sessions.
+   Neutrals carry a slight green bias toward the teal brand.
+   ============================================================ */
+
+:root {
+  /* surfaces */
+  --ground: #f4f6f3;
+  --surface: #ffffff;
+  --surface-2: #edf0eb;
+  --surface-3: #e2e7df;
+  --border: #dce1d9;
+  --border-strong: #c2cabf;
+
+  /* text */
+  --ink: #13181a;
+  --ink-2: #555e62;
+  --ink-3: #838c92;
+
+  /* brand */
+  --brand: #0e6e63;
+  --brand-hover: #0a574e;
+  --brand-soft: #ddede9;
+  --brand-line: #a8d2ca;
+  --on-brand: #ffffff;
+
+  /* semantic */
+  --warn: #a66300;
+  --warn-soft: #faeeda;
+  --warn-line: #e7c68c;
+  --crit: #af2330;
+  --crit-soft: #f9e4e6;
+  --crit-line: #e9adb3;
+  --ok: #3a7648;
+  --ok-soft: #e3efe3;
+  --ok-line: #a9cbad;
+
+  /* cluster categorical ramp */
+  --c1: #0e6e63;
+  --c2: #3f5c9e;
+  --c3: #a65b22;
+  --c4: #7a4a8c;
+  --c5: #5c7a2b;
+  --c6: #9c3a55;
+  --c0: #8a938f;
+
+  --shadow-sm: 0 1px 2px rgb(19 24 26 / 0.05);
+  --shadow-md: 0 1px 2px rgb(19 24 26 / 0.04), 0 6px 16px rgb(19 24 26 / 0.06);
+  --shadow-lg: 0 2px 4px rgb(19 24 26 / 0.05), 0 12px 32px rgb(19 24 26 / 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #101413;
+    --surface: #171c1b;
+    --surface-2: #1e2423;
+    --surface-3: #27302e;
+    --border: #2c3533;
+    --border-strong: #3d4744;
+
+    --ink: #e5eae7;
+    --ink-2: #a3ada9;
+    --ink-3: #7b8783;
+
+    --brand: #4bafa1;
+    --brand-hover: #63c0b2;
+    --brand-soft: #13312d;
+    --brand-line: #1e4a44;
+    --on-brand: #06211e;
+
+    --warn: #d9a054;
+    --warn-soft: #2e2519;
+    --warn-line: #4a3b21;
+    --crit: #e4737e;
+    --crit-soft: #331d20;
+    --crit-line: #55292f;
+    --ok: #6fb47d;
+    --ok-soft: #1a2b1d;
+    --ok-line: #2c452f;
+
+    --c1: #4bafa1;
+    --c2: #8098d8;
+    --c3: #d89a5f;
+    --c4: #b48cc4;
+    --c5: #9dbe63;
+    --c6: #de8298;
+    --c0: #98a29e;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 1px 2px rgb(0 0 0 / 0.4), 0 6px 16px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.45);
+  }
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-line: var(--brand-line);
+  --color-on-brand: var(--on-brand);
+
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-line: var(--warn-line);
+  --color-crit: var(--crit);
+  --color-crit-soft: var(--crit-soft);
+  --color-crit-line: var(--crit-line);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-ok-line: var(--ok-line);
+
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-source-serif), Georgia, "Times New Roman", serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  --shadow-card: var(--shadow-sm);
+  --shadow-raised: var(--shadow-md);
+  --shadow-float: var(--shadow-lg);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  /* One visible focus treatment everywhere. */
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  ::selection {
+    background: var(--brand-soft);
+    color: var(--ink);
+  }
+
+  /* Consistent, unobtrusive scrollbars in the dense panels. */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 8px;
+  }
+  .scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-source-serif), Georgia, serif;
+    letter-spacing: -0.012em;
+  }
+
+  .label-caps {
+    font-family: var(--font-plex-mono), ui-monospace, monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
