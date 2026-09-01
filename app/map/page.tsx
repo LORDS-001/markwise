@@ -267,7 +267,7 @@ export default function MapPage() {
         <Card className="overflow-hidden">
           <div className="px-5 sm:px-6 py-3.5 border-b border-border flex items-center justify-between gap-3">
             <span className="label-caps text-ink-3">
-              Supporting map · area ∝ students affected · ranked by {sortMode}
+              Supporting map · bubble size indicates students affected · ranked by {sortMode}
             </span>
             <span className="text-[12.5px] text-ink-3 hidden sm:block">
               Select a bubble to open it
