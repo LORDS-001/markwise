@@ -11,8 +11,8 @@ export function toneColor(tone: number) {
 
 /* ---------------------------------- Button --------------------------------- */
 
-type Variant = "primary" | "secondary" | "ghost" | "danger" | "quiet";
-type Size = "sm" | "md" | "lg";
+export type Variant = "primary" | "secondary" | "ghost" | "danger" | "quiet";
+export type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
   primary: "bg-primary text-on-primary hover:bg-primary-hover border border-transparent",
@@ -23,9 +23,9 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const SIZES: Record<Size, string> = {
-  sm: "h-8 px-3.5 text-[13px] gap-1.5 rounded-full",
-  md: "h-9.5 px-4.5 text-[13.5px] gap-2 rounded-full",
-  lg: "h-11 px-6 text-[14.5px] gap-2 rounded-full",
+  sm: "h-8 px-3.5 text-[13px] gap-1.5 rounded-[10px]",
+  md: "h-9 px-4.5 text-[13.5px] gap-2 rounded-[10px]",
+  lg: "h-10 px-6 text-[14.5px] gap-2 rounded-[10px]",
 };
 
 export function buttonClass(variant: Variant = "primary", size: Size = "md", extra?: string) {
@@ -44,7 +44,14 @@ export function Button({
   className,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }) {
-  return <button className={buttonClass(variant, size, className)} {...props} />;
+  return (
+    <button
+      data-variant={variant}
+      data-size={size}
+      className={buttonClass(variant, size, className)}
+      {...props}
+    />
+  );
 }
 
 /* ----------------------------------- Card ---------------------------------- */
@@ -81,7 +88,7 @@ export function CardHead({
   return (
     <div
       className={cn(
-        "flex items-start justify-between gap-4 px-6 py-4.5 border-b border-border",
+        "flex items-start justify-between gap-4 px-5 py-4 border-b border-border",
         className,
       )}
     >
@@ -144,14 +151,14 @@ export function Stat({
   tone?: "brand" | "warn" | "plain";
 }) {
   return (
-    <div className="bg-surface border border-border rounded-[var(--r-card)] px-5 py-4 min-w-0">
+    <div className="bg-surface border border-border rounded-[var(--r-card)] px-4 py-3.5 min-w-0">
       <div className="flex items-center gap-1.5 text-ink-3">
         {icon}
         <span className="label-caps">{label}</span>
       </div>
       <div
         className={cn(
-          "font-display text-[26px] font-extrabold leading-tight mt-1.5 tnum truncate",
+          "font-display text-[24px] font-extrabold leading-tight mt-1.5 tnum truncate",
           tone === "brand" && "text-brand",
           tone === "warn" && "text-warn",
         )}
@@ -307,8 +314,8 @@ export function ConfidenceMeter({ value }: { value: number }) {
   const pct = Math.round(value * 100);
   const low = value < 0.7;
   return (
-    <span className="inline-flex items-center gap-2">
-      <span className="w-12 h-1.5 rounded-full bg-surface-3 overflow-hidden shrink-0">
+    <span className="inline-flex items-center gap-2" aria-label={"Confidence " + pct + "%"}>
+      <span className="w-12 h-1.5 rounded-full bg-surface-3 overflow-hidden shrink-0" aria-hidden>
         <span
           className={cn("block h-full", low ? "bg-warn" : "bg-brand")}
           style={{ width: `${pct}%` }}
