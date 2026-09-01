@@ -24,3 +24,17 @@ it("presents one truthful primary action and optional advanced guidance", () => 
   expect(screen.getByText("Advanced marking guidance")).toBeVisible();
   expect(container.querySelectorAll('button[data-variant="primary"]')).toHaveLength(1);
 });
+
+it("keeps criterion descriptions shrinkable beside marks and remove controls", () => {
+  render(
+    <SessionProvider>
+      <SetupPage />
+    </SessionProvider>,
+  );
+
+  for (const description of screen.getAllByRole("textbox", {
+    name: /Criterion \d+ description/,
+  })) {
+    expect(description).toHaveClass("min-w-0", "flex-1");
+  }
+});

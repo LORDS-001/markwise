@@ -277,6 +277,7 @@ export default function SetupPage() {
                     aria-label={`Criterion ${i + 1} description`}
                     value={c.label}
                     placeholder="e.g. Impedance combined in quadrature"
+                    className="min-w-0 flex-1"
                     onChange={(e) =>
                       setCriteria((prev) =>
                         prev.map((x) => (x.id === c.id ? { ...x, label: e.target.value } : x)),
