@@ -14,6 +14,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { Disclosure } from "@/components/disclosure";
 import { Page } from "@/components/shell";
 import {
   Badge,
@@ -123,7 +124,7 @@ export default function SetupPage() {
     <Page
       eyebrow="Step 1 of 7"
       title="Set up this marking session"
-      lead="Markwise reads every answer against your scheme to find the belief behind each mistake. The question and the scheme are mandatory — extraction quality depends entirely on them."
+      lead="Add the assessment context, marking scheme, and student responses. Required fields are marked."
       actions={
         <>
           <Button variant="ghost" size="sm" onClick={clearAll}>
@@ -139,32 +140,34 @@ export default function SetupPage() {
       aside={
         <>
           <Card>
-            <CardHead title="Ready to run" hint="What the pipeline will receive" />
-            <dl className="px-5 py-4 flex flex-col gap-3 text-[13.5px]">
-              <Row label="Answers detected" value={answerCount ? `${answerCount}` : "—"} ok={answerCount > 1} />
-              <Row label="Marking criteria" value={`${criteria.length}`} ok={criteria.length > 0} />
-              <Row label="Marks available" value={`${maxScore}`} ok={maxScore > 0} />
-              <Row
-                label="Prediction"
-                value={prediction.trim() ? "Entered" : "Skipped"}
-                ok={prediction.trim().length > 0}
-                muted={!prediction.trim()}
-              />
-            </dl>
-            <div className="px-5 pb-5">
-              <Button className="w-full" size="lg" disabled={!ready} onClick={run}>
-                <Sparkles size={17} strokeWidth={1.9} aria-hidden />
-                Run the pipeline
-              </Button>
-              {!ready ? (
-                <p className="text-[12.5px] text-ink-3 mt-2 text-center">
-                  Add a question, a marking scheme, and at least two answers.
-                </p>
-              ) : (
-                <p className="text-[12.5px] text-ink-3 mt-2 text-center tnum">
-                  ~{Math.max(35, Math.round(answerCount * 1.7))}s for {answerCount} answers
-                </p>
-              )}
+            <CardHead title="Ready to preview" hint="Check the required inputs." />
+            <div className="flex flex-col gap-5 px-5 py-5">
+              <dl className="flex flex-col gap-3 text-[13.5px]">
+                <Row label="Answers detected" value={answerCount ? `${answerCount}` : "—"} ok={answerCount > 1} />
+                <Row label="Marking criteria" value={`${criteria.length}`} ok={criteria.length > 0} />
+                <Row label="Marks available" value={`${maxScore}`} ok={maxScore > 0} />
+                <Row
+                  label="Prediction"
+                  value={prediction.trim() ? "Entered" : "Skipped"}
+                  ok={prediction.trim().length > 0}
+                  muted={!prediction.trim()}
+                />
+              </dl>
+              <div>
+                <Button className="w-full" size="lg" disabled={!ready} onClick={run}>
+                  <Sparkles size={17} strokeWidth={1.9} aria-hidden />
+                  Preview sample analysis
+                </Button>
+                {!ready ? (
+                  <p className="mt-2 text-center text-[12px] leading-snug text-ink-3">
+                    Add a question, a marking scheme, and at least two answers.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-center text-[12px] leading-snug text-ink-3">
+                    This prototype opens sample results. Nothing is submitted.
+                  </p>
+                )}
+              </div>
             </div>
           </Card>
 
@@ -174,8 +177,8 @@ export default function SetupPage() {
               <div className="text-[13px] text-ink">
                 <p className="font-semibold mb-1">This demo class is pseudonymised</p>
                 <p className="text-ink-2">
-                  40 real answers collected from volunteers at OAU with consent. Names are
-                  replaced with initials and student numbers are invented.
+                  This sample uses 40 pseudonymised volunteer answers. Names are replaced with
+                  initials and student numbers are invented.
                 </p>
               </div>
             </div>
@@ -183,13 +186,39 @@ export default function SetupPage() {
         </>
       }
     >
+      {/* --- Assessment context ---------------------------------------- */}
+      <Card>
+        <CardHead
+          title="Assessment context"
+          hint="Set the subject and level for this marking session."
+        />
+        <div className="grid gap-5 px-5 py-5 sm:grid-cols-2">
+          <Field label="Subject" required htmlFor="subject" hint="Used to judge which later topics a belief will break.">
+            <Input
+              id="subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Electrical Engineering — AC circuit analysis"
+            />
+          </Field>
+          <Field label="Level" required htmlFor="level" hint="Sets the expected depth of the answer.">
+            <Input
+              id="level"
+              value={level}
+              onChange={(e) => setLevel(e.target.value)}
+              placeholder="300 level (Year 3)"
+            />
+          </Field>
+        </div>
+      </Card>
+
       {/* --- Question ------------------------------------------------- */}
       <Card>
         <CardHead
           title="The question"
           hint="One question per session. Paste it exactly as the students saw it."
         />
-        <div className="px-5 py-5 flex flex-col gap-5">
+        <div className="px-5 py-5">
           <Field label="Question text" required htmlFor="question">
             <Textarea
               id="question"
@@ -199,25 +228,6 @@ export default function SetupPage() {
               placeholder="A series RL circuit with R = 30 Ω and L = 0.10 H is connected across a 240 V, 50 Hz supply…"
             />
           </Field>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Subject" required htmlFor="subject" hint="Used to judge which later topics a belief will break.">
-              <Input
-                id="subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="Electrical Engineering — AC circuit analysis"
-              />
-            </Field>
-            <Field label="Level" required htmlFor="level" hint="Sets the expected depth of the answer.">
-              <Input
-                id="level"
-                value={level}
-                onChange={(e) => setLevel(e.target.value)}
-                placeholder="300 level (Year 3)"
-              />
-            </Field>
-          </div>
         </div>
       </Card>
 
@@ -301,6 +311,16 @@ export default function SetupPage() {
                 </li>
               ))}
             </ul>
+
+            <Disclosure
+              title="Advanced marking guidance"
+              description="How criteria and scheme detail affect the preview"
+            >
+              <p>
+                Use one criterion for each independently awarded mark. Include accepted
+                alternatives, required units, and method marks in the marking scheme.
+              </p>
+            </Disclosure>
           </div>
         </div>
       </Card>
@@ -425,7 +445,7 @@ export default function SetupPage() {
 
       {/* --- Prediction ------------------------------------------------ */}
       <Card className="border-brand-line bg-brand-soft/40">
-        <div className="px-5 sm:px-6 py-6 flex flex-col gap-3">
+        <div className="flex flex-col gap-3 px-5 py-5">
           <div className="flex items-center gap-2">
             <span className="label-caps text-brand">Before you run it</span>
             <Badge tone="brand">Optional</Badge>
@@ -450,15 +470,6 @@ export default function SetupPage() {
         </div>
       </Card>
 
-      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pb-2">
-        <p className="text-[13px] text-ink-3">
-          Nothing is submitted anywhere. Scores stay provisional until you confirm them.
-        </p>
-        <Button size="lg" disabled={!ready} onClick={run} className="w-full sm:w-auto">
-          <Sparkles size={17} strokeWidth={1.9} aria-hidden />
-          Run the pipeline
-        </Button>
-      </div>
     </Page>
   );
 }
