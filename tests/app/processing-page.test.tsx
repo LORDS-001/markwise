@@ -67,6 +67,40 @@ it("completes the existing preview lifecycle and keeps the reveal destination", 
   expect(screen.getByTestId("processed-state")).toHaveTextContent("processed");
 });
 
+it("announces the next stage at an exact stage boundary", async () => {
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    frames.push(callback);
+    return frames.length;
+  });
+  vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => undefined);
+  const now = vi.spyOn(performance, "now").mockReturnValue(0);
+
+  render(
+    <SessionProvider>
+      <UnprocessedSession>
+        <ProcessingPage />
+      </UnprocessedSession>
+    </SessionProvider>,
+  );
+
+  expect(
+    await screen.findByText("Starting sample analysis", {
+      selector: '[aria-live="polite"]',
+    }),
+  ).toBeVisible();
+  expect(frames).toHaveLength(1);
+
+  now.mockReturnValue(4_140);
+  act(() => frames[0](4_140));
+
+  expect(
+    screen.getByText("Compare reasoning patterns", {
+      selector: '[aria-live="polite"]',
+    }),
+  ).toBeVisible();
+});
+
 it("shows the completed preview state with the existing reveal destination", () => {
   render(
     <SessionProvider>

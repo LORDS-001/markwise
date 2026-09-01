@@ -94,7 +94,9 @@ export default function ProcessingPage() {
   const answersRead = Math.round((extract.progress / 100) * TOTAL_ANSWERS);
   const clustersFound = stages[2].progress >= 100 ? CLUSTERS.length : 0;
   const labelled = stages[3].progress >= 100 ? CLUSTERS.filter((c) => !c.isOther).length : 0;
-  const currentStage = stages.find((stage) => stage.state === "running");
+  const currentStage =
+    stages.find((stage) => stage.state === "running") ??
+    (pct > 0 ? stages.find((stage) => stage.state === "pending") : undefined);
 
   return (
     <Page
