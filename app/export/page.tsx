@@ -370,7 +370,7 @@ function FormatCard({
             : "border-border bg-surface hover:border-border-strong hover:bg-surface-2",
         )}
       >
-        <div className="flex items-center gap-2.5 mb-1.5">
+        <span className="mb-1.5 flex items-center gap-2.5">
           <span className={cn("shrink-0", active ? "text-brand" : "text-ink-3")}>{icon}</span>
           <span className="font-display text-[18px] font-semibold">{title}</span>
           {active ? (
@@ -378,9 +378,9 @@ function FormatCard({
               <Check size={13} strokeWidth={3} aria-hidden />
             </span>
           ) : null}
-        </div>
-        <div className="label-caps text-ink-3 mb-1.5">{sub}</div>
-        <p className="text-[13px] text-ink-2 leading-relaxed">{body}</p>
+        </span>
+        <span className="label-caps mb-1.5 block text-ink-3">{sub}</span>
+        <span className="block text-[13px] leading-relaxed text-ink-2">{body}</span>
       </label>
     </div>
   );

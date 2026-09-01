@@ -124,6 +124,11 @@ it("uses native radio keyboard behavior and dispatches both formats with reviewe
   expect(docx).toHaveAttribute("type", "radio");
   expect(xlsx).toHaveAttribute("name", "export-format");
   expect(docx).toHaveAttribute("name", "export-format");
+  for (const radio of [xlsx, docx]) {
+    const label = (radio as HTMLInputElement).labels?.item(0);
+    expect(label).not.toBeNull();
+    expect(label?.querySelector("div, p")).toBeNull();
+  }
   expect(xlsx).toBeChecked();
   expect(docx).not.toBeChecked();
 
