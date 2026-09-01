@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!supabase) {
         // Demo mode: accept the address for the provenance line, but there is
         // nowhere to persist it. Say so rather than pretending it saved.
-        setError("Connect Supabase to keep this session across devices.");
+        setError("Account linking is unavailable in this preview.");
         return false;
       }
       setLinking(true);

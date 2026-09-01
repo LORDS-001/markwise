@@ -23,7 +23,11 @@ export function AccountLink() {
 
   if (status === "loading") {
     return (
-      <div className="rounded-[14px] border border-border bg-surface-2 px-4 py-3">
+      <div
+        role="region"
+        aria-label="Account connection"
+        className="rounded-[14px] border border-border bg-surface-2 px-4 py-3"
+      >
         <div className="h-3.5 w-40 rounded-full bg-surface-3" />
       </div>
     );
@@ -31,11 +35,15 @@ export function AccountLink() {
 
   if (status === "linked" && email) {
     return (
-      <div className="flex items-start gap-2.5 rounded-[14px] border border-ok-line bg-ok-soft px-4 py-3">
+      <div
+        role="region"
+        aria-label="Account connection"
+        className="flex items-start gap-2.5 rounded-[14px] border border-ok-line bg-ok-soft px-4 py-3"
+      >
         <Check size={15} strokeWidth={2.4} className="text-ok shrink-0 mt-0.5" aria-hidden />
         <p className="text-[12.5px] text-ink-2">
-          Saved to <span className="font-semibold text-ink">{email}</span>. This batch will be
-          here when you come back.
+          Signed in as <span className="font-semibold text-ink">{email}</span>. Batch results are
+          not synced in this preview.
         </p>
       </div>
     );
@@ -43,7 +51,11 @@ export function AccountLink() {
 
   if (pendingEmail) {
     return (
-      <div className="flex items-start gap-2.5 rounded-[14px] border border-brand-line bg-brand-soft px-4 py-3">
+      <div
+        role="region"
+        aria-label="Account connection"
+        className="flex items-start gap-2.5 rounded-[14px] border border-brand-line bg-brand-soft px-4 py-3"
+      >
         <Mail size={15} strokeWidth={2} className="text-brand shrink-0 mt-0.5" aria-hidden />
         <p className="text-[12.5px] text-ink-2">
           Check <span className="font-semibold text-ink">{pendingEmail}</span> and click the link
@@ -57,17 +69,17 @@ export function AccountLink() {
 
   return (
     <div
+      role="region"
+      aria-label="Account connection"
       className={cn(
         "rounded-[14px] border px-4 py-3.5 flex flex-col gap-2.5",
         demo ? "border-border bg-surface-2" : "border-border bg-surface-2",
       )}
     >
       <div>
-        <p className="text-[12.5px] font-bold text-ink">Keep this batch?</p>
+        <p className="text-[12.5px] font-bold text-ink">Connect an email</p>
         <p className="text-[12.5px] text-ink-2 mt-0.5 leading-snug">
-          {demo
-            ? "Session storage isn't connected in this demo, so this batch lives in the browser only."
-            : "Right now this session lives in this browser. Add an email and it follows you to any device."}
+          Use an email for your Markwise identity. This demo batch remains in this tab.
         </p>
       </div>
 
@@ -94,7 +106,7 @@ export function AccountLink() {
               onClick={() => void linkEmail(draft.trim())}
               className="shrink-0"
             >
-              {linking ? "Sending…" : "Send link"}
+              {linking ? "Sending…" : "Connect email"}
             </Button>
           </div>
           <p className="text-[11.5px] text-ink-3">Optional — export works without it.</p>

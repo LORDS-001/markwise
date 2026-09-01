@@ -154,100 +154,80 @@ export default function ExportPage() {
   return (
     <Page
       eyebrow="Step 7 of 7"
-      title="Export the class"
-      lead="Format, a look at what you're sending, then confirm. Both files carry a provenance line naming you and the date."
-      aside={
-        <>
-          <Card className={cn(confirmed ? "border-ok-line" : "border-brand-line")}>
-            <CardHead
-              title={confirmed ? "Batch confirmed" : "Confirm the batch"}
-              hint={
-                confirmed
-                  ? "You can reopen it until you leave this session"
-                  : "This attaches your name to the provenance line"
-              }
-            />
-            <div className="px-5 py-4 flex flex-col gap-3">
-              <label htmlFor="lecturer" className="text-[13px] font-bold">
-                Confirmed by
-              </label>
-              <Input
-                id="lecturer"
-                value={confirmedBy}
-                onChange={(e) => setConfirmedBy(e.target.value)}
-                disabled={confirmed}
-                placeholder="Your name as it should appear"
-              />
-
-              <AccountLink />
-
-              {confirmed ? (
-                <>
-                  <div className="flex items-center gap-2 text-[13.5px] text-ok font-medium">
-                    <ShieldCheck size={16} strokeWidth={2} aria-hidden />
-                    All {TOTAL_ANSWERS} rows reviewed and confirmed
-                  </div>
-                  <Button size="lg" onClick={runExport} disabled={busy}>
-                    {busy ? "Generating…" : `Download .${format}`}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setConfirmed(false)}>
-                    Reopen for edits
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  size="lg"
-                  onClick={() => setConfirmed(true)}
-                  disabled={!confirmedBy.trim()}
-                >
-                  <Check size={17} strokeWidth={2.2} aria-hidden />
-                  Confirm all {TOTAL_ANSWERS} scores
-                </Button>
-              )}
-
-              {error ? (
-                <p className="text-[13px] text-crit flex items-start gap-1.5" role="alert">
-                  <TriangleAlert size={14} strokeWidth={2} className="shrink-0 mt-0.5" aria-hidden />
-                  {error}
-                </p>
-              ) : null}
-            </div>
-          </Card>
-
-          <Card>
-            <CardHead title="Class summary" hint="Written into both files" />
-            <dl className="px-5 py-4 flex flex-col gap-2.5 text-[13.5px]">
-              <SummaryRow label="Students" value={`${rows.length}`} />
-              <SummaryRow label="Mean" value={`${stats.mean.toFixed(1)} / 10`} />
-              <SummaryRow label="Median" value={`${stats.median}`} />
-              <SummaryRow label="Pass rate" value={`${stats.passRate.toFixed(0)}%`} />
-            </dl>
-            <div className="px-5 pb-4">
-              <div className="label-caps text-ink-3 mb-2">Distribution</div>
-              <div className="flex items-end gap-1.5 h-16">
-                {stats.distribution.map((d) => {
-                  const max = Math.max(1, ...stats.distribution.map((x) => x.count));
-                  return (
-                    <div key={d.band} className="flex-1 flex flex-col items-center gap-1">
-                      <div
-                        className="w-full rounded-t-[3px] bg-brand/70 min-h-[2px]"
-                        style={{ height: `${(d.count / max) * 100}%` }}
-                        title={`${d.band}: ${d.count}`}
-                      />
-                      <span className="text-[10.5px] text-ink-3 tnum">{d.band}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </Card>
-        </>
-      }
+      title="Export reviewed results"
+      lead="Confirm the reviewer, choose a format, and download the reviewed sample."
     >
-      {/* Format */}
+      <Card className="border-ok-line bg-ok-soft">
+        <div className="grid gap-4 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6">
+          <div className="flex min-w-0 items-start gap-3">
+            <ShieldCheck size={19} strokeWidth={2} className="mt-0.5 shrink-0 text-ok" aria-hidden />
+            <div>
+              <h2 className="font-display text-[16px] font-bold">Review complete</h2>
+              <p className="mt-1 text-[13px] text-ink-2">
+                All {TOTAL_ANSWERS} rows have a lecturer-reviewed score and are ready to export.
+              </p>
+            </div>
+          </div>
+          <dl className="grid grid-cols-2 gap-x-5 gap-y-1 text-[12.5px] sm:grid-cols-4">
+            <SummaryRow label="Students" value={`${rows.length}`} />
+            <SummaryRow label="Mean" value={`${stats.mean.toFixed(1)} / 10`} />
+            <SummaryRow label="Median" value={`${stats.median}`} />
+            <SummaryRow label="Pass rate" value={`${stats.passRate.toFixed(0)}%`} />
+          </dl>
+        </div>
+      </Card>
+
+      <Card className={cn(confirmed ? "border-ok-line" : "border-brand-line")}>
+        <CardHead
+          title="Lecturer confirmation"
+          hint="Your name is written into the provenance line in both files"
+          action={confirmed ? <Badge tone="ok">Confirmed</Badge> : null}
+        />
+        <div className="flex flex-col gap-3 px-5 py-4 sm:px-6">
+          <label htmlFor="lecturer" className="text-[13px] font-bold">
+            Confirmed by
+          </label>
+          <Input
+            id="lecturer"
+            value={confirmedBy}
+            onChange={(e) => setConfirmedBy(e.target.value)}
+            disabled={confirmed}
+            placeholder="Your name as it should appear"
+          />
+          <p className="text-[13px] italic text-ink-2">
+            {provenanceLine(confirmedBy.trim() || "[your name]")}
+          </p>
+          {confirmed ? (
+            <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 text-[13.5px] font-medium text-ok">
+                <ShieldCheck size={16} strokeWidth={2} aria-hidden />
+                All {TOTAL_ANSWERS} rows reviewed and confirmed
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setConfirmed(false)}>
+                Reopen for edits
+              </Button>
+            </div>
+          ) : (
+            <Button
+              size="lg"
+              onClick={() => setConfirmed(true)}
+              disabled={!confirmedBy.trim()}
+              className="self-start"
+            >
+              <Check size={17} strokeWidth={2.2} aria-hidden />
+              Confirm reviewer
+            </Button>
+          )}
+        </div>
+      </Card>
+
       <Card>
-        <CardHead title="Format" hint="Pick one — you can come back and export the other" />
-        <div className="px-5 py-5 grid gap-3 sm:grid-cols-2">
+        <CardHead title="Choose a format" hint="You can return and export the other format later" />
+        <div
+          role="radiogroup"
+          aria-label="Export format"
+          className="grid gap-3 px-5 py-5 sm:grid-cols-2"
+        >
           <FormatCard
             active={format === "xlsx"}
             onSelect={() => setFormat("xlsx")}
@@ -267,7 +247,6 @@ export default function ExportPage() {
         </div>
       </Card>
 
-      {/* Preview */}
       <Card className="overflow-hidden">
         <CardHead
           title="Preview"
@@ -278,7 +257,7 @@ export default function ExportPage() {
           <table className="w-full min-w-[760px] text-[13px]">
             <thead>
               <tr className="bg-surface-2 text-ink-3">
-                {["Student ID", "Name", "Score", "%", "Misconception", "Criteria missed", "Status"].map(
+                {["Student ID", "Initials", "Score", "%", "Misconception", "Criteria missed", "Status"].map(
                   (h) => (
                     <th
                       key={h}
@@ -321,21 +300,34 @@ export default function ExportPage() {
         </div>
       </Card>
 
-      {/* Provenance */}
-      <Card className="bg-surface-2 border-border">
-        <div className="px-5 sm:px-6 py-4 flex gap-3">
-          <ShieldCheck size={18} strokeWidth={1.9} className="text-brand shrink-0 mt-0.5" aria-hidden />
-          <div className="min-w-0">
-            <p className="text-[13.5px] font-semibold mb-1">Footer written into both files</p>
-            <p className="text-[13.5px] text-ink-2 italic">
-              {provenanceLine(confirmedBy.trim() || "[your name]")}
-            </p>
-            <p className="text-[12.5px] text-ink-3 mt-1.5">
-              A provenance record, not a disclaimer — it says who stands behind these marks.
-            </p>
-          </div>
+      <Card className="border-border bg-surface-2">
+        <div className="px-5 py-4 sm:px-6">
+          <p className="label-caps mb-2 text-ink-3">Optional account</p>
+          <AccountLink />
         </div>
       </Card>
+
+      {confirmed ? (
+        <Card className="border-brand-line">
+          <div className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div>
+              <h2 className="font-display text-[16px] font-bold">Download reviewed results</h2>
+              <p className="mt-1 text-[13px] text-ink-2">
+                Generate the selected {format.toUpperCase()} file in this tab.
+              </p>
+            </div>
+            <Button size="lg" onClick={runExport} disabled={busy} className="shrink-0">
+              {busy ? "Generating…" : `Download ${format.toUpperCase()}`}
+            </Button>
+          </div>
+          {error ? (
+            <p className="mx-5 mb-5 flex items-start gap-1.5 text-[13px] text-crit sm:mx-6" role="alert">
+              <TriangleAlert size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
+              {error}
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
     </Page>
   );
 }
@@ -357,8 +349,10 @@ function FormatCard({
 }) {
   return (
     <button
+      type="button"
+      role="radio"
+      aria-checked={active}
       onClick={onSelect}
-      aria-pressed={active}
       className={cn(
         "text-left rounded-[16px] border p-4 transition-colors",
         active
