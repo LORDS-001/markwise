@@ -42,7 +42,7 @@ export function OverlayPanel({
     const panel = panelRef.current;
     const focusable = () =>
       Array.from(panel?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
-    focusable()[0]?.focus();
+    (focusable()[0] ?? panel)?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -59,6 +59,11 @@ export function OverlayPanel({
       }
       const first = items[0];
       const last = items[items.length - 1];
+      if (!panel?.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+        return;
+      }
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
