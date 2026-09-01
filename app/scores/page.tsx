@@ -51,6 +51,7 @@ export default function ScoresPage() {
 
   const [sort, setSort] = useState<SortKey>("confidence");
   const [onlyUnreviewed, setOnlyUnreviewed] = useState(false);
+  const [query, setQuery] = useState("");
   const [open, setOpen] = useState<string | null>(null);
 
   const clusterOf = useMemo(() => {
@@ -59,16 +60,31 @@ export default function ScoresPage() {
   }, [clusters]);
 
   const rows = useMemo(() => {
-    const list = onlyUnreviewed
+    const statusFiltered = onlyUnreviewed
       ? answers.filter((answer) => answer.status === "unreviewed")
       : [...answers];
+    const normalizedQuery = query.trim().toLowerCase();
+    const list = normalizedQuery
+      ? statusFiltered.filter((answer) => {
+          const cluster = clusterOf(answer.clusterId);
+          const searchableText = [
+            answer.studentId,
+            answer.initials,
+            answer.answer,
+            answer.scoreRationale,
+            answer.errorSignature ?? "",
+            cluster?.label ?? (answer.isCorrect ? "Correct" : ""),
+          ];
+          return searchableText.some((value) => value.toLowerCase().includes(normalizedQuery));
+        })
+      : statusFiltered;
 
     return list.sort((a, b) => {
       if (sort === "confidence") return a.confidence - b.confidence;
       if (sort === "score") return a.provisionalScore - b.provisionalScore;
       return (a.clusterId ?? "zz").localeCompare(b.clusterId ?? "zz");
     });
-  }, [answers, onlyUnreviewed, sort]);
+  }, [answers, clusterOf, onlyUnreviewed, query, sort]);
 
   const mean =
     answers.reduce((sum, answer) => sum + answer.provisionalScore, 0) /
@@ -120,8 +136,20 @@ export default function ScoresPage() {
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-6">
         <div className="flex min-w-0 flex-col gap-5">
           <Card className="overflow-hidden">
-            <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:px-5 lg:flex-row lg:items-center">
+            <div
+              role="toolbar"
+              aria-label="Score review controls"
+              className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:px-5 lg:flex-row lg:items-center"
+            >
               <div className="flex flex-1 flex-wrap items-center gap-3">
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  aria-label="Search responses"
+                  placeholder="Search responses"
+                  className="h-8 w-full rounded-[10px] border border-border bg-surface px-3 text-[13px] text-ink placeholder:text-ink-3 hover:border-border-strong focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--brand-line)] sm:w-52"
+                />
                 <div className="flex items-center gap-2">
                   <span className="label-caps text-ink-3">Status filter</span>
                   <label className="flex cursor-pointer select-none items-center gap-2 text-[13px] text-ink-2">
@@ -152,7 +180,11 @@ export default function ScoresPage() {
                   Reset
                 </Button>
                 {exportReady ? (
-                  <Link href="/export" className={buttonClass("primary", "sm")}>
+                  <Link
+                    href="/export"
+                    data-variant="primary"
+                    className={buttonClass("primary", "sm")}
+                  >
                     Continue to export
                     <ArrowRight size={15} strokeWidth={2} aria-hidden />
                   </Link>
@@ -165,11 +197,22 @@ export default function ScoresPage() {
                     <Sparkles size={15} strokeWidth={1.9} aria-hidden />
                     Accept high-confidence
                   </Button>
-                ) : null}
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      setQuery("");
+                      setOnlyUnreviewed(true);
+                    }}
+                  >
+                    Review remaining
+                  </Button>
+                )}
               </div>
             </div>
 
-            <div className="hidden overflow-x-auto scroll-thin lg:block">
+            <div className="hidden max-h-[70vh] overflow-x-auto overflow-y-auto scroll-thin lg:block">
               <table className="w-full min-w-[960px] border-collapse text-left">
                 <caption className="sr-only">Student score review</caption>
                 <thead className="sticky top-0 z-10 bg-surface-2 label-caps text-ink-3">
