@@ -18,7 +18,8 @@
    for graphics, where the floor is 3:1.
    ============================================================ */
 
-:root {
+:root,
+[data-theme="light"] {
   color-scheme: light;
 
   /* brand mark */
@@ -26,17 +27,18 @@
   --logo-cyan: #17a3ba;
 
   /* surfaces — near-white ground, white cards, hairline separation */
-  --ground: #fbfcfd;
+  --ground: #e9eef1;
+  --shell: #f7f8f6;
   --surface: #ffffff;
-  --surface-2: #f3f5f8;
-  --surface-3: #e8ecf1;
-  --border: #e7eaf0;
-  --border-strong: #d2d8e1;
+  --surface-2: #f1f4f5;
+  --surface-3: #e5eaed;
+  --border: #dce2e6;
+  --border-strong: #c7d0d7;
 
   /* text */
   --ink: #0f1e3d;
-  --ink-2: #59647a;
-  --ink-3: #929cad;
+  --ink-2: #59667a;
+  --ink-3: #8793a4;
 
   /* primary action — the mark's navy */
   --primary: #0f1e3d;
@@ -45,21 +47,21 @@
 
   /* accent — the mark's cyan, darkened for text */
   --brand: #0c7c90;
-  --brand-hover: #0a6274;
-  --brand-soft: #e7f4f7;
-  --brand-line: #b8dee6;
+  --brand-hover: #09697c;
+  --brand-soft: #e4f3f6;
+  --brand-line: #b5dce4;
   --on-brand: #ffffff;
 
   /* semantic */
-  --warn: #9a6207;
-  --warn-soft: #fdf3e4;
-  --warn-line: #f0ddba;
-  --crit: #ab2437;
-  --crit-soft: #fdebee;
-  --crit-line: #f4c8cf;
-  --ok: #1f7a52;
-  --ok-soft: #e7f4ef;
-  --ok-line: #b7ddcb;
+  --warn: #8d5906;
+  --warn-soft: #fcf2e3;
+  --warn-line: #ead7b6;
+  --crit: #a52438;
+  --crit-soft: #fcebee;
+  --crit-line: #efc5cc;
+  --ok: #1d744e;
+  --ok-soft: #e5f3ed;
+  --ok-line: #b3d8c6;
 
   /* cluster categorical ramp */
   --c1: #0e8ca3;
@@ -71,18 +73,59 @@
   --c0: #93a0b0;
 
   /* radii */
-  --r-card: 20px;
-  --r-input: 12px;
+  --r-card: 14px;
+  --r-input: 10px;
+  --r-shell: 28px;
   --r-pill: 999px;
 
   /* elevation is used once, for the mobile drawer */
-  --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-lg: 0 16px 48px rgb(15 30 61 / 0.14);
+  --shadow-panel: 0 20px 60px rgb(15 30 61 / 0.16);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --logo-navy: #f4f7fb;
+  --logo-cyan: #32b4c9;
+  --ground: #07101f;
+  --shell: #0b1525;
+  --surface: #111d2f;
+  --surface-2: #17243a;
+  --surface-3: #1d2c44;
+  --border: #25364d;
+  --border-strong: #354a64;
+  --ink: #f4f7fb;
+  --ink-2: #b1bed0;
+  --ink-3: #7f8ea5;
+  --primary: #17a3ba;
+  --primary-hover: #32b4c9;
+  --on-primary: #061018;
+  --brand: #49bfd0;
+  --brand-hover: #66cedc;
+  --brand-soft: #102f3a;
+  --brand-line: #205363;
+  --on-brand: #061018;
+  --warn: #f1b75a;
+  --warn-soft: #352812;
+  --warn-line: #5a4320;
+  --crit: #ff8293;
+  --crit-soft: #371923;
+  --crit-line: #642b3a;
+  --ok: #69d2a3;
+  --ok-soft: #112f27;
+  --ok-line: #285845;
+  --c1: #35b8cb;
+  --c2: #809df2;
+  --c3: #e49a58;
+  --c4: #c493d8;
+  --c5: #87b96d;
+  --c6: #e57491;
+  --c0: #8b99ac;
+  --shadow-panel: 0 24px 72px rgb(0 0 0 / 0.45);
 }
 
 @theme inline {
   --color-ground: var(--ground);
+  --color-shell: var(--shell);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-surface-3: var(--surface-3);
@@ -117,9 +160,9 @@
   --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
 
   --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
+  --radius-md: var(--r-input);
+  --radius-lg: var(--r-card);
+  --radius-xl: var(--r-shell);
 }
 
 @layer base {
@@ -129,7 +172,6 @@
 
   html {
     -webkit-text-size-adjust: 100%;
-    color-scheme: light;
   }
 
   body {

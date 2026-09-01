@@ -4,6 +4,8 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
 import { SessionProvider } from "@/components/session-provider";
 import { AppShell } from "@/components/shell";
+import { ThemeProvider } from "@/components/theme/theme-provider";
+import { THEME_BOOTSTRAP_SCRIPT } from "@/components/theme/theme";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -29,8 +31,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fbfcfd" },
-    { media: "(prefers-color-scheme: dark)", color: "#fbfcfd" },
+    { media: "(prefers-color-scheme: light)", color: "#e9eef1" },
+    { media: "(prefers-color-scheme: dark)", color: "#07101f" },
   ],
 };
 
@@ -38,23 +40,26 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" data-theme="light">
-      <body
-        className={`${manrope.variable} ${plexMono.variable} antialiased`}
-      >
+    <html lang="en" data-theme="light" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
+      </head>
+      <body className={manrope.variable + " " + plexMono.variable + " antialiased"}>
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:absolute focus:z-[60] focus:left-4 focus:top-4 focus:bg-surface focus:text-ink focus:border focus:border-brand focus:rounded-[10px] focus:px-4 focus:py-2 focus:text-sm focus:font-medium"
+          className="sr-only focus:not-sr-only focus:absolute focus:z-[70] focus:left-4 focus:top-4 focus:bg-surface focus:text-ink focus:border focus:border-brand focus:rounded-[10px] focus:px-4 focus:py-2 focus:text-sm focus:font-medium"
         >
           Skip to content
         </a>
-        <AuthProvider>
-          <SessionProvider>
-            <AppShell>
-              <div id="main">{children}</div>
-            </AppShell>
-          </SessionProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <SessionProvider>
+              <AppShell>
+                <div id="main">{children}</div>
+              </AppShell>
+            </SessionProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
