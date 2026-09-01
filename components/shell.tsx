@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { AppNavigation } from "@/components/app-navigation";
 import { OverlayPanel } from "@/components/overlay-panel";
@@ -13,10 +13,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const navigationTriggerRef = useRef<HTMLButtonElement>(null);
   const settingsReturnRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    document.getElementById("main")?.setAttribute("tabindex", "-1");
-  }, []);
+  const mainRef = useRef<HTMLElement>(null);
 
   function openSettings(returnTarget: HTMLElement | null) {
     settingsReturnRef.current = returnTarget;
@@ -25,6 +22,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh bg-ground lg:p-4">
+      <a
+        href="#main"
+        onClick={() => mainRef.current?.focus()}
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[70] focus:left-4 focus:top-4 focus:bg-surface focus:text-ink focus:border focus:border-brand focus:rounded-[10px] focus:px-4 focus:py-2 focus:text-sm focus:font-medium"
+      >
+        Skip to content
+      </a>
       <div className="min-h-dvh overflow-hidden bg-shell lg:grid lg:min-h-[calc(100dvh-2rem)] lg:grid-cols-[228px_minmax(0,1fr)] lg:rounded-[var(--r-shell)] lg:border lg:border-border-strong">
         <aside className="hidden border-r border-border bg-surface lg:block">
           <AppNavigation onOpenSettings={(trigger) => openSettings(trigger)} />
@@ -59,7 +63,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             onOpenNavigation={() => setNavOpen(true)}
             navigationTriggerRef={navigationTriggerRef}
           />
-          <main className="min-w-0 flex-1">{children}</main>
+          <main ref={mainRef} id="main" tabIndex={-1} className="min-w-0 flex-1">
+            {children}
+          </main>
         </div>
 
         <SettingsDialog

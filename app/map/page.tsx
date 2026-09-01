@@ -258,6 +258,9 @@ export default function MapPage() {
             <p className="mx-auto mt-1 max-w-[48ch] text-[12.5px] text-ink-2">
               The sample class has no active misconception clusters to review.
             </p>
+            <Link href="/" className={buttonClass("primary", "sm") + " mt-4"}>
+              Return to setup
+            </Link>
           </div>
         )}
       </Card>

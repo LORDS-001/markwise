@@ -45,18 +45,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
       </head>
       <body className={manrope.variable + " " + plexMono.variable + " antialiased"}>
-        <a
-          href="#main"
-          className="sr-only focus:not-sr-only focus:absolute focus:z-[70] focus:left-4 focus:top-4 focus:bg-surface focus:text-ink focus:border focus:border-brand focus:rounded-[10px] focus:px-4 focus:py-2 focus:text-sm focus:font-medium"
-        >
-          Skip to content
-        </a>
         <ThemeProvider>
           <AuthProvider>
             <SessionProvider>
-              <AppShell>
-                <div id="main">{children}</div>
-              </AppShell>
+              <AppShell>{children}</AppShell>
             </SessionProvider>
           </AuthProvider>
         </ThemeProvider>

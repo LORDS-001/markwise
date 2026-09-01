@@ -17,24 +17,32 @@ vi.mock("@/lib/supabase/client", () => ({
 
 beforeEach(() => installMatchMedia(false));
 
-it("makes the existing skip-link target programmatically focusable", () => {
+it("renders one semantic skip target and focuses it from the skip link", async () => {
+  const user = userEvent.setup();
   render(
-    <div id="main">
-      <ThemeProvider>
-        <AuthProvider>
-          <SessionProvider>
-            <AppShell>
-              <p>Content</p>
-            </AppShell>
-          </SessionProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </div>,
+    <ThemeProvider>
+      <AuthProvider>
+        <SessionProvider>
+          <AppShell>
+            <p>Content</p>
+          </AppShell>
+        </SessionProvider>
+      </AuthProvider>
+    </ThemeProvider>,
   );
 
-  const mainTarget = document.getElementById("main");
+  const skipLink = screen.getByRole("link", { name: "Skip to content" });
+  const mainTarget = screen.getByRole("main");
+  expect(skipLink).toHaveAttribute("href", "#main");
+  expect(mainTarget).toHaveAttribute("id", "main");
   expect(mainTarget).toHaveAttribute("tabindex", "-1");
-  mainTarget?.focus();
+  expect(document.querySelectorAll("#main")).toHaveLength(1);
+
+  await user.tab();
+  expect(skipLink).toHaveFocus();
+  await user.keyboard("{Enter}");
+
+  expect(window.location.hash).toBe("#main");
   expect(mainTarget).toHaveFocus();
 });
 
