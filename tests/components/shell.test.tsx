@@ -52,8 +52,12 @@ it("opens Settings from the labelled navigation", async () => {
       </AuthProvider>
     </ThemeProvider>,
   );
-  await user.click(screen.getAllByRole("button", { name: "Settings" })[0]);
+  const settingsTrigger = screen.getAllByRole("button", { name: "Settings" })[0];
+  await user.click(settingsTrigger);
   expect(screen.getByRole("dialog", { name: "Settings" })).toBeVisible();
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog", { name: "Settings" })).not.toBeInTheDocument();
+  expect(settingsTrigger).toHaveFocus();
 });
 
 it("closes mobile navigation for Settings and restores focus to its trigger", async () => {

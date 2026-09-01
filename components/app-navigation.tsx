@@ -91,7 +91,7 @@ export function AppNavigation({
         className="flex h-16 shrink-0 items-center gap-2.5 border-b border-border px-4"
       >
         <span className="min-w-0">
-          <MarkwiseLogo className="max-w-full" markClassName="h-6 w-auto" />
+          <MarkwiseLogo className="max-w-full" />
           <span className="mt-0.5 block truncate text-[11px] leading-tight text-ink-3">
             {SESSION.courseCode} · {SESSION.courseTitle}
           </span>
