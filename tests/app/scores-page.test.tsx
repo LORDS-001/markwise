@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import ScoresPage from "@/app/scores/page";
 import { SessionProvider, useSession } from "@/components/session-provider";
 import { ANSWERS } from "@/lib/mock";
@@ -39,6 +39,27 @@ function primaryActions(toolbar: HTMLElement) {
 
 function firstStudentId(table: HTMLElement) {
   return table.querySelector("tbody > tr > td")?.textContent?.trim();
+}
+
+function installScrollIntoViewMock() {
+  const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
+  const mock = vi.fn();
+
+  Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    configurable: true,
+    value: mock,
+  });
+
+  return {
+    mock,
+    restore() {
+      if (original) {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", original);
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+      }
+    },
+  };
 }
 
 it(
@@ -104,26 +125,38 @@ it.each([
   "moves focus to unresolved $viewport work every time Review remaining is activated",
   ({ matchesDesktop, rowTag }) => {
     installMatchMedia(matchesDesktop);
-    renderScores();
-    const toolbar = screen.getByRole("toolbar", { name: "Score review controls" });
+    const scrollIntoView = installScrollIntoViewMock();
 
-    fireEvent.click(within(toolbar).getByRole("button", { name: "Accept high-confidence" }));
-    const reviewRemaining = within(toolbar).getByRole("button", { name: "Review remaining" });
-    fireEvent.click(reviewRemaining);
+    try {
+      renderScores();
+      const toolbar = screen.getByRole("toolbar", { name: "Score review controls" });
 
-    expect(document.activeElement).toHaveAttribute("data-review-row", "unreviewed");
-    expect(document.activeElement?.tagName).toBe(rowTag);
-    expect(document.activeElement).toHaveAccessibleName(/Review unresolved response from/);
+      fireEvent.click(within(toolbar).getByRole("button", { name: "Accept high-confidence" }));
+      const reviewRemaining = within(toolbar).getByRole("button", { name: "Review remaining" });
+      fireEvent.click(reviewRemaining);
 
-    const search = within(toolbar).getByRole("searchbox", { name: "Search responses" });
-    search.focus();
-    expect(search).toHaveFocus();
-    fireEvent.click(reviewRemaining);
+      const firstTarget = document.activeElement;
+      expect(firstTarget).toHaveAttribute("data-review-row", "unreviewed");
+      expect(firstTarget?.tagName).toBe(rowTag);
+      expect(firstTarget).toHaveAccessibleName(/Review unresolved response from/);
+      expect(scrollIntoView.mock).toHaveBeenNthCalledWith(1, { block: "nearest" });
+      expect(scrollIntoView.mock.mock.contexts[0]).toBe(firstTarget);
 
-    expect(document.activeElement).toHaveAttribute("data-review-row", "unreviewed");
-    expect(document.activeElement?.tagName).toBe(rowTag);
-    expect(primaryActions(toolbar)).toHaveLength(1);
-    expect(primaryActions(toolbar)[0]).toHaveAccessibleName("Review remaining");
+      const search = within(toolbar).getByRole("searchbox", { name: "Search responses" });
+      search.focus();
+      expect(search).toHaveFocus();
+      fireEvent.click(reviewRemaining);
+
+      const secondTarget = document.activeElement;
+      expect(secondTarget).toHaveAttribute("data-review-row", "unreviewed");
+      expect(secondTarget?.tagName).toBe(rowTag);
+      expect(scrollIntoView.mock).toHaveBeenNthCalledWith(2, { block: "nearest" });
+      expect(scrollIntoView.mock.mock.contexts[1]).toBe(secondTarget);
+      expect(primaryActions(toolbar)).toHaveLength(1);
+      expect(primaryActions(toolbar)[0]).toHaveAccessibleName("Review remaining");
+    } finally {
+      scrollIntoView.restore();
+    }
   },
   TEST_TIMEOUT,
 );
@@ -193,6 +226,55 @@ it(
     ).toBeVisible();
     expect(
       screen.queryByText("Every row has been reviewed. Clear the filter to see them all."),
+    ).not.toBeInTheDocument();
+  },
+  TEST_TIMEOUT,
+);
+
+it(
+  "explains when status and search filters hide the remaining reviews",
+  () => {
+    renderScores();
+    const toolbar = screen.getByRole("toolbar", { name: "Score review controls" });
+
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Accept high-confidence" }));
+    fireEvent.change(within(toolbar).getByRole("searchbox", { name: "Search responses" }), {
+      target: { value: "EEE/022/0103" },
+    });
+    fireEvent.click(within(toolbar).getByRole("checkbox", { name: /Only unreviewed/ }));
+
+    expect(
+      screen.getByText(
+        'No unreviewed responses match "EEE/022/0103". Try a different search or clear a filter.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.queryByText(
+        'No responses match "EEE/022/0103". Try a different search or clear it.',
+      ),
+    ).not.toBeInTheDocument();
+  },
+  TEST_TIMEOUT,
+);
+
+it(
+  "prioritizes an exhausted review message over a nonblank search",
+  () => {
+    renderScores({ completionProbe: true });
+    const toolbar = screen.getByRole("toolbar", { name: "Score review controls" });
+
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Accept high-confidence" }));
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Review remaining" }));
+    fireEvent.change(within(toolbar).getByRole("searchbox", { name: "Search responses" }), {
+      target: { value: "no-such-response" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Complete remaining review" }));
+
+    expect(screen.getByText("Every row has been reviewed. Clear the filter to see them all.")).toBeVisible();
+    expect(
+      screen.queryByText(
+        'No responses match "no-such-response". Try a different search or clear it.',
+      ),
     ).not.toBeInTheDocument();
   },
   TEST_TIMEOUT,

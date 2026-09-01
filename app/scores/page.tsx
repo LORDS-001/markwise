@@ -266,11 +266,13 @@ export default function ScoresPage() {
 
             {rows.length === 0 ? (
               <p className="px-5 py-10 text-center text-[14px] text-ink-2">
-                {hasSearchQuery
-                  ? `No responses match "${query.trim()}". Try a different search or clear it.`
-                  : onlyUnreviewed && remainingCount === 0
-                    ? "Every row has been reviewed. Clear the filter to see them all."
-                    : "No responses are available for review."}
+                {onlyUnreviewed && remainingCount === 0
+                  ? "Every row has been reviewed. Clear the filter to see them all."
+                  : onlyUnreviewed && hasSearchQuery
+                    ? `No unreviewed responses match "${query.trim()}". Try a different search or clear a filter.`
+                    : hasSearchQuery
+                      ? `No responses match "${query.trim()}". Try a different search or clear it.`
+                      : "No responses are available for review."}
               </p>
             ) : null}
           </Card>
