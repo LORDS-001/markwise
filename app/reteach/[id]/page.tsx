@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { Page } from "@/components/shell";
+import { ActionArea } from "@/components/page-structure";
 import {
   Badge,
   Button,
@@ -69,8 +70,8 @@ export default function ReteachPackPage() {
       >
         <Card>
           <EmptyState
-            title="No pack generated for this cluster yet"
-            body="This cluster was created by a split or merge. Generating a pack for it needs one model call against the new grouping."
+            title="No sample pack for this cluster yet"
+            body="This cluster was created by a split or merge, so a sample pack is not available for it yet."
             action={
               <Link href="/reteach" className={buttonClass("secondary", "md")}>
                 Choose another cluster
@@ -127,23 +128,7 @@ export default function ReteachPackPage() {
         </Link>
       }
       title={cluster.label}
-      lead={`A five-minute lesson written against this belief, for the ${members.length} students who hold it.`}
-      actions={
-        <>
-          <Button variant="secondary" size="md" onClick={copyPack}>
-            {copied ? (
-              <Check size={16} strokeWidth={2.2} aria-hidden />
-            ) : (
-              <Copy size={16} strokeWidth={1.9} aria-hidden />
-            )}
-            {copied ? "Copied" : "Copy"}
-          </Button>
-          <Button variant="secondary" size="md" onClick={downloadMarkdown}>
-            <FileDown size={16} strokeWidth={1.9} aria-hidden />
-            Markdown
-          </Button>
-        </>
-      }
+      lead={`A five-minute sample lesson for the ${members.length} students who hold this belief.`}
       aside={
         <>
           <Card>
@@ -160,12 +145,6 @@ export default function ReteachPackPage() {
                 students, {((members.length / TOTAL_ANSWERS) * 100).toFixed(0)}% of the class.
                 Pull them aside, or send the pack to everyone and let it land where it needs to.
               </div>
-            </div>
-            <div className="px-5 pb-4">
-              <Button variant="secondary" size="sm" className="w-full" onClick={downloadRoster}>
-                <Download size={14} strokeWidth={2} aria-hidden />
-                Download roster CSV
-              </Button>
             </div>
           </Card>
 
@@ -188,21 +167,49 @@ export default function ReteachPackPage() {
         </>
       }
     >
+      <ActionArea note="Copy or download this sample lesson and its affected-student roster.">
+        <Button variant="secondary" size="md" onClick={copyPack}>
+          {copied ? (
+            <Check size={16} strokeWidth={2.2} aria-hidden />
+          ) : (
+            <Copy size={16} strokeWidth={1.9} aria-hidden />
+          )}
+          Copy lesson
+        </Button>
+        <Button variant="secondary" size="md" onClick={downloadMarkdown}>
+          <FileDown size={16} strokeWidth={1.9} aria-hidden />
+          Download Markdown
+        </Button>
+        <Button variant="secondary" size="md" onClick={downloadRoster}>
+          <Download size={16} strokeWidth={2} aria-hidden />
+          Download roster CSV
+        </Button>
+        <span aria-live="polite" aria-atomic="true" className="text-[13px] text-ink-2">
+          {copied ? "Copied" : ""}
+        </span>
+      </ActionArea>
+
       {/* Micro-lesson */}
       <Card>
         <CardHead
-          title="Five-minute micro-lesson"
-          hint="Written against this belief, not the topic in general"
+          title={`Micro-lesson: ${pack.lesson[0]?.heading ?? cluster.label}`}
+          hint="Start with the objective, then use the explanation and worked example."
           action={<Badge tone="brand">~5 min</Badge>}
         />
         <div className="px-5 sm:px-8 py-6 flex flex-col gap-6">
+          <section className="flex flex-col gap-2">
+            <h3 className="font-display text-[18px] font-semibold">Objective</h3>
+            <p className="text-[15px] leading-[1.65] text-ink-2 max-w-[68ch]">
+              Recognise and correct the misconception before answering the diagnostic.
+            </p>
+          </section>
           {pack.lesson.map((section, i) => (
             <section key={section.heading} className="flex flex-col gap-2">
               <h3 className="flex items-baseline gap-2.5 font-display text-[18px] font-semibold">
                 <span className="label-caps text-ink-3 tnum">
                   {String(i + 1).padStart(2, "0")}
                 </span>
-                {section.heading}
+                {i === 0 ? "Explanation" : i === 2 ? "Worked example" : section.heading}
               </h3>
               {section.body.split("\n\n").map((para, j) => (
                 <p key={j} className="text-[15px] leading-[1.65] text-ink-2 max-w-[68ch]">
@@ -221,38 +228,51 @@ export default function ReteachPackPage() {
             title="Two-question diagnostic"
             hint="A student holding this belief fails these. A student who has corrected it passes."
           />
-          <ol className="divide-y divide-border">
+          <ol className="flex flex-col gap-3 px-3 py-3 sm:px-4">
             {pack.diagnostics.map((d, i) => (
-              <li key={i} className="px-5 sm:px-8 py-6 flex flex-col gap-4">
-                <div className="flex gap-3">
-                  <span
-                    className="grid place-items-center w-7 h-7 rounded-full shrink-0 text-[13px] font-semibold text-white tnum"
-                    style={{ background: toneColor(cluster.tone) }}
-                    aria-hidden
-                  >
-                    {i + 1}
-                  </span>
-                  <p className="text-[15.5px] leading-relaxed font-medium max-w-[68ch]">
-                    {d.prompt}
-                  </p>
-                </div>
+              <li key={i}>
+                <Card className="px-4 py-4 sm:px-5">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex gap-3">
+                      <span
+                        className="grid place-items-center w-7 h-7 rounded-full shrink-0 text-[13px] font-semibold text-white tnum"
+                        style={{ background: toneColor(cluster.tone) }}
+                        aria-hidden
+                      >
+                        {i + 1}
+                      </span>
+                      <p className="text-[15.5px] leading-relaxed font-medium max-w-[68ch]">
+                        {d.prompt}
+                      </p>
+                    </div>
 
-                <div className="grid gap-3 sm:grid-cols-2 sm:pl-10">
-                  <div className="rounded-[12px] border border-crit-line bg-crit-soft px-4 py-3">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <CircleX size={14} strokeWidth={2.2} className="text-crit" aria-hidden />
-                      <span className="label-caps text-crit">Still holds the belief</span>
-                    </div>
-                    <p className="text-[13px] text-ink-2 leading-relaxed">{d.holderAnswers}</p>
+                    <details className="sm:ml-10 rounded-[12px] border border-border bg-surface-2">
+                      <summary className="cursor-pointer px-4 py-3 text-[13px] font-semibold text-ink">
+                        Reveal diagnostic responses
+                      </summary>
+                      <div className="grid gap-3 border-t border-border px-4 py-4 sm:grid-cols-2">
+                        <div className="rounded-[12px] border border-crit-line bg-crit-soft px-4 py-3">
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <CircleX size={14} strokeWidth={2.2} className="text-crit" aria-hidden />
+                            <span className="label-caps text-crit">Still holds the belief</span>
+                          </div>
+                          <p className="text-[13px] text-ink-2 leading-relaxed">
+                            {d.holderAnswers}
+                          </p>
+                        </div>
+                        <div className="rounded-[12px] border border-ok-line bg-ok-soft px-4 py-3">
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <CircleCheck size={14} strokeWidth={2.2} className="text-ok" aria-hidden />
+                            <span className="label-caps text-ok">Has corrected it</span>
+                          </div>
+                          <p className="text-[13px] text-ink-2 leading-relaxed">
+                            {d.correctedAnswers}
+                          </p>
+                        </div>
+                      </div>
+                    </details>
                   </div>
-                  <div className="rounded-[12px] border border-ok-line bg-ok-soft px-4 py-3">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <CircleCheck size={14} strokeWidth={2.2} className="text-ok" aria-hidden />
-                      <span className="label-caps text-ok">Has corrected it</span>
-                    </div>
-                    <p className="text-[13px] text-ink-2 leading-relaxed">{d.correctedAnswers}</p>
-                  </div>
-                </div>
+                </Card>
               </li>
             ))}
           </ol>
@@ -292,6 +312,6 @@ function buildMarkdown(
     lines.push(`## Diagnostic`, ``);
     pack.diagnostics.forEach((d, i) => lines.push(`${i + 1}. ${d.prompt}`, ``));
   }
-  lines.push(`---`, `Generated by Markwise.`);
+  lines.push(`---`, `Sample pack for classroom review.`);
   return lines.join("\n");
 }

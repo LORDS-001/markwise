@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { ArrowRight, BookOpen, Users } from "lucide-react";
+import { Disclosure } from "@/components/disclosure";
 import { Page } from "@/components/shell";
-import { Badge, Card, CardHead, EmptyState, buttonClass, toneColor } from "@/components/ui";
+import { Card, EmptyState, buttonClass, toneColor } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
 import { TOTAL_ANSWERS } from "@/lib/mock";
 
 export default function ReteachIndexPage() {
-  const { clusters, sortMode } = useSession();
+  const { clusters, sortMode, answers } = useSession();
 
   const ranked = useMemo(
     () =>
@@ -26,15 +27,15 @@ export default function ReteachIndexPage() {
   return (
     <Page
       eyebrow="Step 5 of 7"
-      title="Reteach packs"
-      lead="Pick a misconception and Markwise writes a five-minute lesson against that specific false belief, plus two diagnostics that only a student who has corrected it can pass."
+      title="Choose a misconception to reteach"
+      lead="Open a sample teaching pack for one of the prioritised patterns."
     >
       {ranked.length === 0 ? (
         <Card>
           <EmptyState
             icon={<BookOpen size={26} strokeWidth={1.6} />}
             title="No clusters to teach against yet"
-            body="Run the pipeline first. Reteach packs are generated per cluster, from the false belief the run identified."
+            body="Review an active misconception cluster before opening its sample teaching pack."
             action={
               <Link href="/processing" className={buttonClass("primary", "md")}>
                 Run the pipeline
@@ -44,13 +45,17 @@ export default function ReteachIndexPage() {
         </Card>
       ) : (
         <Card>
-          <CardHead
-            title="Choose a cluster"
-            hint={`Ordered by ${sortMode === "spread" ? "how many students hold it" : "what it blocks next"}`}
-          />
           <ul className="divide-y divide-border">
-            {ranked.map((c) => {
+            {ranked.map((c, index) => {
               const pct = (c.memberIds.length / TOTAL_ANSWERS) * 100;
+              const clusterAnswers = answers.filter((answer) => c.memberIds.includes(answer.id));
+              const averageLoss =
+                clusterAnswers.length > 0
+                  ? clusterAnswers.reduce(
+                      (sum, answer) => sum + answer.maxScore - answer.provisionalScore,
+                      0,
+                    ) / clusterAnswers.length
+                  : 0;
               return (
                 <li key={c.id}>
                   <Link
@@ -58,10 +63,12 @@ export default function ReteachIndexPage() {
                     className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-5 sm:px-6 py-4 hover:bg-surface-2 transition-colors"
                   >
                     <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0 hidden sm:block"
+                      className="grid w-7 h-7 rounded-full shrink-0 place-items-center text-[12px] font-semibold text-white tnum"
                       style={{ background: toneColor(c.tone) }}
                       aria-hidden
-                    />
+                    >
+                      {index + 1}
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[15px] font-medium leading-snug">
                         {c.label}
@@ -72,12 +79,16 @@ export default function ReteachIndexPage() {
                       </span>
                     </span>
                     <span className="flex items-center gap-3 shrink-0">
-                      {c.isOther ? (
-                        <Badge tone="neutral">No shared belief</Badge>
-                      ) : (
-                        <Badge tone="warn">Severity {c.severity}/5</Badge>
-                      )}
-                      <ArrowRight size={16} strokeWidth={2} className="text-ink-3" aria-hidden />
+                      <span className="text-right">
+                        <span className="block text-[15px] font-semibold tnum">
+                          {averageLoss.toFixed(1)}
+                        </span>
+                        <span className="block text-[12px] text-ink-3">avg loss</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand">
+                        View pack
+                        <ArrowRight size={16} strokeWidth={2} aria-hidden />
+                      </span>
                     </span>
                   </Link>
                 </li>
@@ -87,13 +98,15 @@ export default function ReteachIndexPage() {
         </Card>
       )}
 
-      <Card className="bg-surface-2 border-border">
-        <div className="px-5 sm:px-6 py-4 text-[13.5px] text-ink-2">
-          <b className="text-ink font-semibold">Why two diagnostics, not five.</b> Each one is
-          written so that a student still holding the belief gets it wrong and a student who has
-          corrected it gets it right. A question both groups pass tells you nothing.
-        </div>
-      </Card>
+      <Disclosure
+        title="What each pack contains"
+        description="A short lesson and a diagnostic check"
+      >
+        <p>
+          Each sample pack includes an explanation, a worked example, a quick diagnostic, and the
+          affected-student roster.
+        </p>
+      </Disclosure>
     </Page>
   );
 }
