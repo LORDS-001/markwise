@@ -63,7 +63,7 @@ export function MarkwiseMark({
 /** Horizontal lockup: mark plus wordmark, as supplied. */
 export function MarkwiseLogo({
   className,
-  markClassName = "h-7 w-auto",
+  markClassName = "h-6 w-auto",
 }: {
   className?: string;
   markClassName?: string;
@@ -71,7 +71,7 @@ export function MarkwiseLogo({
   return (
     <span className={`inline-flex items-center gap-2.5 ${className ?? ""}`}>
       <MarkwiseMark className={markClassName} title="Markwise" />
-      <span className="font-sans text-[19px] font-semibold tracking-[-0.02em] text-[var(--logo-navy)] leading-none">
+      <span className="font-sans text-[18px] font-semibold tracking-[-0.02em] text-[var(--logo-navy)] leading-none">
         Markwise
       </span>
     </span>
