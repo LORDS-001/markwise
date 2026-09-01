@@ -9,8 +9,8 @@ import {
   Flag,
   RotateCcw,
   Sparkles,
-  TriangleAlert,
 } from "lucide-react";
+import { Disclosure } from "@/components/disclosure";
 import { Page } from "@/components/shell";
 import {
   Badge,
@@ -25,15 +25,16 @@ import {
   toneColor,
 } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
-import { CONFIDENCE_THRESHOLD, CRITERIA, SESSION, TOTAL_ANSWERS, criterionLabel } from "@/lib/mock";
+import {
+  CONFIDENCE_THRESHOLD,
+  CRITERIA,
+  SESSION,
+  TOTAL_ANSWERS,
+  criterionLabel,
+} from "@/lib/mock";
 import type { StudentAnswer } from "@/lib/types";
 
 type SortKey = "confidence" | "score" | "cluster";
-
-/** Shared by the header and every row so the columns can never drift apart.
- *  The criteria column has a floor rather than a bare 1fr — without it the
- *  column collapses at narrow widths and its chips get clipped to nothing. */
-const GRID_COLS = "120px 78px 104px minmax(130px,1fr) 88px 88px 22px";
 
 export default function ScoresPage() {
   const {
@@ -53,26 +54,34 @@ export default function ScoresPage() {
   const [open, setOpen] = useState<string | null>(null);
 
   const clusterOf = useMemo(() => {
-    const m = new Map(clusters.map((c) => [c.id, c]));
-    return (id: string | null) => (id ? m.get(id) : undefined);
+    const clusterMap = new Map(clusters.map((cluster) => [cluster.id, cluster]));
+    return (id: string | null) => (id ? clusterMap.get(id) : undefined);
   }, [clusters]);
 
   const rows = useMemo(() => {
     const list = onlyUnreviewed
-      ? answers.filter((a) => a.status === "unreviewed")
+      ? answers.filter((answer) => answer.status === "unreviewed")
       : [...answers];
+
     return list.sort((a, b) => {
       if (sort === "confidence") return a.confidence - b.confidence;
       if (sort === "score") return a.provisionalScore - b.provisionalScore;
       return (a.clusterId ?? "zz").localeCompare(b.clusterId ?? "zz");
     });
-  }, [answers, sort, onlyUnreviewed]);
+  }, [answers, onlyUnreviewed, sort]);
 
   const mean =
-    answers.reduce((s, a) => s + a.provisionalScore, 0) / Math.max(1, answers.length);
+    answers.reduce((sum, answer) => sum + answer.provisionalScore, 0) /
+    Math.max(1, answers.length);
   const passRate =
-    (answers.filter((a) => a.provisionalScore / a.maxScore >= 0.4).length / Math.max(1, answers.length)) *
+    (answers.filter((answer) => answer.provisionalScore / answer.maxScore >= 0.4).length /
+      Math.max(1, answers.length)) *
     100;
+  const remainingCount = TOTAL_ANSWERS - reviewedCount;
+  const hasEligibleUnreviewed = answers.some(
+    (answer) =>
+      answer.status === "unreviewed" && answer.confidence >= CONFIDENCE_THRESHOLD,
+  );
 
   const shared = {
     clusterOf,
@@ -85,189 +94,167 @@ export default function ScoresPage() {
   return (
     <Page
       eyebrow="Step 6 of 7"
-      title="Score review"
-      lead="Every score here is provisional and every one is editable. Rows are sorted by confidence, so the answers most likely to be wrong sit at the top and get looked at first."
-      actions={
-        <>
-          <Button variant="ghost" size="sm" onClick={resetReview}>
-            <RotateCcw size={15} strokeWidth={1.9} aria-hidden />
-            Reset
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => acceptAbove(CONFIDENCE_THRESHOLD)}
-            disabled={reviewedCount === TOTAL_ANSWERS}
-          >
-            <Sparkles size={15} strokeWidth={1.9} aria-hidden />
-            Accept all above {Math.round(CONFIDENCE_THRESHOLD * 100)}%
-          </Button>
-        </>
-      }
-      aside={
-        <>
-          <Card>
-            <CardHead title="Review progress" hint="Export unlocks at zero remaining" />
-            <div className="px-5 py-4 flex flex-col gap-3">
-              <div>
-                <div className="flex items-baseline justify-between mb-2">
-                  <span className="font-display text-[22px] font-semibold tnum">
-                    {reviewedCount}
-                    <span className="text-ink-3 font-normal text-[15px]"> of {TOTAL_ANSWERS}</span>
-                  </span>
-                  <span className="text-[13px] text-ink-2">reviewed</span>
+      title="Review provisional scores"
+      lead="Check low-confidence or flagged responses, then confirm the class for export."
+    >
+      <Card className="px-4 py-3 sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+          <div className="min-w-0 sm:w-44">
+            <h2 className="text-[13px] font-semibold text-ink">Review progress</h2>
+            <p className="mt-0.5 text-[12px] text-ink-3">Export unlocks at zero remaining</p>
+          </div>
+          <dl className="grid flex-1 grid-cols-3 gap-3 text-[12px]">
+            <ProgressCount label="Reviewed" value={reviewedCount} />
+            <ProgressCount label="Remaining" value={remainingCount} />
+            <ProgressCount label="Needs attention" value={needsAttention} tone="warn" />
+          </dl>
+          <div className="sm:w-[min(32%,280px)]">
+            <Progress
+              value={(reviewedCount / TOTAL_ANSWERS) * 100}
+              tone={exportReady ? "ok" : "brand"}
+            />
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-6">
+        <div className="flex min-w-0 flex-col gap-5">
+          <Card className="overflow-hidden">
+            <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:px-5 lg:flex-row lg:items-center">
+              <div className="flex flex-1 flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="label-caps text-ink-3">Status filter</span>
+                  <label className="flex cursor-pointer select-none items-center gap-2 text-[13px] text-ink-2">
+                    <input
+                      type="checkbox"
+                      checked={onlyUnreviewed}
+                      onChange={(event) => setOnlyUnreviewed(event.target.checked)}
+                      className="h-4 w-4 accent-[var(--brand)]"
+                    />
+                    Only unreviewed
+                    <span className="tnum text-ink-3">({remainingCount})</span>
+                  </label>
                 </div>
-                <Progress
-                  value={(reviewedCount / TOTAL_ANSWERS) * 100}
-                  tone={exportReady ? "ok" : "brand"}
+                <Segmented<SortKey>
+                  label="Sort rows"
+                  value={sort}
+                  onChange={setSort}
+                  options={[
+                    { value: "confidence", label: "Confidence" },
+                    { value: "score", label: "Score" },
+                    { value: "cluster", label: "Cluster" },
+                  ]}
                 />
               </div>
-
-              <div
-                className={cn(
-                  "flex items-center gap-2.5 rounded-[12px] px-3 py-2.5 border text-[13.5px]",
-                  needsAttention > 0
-                    ? "bg-warn-soft border-warn-line text-warn"
-                    : "bg-ok-soft border-ok-line text-ok",
-                )}
-              >
-                {needsAttention > 0 ? (
-                  <TriangleAlert size={16} strokeWidth={2} className="shrink-0" aria-hidden />
-                ) : (
-                  <Check size={16} strokeWidth={2.4} className="shrink-0" aria-hidden />
-                )}
-                <span className="font-medium">
-                  {needsAttention > 0
-                    ? `${needsAttention} need your attention`
-                    : "Nothing flagged for review"}
-                </span>
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <Button variant="ghost" size="sm" onClick={resetReview}>
+                  <RotateCcw size={15} strokeWidth={1.9} aria-hidden />
+                  Reset
+                </Button>
+                {exportReady ? (
+                  <Link href="/export" className={buttonClass("primary", "sm")}>
+                    Continue to export
+                    <ArrowRight size={15} strokeWidth={2} aria-hidden />
+                  </Link>
+                ) : hasEligibleUnreviewed ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => acceptAbove(CONFIDENCE_THRESHOLD)}
+                  >
+                    <Sparkles size={15} strokeWidth={1.9} aria-hidden />
+                    Accept high-confidence
+                  </Button>
+                ) : null}
               </div>
-
-              <Link
-                href="/export"
-                aria-disabled={!exportReady}
-                onClick={(e) => {
-                  if (!exportReady) e.preventDefault();
-                }}
-                className={buttonClass(
-                  "primary",
-                  "md",
-                  cn("w-full", !exportReady && "opacity-45 pointer-events-none"),
-                )}
-              >
-                Continue to export
-                <ArrowRight size={16} strokeWidth={2} aria-hidden />
-              </Link>
-              {!exportReady ? (
-                <p className="text-[12.5px] text-ink-3 text-center -mt-1">
-                  {TOTAL_ANSWERS - reviewedCount} row
-                  {TOTAL_ANSWERS - reviewedCount === 1 ? "" : "s"} still unreviewed.
-                </p>
-              ) : null}
             </div>
+
+            <div className="hidden overflow-x-auto scroll-thin lg:block">
+              <table className="w-full min-w-[960px] border-collapse text-left">
+                <caption className="sr-only">Student score review</caption>
+                <thead className="sticky top-0 z-10 bg-surface-2 label-caps text-ink-3">
+                  <tr className="border-b border-border">
+                    <th className="w-[120px] px-4 py-2 font-semibold">Student</th>
+                    <th className="min-w-[190px] px-3 py-2 font-semibold">Response</th>
+                    <th className="w-[80px] px-3 py-2 font-semibold">Score</th>
+                    <th className="w-[104px] px-3 py-2 font-semibold">Criteria</th>
+                    <th className="w-[140px] px-3 py-2 font-semibold">Cluster</th>
+                    <th className="w-[96px] px-3 py-2 font-semibold">Confidence</th>
+                    <th className="w-[96px] px-3 py-2 font-semibold">Status</th>
+                    <th className="w-10 px-2 py-2 font-semibold">
+                      <span className="sr-only">Expand</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rows.map((answer) => (
+                    <TableRow key={answer.id} a={answer} {...shared} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <ul className="divide-y divide-border lg:hidden">
+              {rows.map((answer) => (
+                <MobileRow key={answer.id} a={answer} {...shared} />
+              ))}
+            </ul>
+
+            {rows.length === 0 ? (
+              <p className="px-5 py-10 text-center text-[14px] text-ink-2">
+                Every row has been reviewed. Clear the filter to see them all.
+              </p>
+            ) : null}
           </Card>
 
+          <Disclosure
+            title="How confidence is used"
+            description="Why some responses need lecturer attention"
+          >
+            <p>
+              Confidence helps prioritise review. It does not replace the lecturer&apos;s
+              score decision, and every provisional mark remains editable.
+            </p>
+          </Disclosure>
+        </div>
+
+        <aside className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-[80px]">
           <Card>
             <CardHead title="Class summary" hint="Provisional — updates as you edit" />
-            <dl className="px-5 py-4 flex flex-col gap-2.5 text-[13.5px]">
+            <dl className="flex flex-col gap-2.5 px-5 py-4 text-[13.5px]">
               <SummaryRow label="Mean score" value={`${mean.toFixed(1)} / 10`} />
               <SummaryRow label="Pass rate (≥40%)" value={`${passRate.toFixed(0)}%`} />
               <SummaryRow
                 label="Correct answers"
-                value={`${answers.filter((a) => a.isCorrect).length}`}
+                value={`${answers.filter((answer) => answer.isCorrect).length}`}
               />
               <SummaryRow
                 label="Low confidence"
-                value={`${answers.filter((a) => a.confidence < CONFIDENCE_THRESHOLD).length}`}
+                value={`${answers.filter((answer) => answer.confidence < CONFIDENCE_THRESHOLD).length}`}
               />
             </dl>
           </Card>
 
-          <Card className="bg-surface-2 border-border">
+          <Card className="border-border bg-surface-2">
             <div className="px-5 py-4 text-[13px] text-ink-2">
-              <b className="text-ink font-semibold">Markwise never assigns a final mark.</b> It
+              <b className="font-semibold text-ink">Markwise never assigns a final mark.</b> It
               proposes a score against named criteria; you confirm the batch. Nothing is
               submitted anywhere.
             </div>
           </Card>
-        </>
-      }
-    >
-      <Card className="overflow-hidden">
-        <div className="px-4 sm:px-5 py-3 border-b border-border flex flex-wrap items-center gap-3 justify-between">
-          <Segmented<SortKey>
-            label="Sort rows"
-            value={sort}
-            onChange={setSort}
-            options={[
-              { value: "confidence", label: "Confidence" },
-              { value: "score", label: "Score" },
-              { value: "cluster", label: "Cluster" },
-            ]}
-          />
-          <label className="flex items-center gap-2 text-[13px] text-ink-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={onlyUnreviewed}
-              onChange={(e) => setOnlyUnreviewed(e.target.checked)}
-              className="accent-[var(--brand)] w-4 h-4"
-            />
-            Only unreviewed
-            <span className="tnum text-ink-3">
-              ({TOTAL_ANSWERS - reviewedCount})
-            </span>
-          </label>
-        </div>
-
-        {/* ---------- Desktop table ---------- */}
-        <div className="hidden lg:block overflow-x-auto scroll-thin">
-          <div className="min-w-[712px]">
-            <div
-              className="grid items-center gap-2 px-4 py-2.5 border-b border-border bg-surface-2 label-caps text-ink-3"
-              style={{ gridTemplateColumns: GRID_COLS }}
-            >
-              <span>Student</span>
-              <span>Score</span>
-              <span>Criteria</span>
-              <span>Cluster</span>
-              <span>Confidence</span>
-              <span>Status</span>
-              <span className="sr-only">Expand</span>
-            </div>
-            <ul className="divide-y divide-border">
-              {rows.map((a) => (
-                <TableRow key={a.id} a={a} {...shared} />
-              ))}
-            </ul>
-          </div>
-        </div>
-
-        {/* ---------- Mobile cards ---------- */}
-        <ul className="lg:hidden divide-y divide-border">
-          {rows.map((a) => (
-            <MobileRow key={a.id} a={a} {...shared} />
-          ))}
-        </ul>
-
-        {rows.length === 0 ? (
-          <p className="px-5 py-10 text-center text-[14px] text-ink-2">
-            Every row has been reviewed. Clear the filter to see them all.
-          </p>
-        ) : null}
-      </Card>
+        </aside>
+      </div>
     </Page>
   );
 }
 
-/* ------------------------------------------------------------------ */
-
 type RowProps = {
   a: StudentAnswer;
   clusterOf: (id: string | null) => { label: string; tone: number } | undefined;
-  setScore: (id: string, n: number) => void;
-  setStatus: (id: string, s: StudentAnswer["status"]) => void;
+  setScore: (id: string, score: number) => void;
+  setStatus: (id: string, status: StudentAnswer["status"]) => void;
   open: string | null;
-  setOpen: (v: string | null) => void;
+  setOpen: (value: string | null) => void;
 };
 
 function TableRow({ a, clusterOf, setScore, setStatus, open, setOpen }: RowProps) {
@@ -276,63 +263,64 @@ function TableRow({ a, clusterOf, setScore, setStatus, open, setOpen }: RowProps
   const expanded = open === a.id;
 
   return (
-    <li
-      className={cn(
-        "transition-colors",
-        low && a.status === "unreviewed" && "bg-warn-soft/45",
-        expanded && "bg-surface-2",
-      )}
-    >
-      <div
-        className="grid items-center gap-2 px-4 py-2.5"
-        style={{ gridTemplateColumns: GRID_COLS }}
+    <>
+      <tr
+        className={cn(
+          "h-12 transition-colors",
+          low && a.status === "unreviewed" && "bg-warn-soft/45",
+          expanded && "bg-surface-2",
+        )}
       >
-        <div className="min-w-0">
-          <div className="font-mono text-[12.5px] text-ink truncate">{a.studentId}</div>
+        <td className="px-4 py-1.5">
+          <div className="max-w-[120px] truncate font-mono text-[12.5px] text-ink">
+            {a.studentId}
+          </div>
           <div className="text-[12px] text-ink-3">{a.initials}</div>
-        </div>
-
-        <ScoreInput a={a} setScore={setScore} />
-
-        <CriteriaMeter a={a} />
-
-        <div className="min-w-0 flex items-center gap-2">
-          {cluster ? (
-            <>
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ background: toneColor(cluster.tone) }}
-                aria-hidden
-              />
-              <span className="text-[12.5px] text-ink-2 truncate" title={cluster.label}>
-                {cluster.label}
-              </span>
-            </>
-          ) : (
-            <Badge tone="ok">Correct</Badge>
-          )}
-        </div>
-
-        <ConfidenceMeter value={a.confidence} />
-
-        <StatusCell a={a} setStatus={setStatus} />
-
-        <button
-          onClick={() => setOpen(expanded ? null : a.id)}
-          aria-expanded={expanded}
-          aria-label={expanded ? "Collapse answer" : "Expand answer"}
-          className="grid place-items-center w-7 h-7 rounded-[10px] text-ink-3 hover:bg-surface-3 hover:text-ink transition-colors"
-        >
-          <ChevronDown
-            size={16}
-            strokeWidth={2}
-            className={cn("transition-transform", expanded && "rotate-180")}
-          />
-        </button>
-      </div>
-
-      {expanded ? <ExpandedPanel a={a} /> : null}
-    </li>
+        </td>
+        <td className="px-3 py-1.5">
+          <p className="max-w-[320px] truncate text-[12.5px] text-ink-2" title={a.answer}>
+            {a.answer}
+          </p>
+        </td>
+        <td className="px-3 py-1.5 tnum">
+          <ScoreInput a={a} setScore={setScore} />
+        </td>
+        <td className="px-3 py-1.5 tnum">
+          <CriteriaMeter a={a} />
+        </td>
+        <td className="px-3 py-1.5">
+          <ClusterCell cluster={cluster} />
+        </td>
+        <td className="px-3 py-1.5 tnum">
+          <ConfidenceMeter value={a.confidence} />
+        </td>
+        <td className="px-3 py-1.5">
+          <StatusCell a={a} setStatus={setStatus} />
+        </td>
+        <td className="px-2 py-1.5">
+          <button
+            type="button"
+            onClick={() => setOpen(expanded ? null : a.id)}
+            aria-expanded={expanded}
+            aria-label={expanded ? "Collapse answer" : "Expand answer"}
+            className="grid h-7 w-7 place-items-center rounded-[10px] text-ink-3 transition-colors hover:bg-surface-3 hover:text-ink"
+          >
+            <ChevronDown
+              size={16}
+              strokeWidth={2}
+              className={cn("transition-transform", expanded && "rotate-180")}
+            />
+          </button>
+        </td>
+      </tr>
+      {expanded ? (
+        <tr className="bg-surface">
+          <td colSpan={8} className="p-0">
+            <ExpandedPanel a={a} />
+          </td>
+        </tr>
+      ) : null}
+    </>
   );
 }
 
@@ -343,79 +331,71 @@ function MobileRow({ a, clusterOf, setScore, setStatus, open, setOpen }: RowProp
 
   return (
     <li className={cn(low && a.status === "unreviewed" && "bg-warn-soft/45")}>
-      <div className="px-4 py-3.5 flex flex-col gap-3">
+      <div className="flex flex-col gap-3 px-4 py-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="font-mono text-[13px] truncate">{a.studentId}</div>
+            <div className="truncate font-mono text-[13px]">{a.studentId}</div>
             <div className="text-[12px] text-ink-3">{a.initials}</div>
           </div>
+          <ClusterCell cluster={cluster} />
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <ScoreInput a={a} setScore={setScore} />
+          <StatusCell a={a} setStatus={setStatus} />
         </div>
 
-        <div className="flex items-center gap-2 min-w-0">
-          {cluster ? (
-            <>
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ background: toneColor(cluster.tone) }}
-                aria-hidden
-              />
-              <span className="text-[12.5px] text-ink-2 truncate">{cluster.label}</span>
-            </>
-          ) : (
-            <Badge tone="ok">Correct</Badge>
-          )}
-        </div>
+        <p className="line-clamp-2 text-[12.5px] leading-relaxed text-ink-2" title={a.answer}>
+          {a.answer}
+        </p>
 
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex flex-wrap items-center gap-4">
           <ConfidenceMeter value={a.confidence} />
           <CriteriaMeter a={a} />
         </div>
 
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <StatusCell a={a} setStatus={setStatus} />
-            <button
-              onClick={() => setOpen(expanded ? null : a.id)}
-              aria-expanded={expanded}
-              className="inline-flex items-center gap-1 text-[12.5px] text-ink-2 hover:text-ink"
-            >
-              {expanded ? "Hide" : "Details"}
-              <ChevronDown
-                size={14}
-                strokeWidth={2}
-                className={cn("transition-transform", expanded && "rotate-180")}
-              />
-            </button>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(expanded ? null : a.id)}
+          aria-expanded={expanded}
+          className="inline-flex w-fit items-center gap-1 text-[12.5px] text-ink-2 hover:text-ink"
+        >
+          {expanded ? "Hide evidence" : "Show evidence"}
+          <ChevronDown
+            size={14}
+            strokeWidth={2}
+            className={cn("transition-transform", expanded && "rotate-180")}
+          />
+        </button>
       </div>
       {expanded ? <ExpandedPanel a={a} /> : null}
     </li>
   );
 }
 
-function ScoreInput({ a, setScore }: { a: StudentAnswer; setScore: (id: string, n: number) => void }) {
+function ScoreInput({
+  a,
+  setScore,
+}: {
+  a: StudentAnswer;
+  setScore: (id: string, score: number) => void;
+}) {
   return (
-    <div className="flex items-center gap-1 shrink-0">
+    <div className="flex shrink-0 items-center gap-1">
       <input
         type="number"
         min={0}
         max={a.maxScore}
         value={a.provisionalScore}
-        onChange={(e) => setScore(a.id, Number(e.target.value))}
-        aria-label={`Score for ${a.studentId}, out of ${a.maxScore}`}
-        className="w-[52px] h-8 text-center tnum text-[14px] font-semibold bg-surface border border-border rounded-[9px] hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--brand-line)]"
+        onChange={(event) => setScore(a.id, Number(event.target.value))}
+        aria-label={"Score for " + a.initials}
+        className="h-8 w-[52px] rounded-[9px] border border-border bg-surface text-center text-[14px] font-semibold tnum hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--brand-line)]"
       />
       <span className="text-[12.5px] text-ink-3 tnum">/{a.maxScore}</span>
     </div>
   );
 }
 
-/** One segment per criterion, filled where it was awarded. A truncated chip
- *  list ("Reactance term i…") tells the lecturer nothing at this width; a
- *  filled-out-of-total bar is readable in a glance and the full wording is one
- *  row-expand away. */
 function CriteriaMeter({ a }: { a: StudentAnswer }) {
   const met = a.criteriaMet.length;
   const total = CRITERIA.length;
@@ -424,23 +404,48 @@ function CriteriaMeter({ a }: { a: StudentAnswer }) {
     `Missed: ${a.criteriaMissed.map(criterionLabel).join(", ") || "none"}`;
 
   return (
-    <span className="flex items-center gap-2 min-w-0" title={title}>
-      <span className="flex gap-[3px] shrink-0" aria-hidden>
-        {Array.from({ length: total }).map((_, i) => (
+    <span className="flex min-w-0 items-center gap-2" title={title}>
+      <span className="flex shrink-0 gap-[3px]" aria-hidden>
+        {Array.from({ length: total }).map((_, index) => (
           <span
-            key={i}
+            key={index}
             className={cn(
-              "w-[9px] h-3.5 rounded-[4px]",
-              i < met ? "bg-ok" : "bg-surface-3 border border-border",
+              "h-3.5 w-[9px] rounded-[4px]",
+              index < met ? "bg-ok" : "border border-border bg-surface-3",
             )}
           />
         ))}
       </span>
-      <span className="tnum text-[12.5px] text-ink-2 shrink-0">
+      <span className="shrink-0 text-[12.5px] text-ink-2 tnum">
         {met}/{total}
       </span>
       <span className="sr-only">criteria met</span>
     </span>
+  );
+}
+
+function ClusterCell({
+  cluster,
+}: {
+  cluster: { label: string; tone: number } | undefined;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      {cluster ? (
+        <>
+          <span
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ background: toneColor(cluster.tone) }}
+            aria-hidden
+          />
+          <span className="truncate text-[12.5px] text-ink-2" title={cluster.label}>
+            {cluster.label}
+          </span>
+        </>
+      ) : (
+        <Badge tone="ok">Correct</Badge>
+      )}
+    </div>
   );
 }
 
@@ -449,25 +454,27 @@ function StatusCell({
   setStatus,
 }: {
   a: StudentAnswer;
-  setStatus: (id: string, s: StudentAnswer["status"]) => void;
+  setStatus: (id: string, status: StudentAnswer["status"]) => void;
 }) {
   if (a.status === "unreviewed") {
     return (
       <div className="flex items-center gap-1">
         <button
+          type="button"
           onClick={() => setStatus(a.id, "accepted")}
-          className="inline-flex items-center gap-1 h-7 px-2 rounded-[9px] border border-border-strong bg-surface text-[12px] font-medium hover:bg-brand hover:text-on-brand hover:border-brand transition-colors"
+          className="inline-flex h-7 items-center gap-1 rounded-[9px] border border-border-strong bg-surface px-2 text-[12px] font-medium transition-colors hover:border-brand hover:bg-brand hover:text-on-brand"
         >
           <Check size={13} strokeWidth={2.6} aria-hidden />
           Accept
         </button>
         <button
+          type="button"
           onClick={() => setStatus(a.id, "flagged")}
           aria-label="Flag for a second look"
           title="Flag for a second look"
-          className="grid place-items-center w-7 h-7 rounded-[9px] text-ink-3 hover:text-warn hover:bg-warn-soft transition-colors"
+          className="grid h-7 w-7 place-items-center rounded-[9px] text-ink-3 transition-colors hover:bg-warn-soft hover:text-warn"
         >
-          <Flag size={13} strokeWidth={2.2} />
+          <Flag size={13} strokeWidth={2.2} aria-hidden />
         </button>
       </div>
     );
@@ -476,6 +483,7 @@ function StatusCell({
   const tone = a.status === "flagged" ? "warn" : a.status === "edited" ? "brand" : "ok";
   return (
     <button
+      type="button"
       onClick={() => setStatus(a.id, "unreviewed")}
       title="Undo — set back to unreviewed"
       className="text-left"
@@ -489,30 +497,32 @@ function StatusCell({
 
 function ExpandedPanel({ a }: { a: StudentAnswer }) {
   return (
-    <div className="px-4 sm:px-5 pb-5 pt-1 grid gap-4 md:grid-cols-2 border-t border-border bg-surface">
+    <div className="grid gap-4 border-t border-border bg-surface px-4 pb-5 pt-1 sm:px-5 md:grid-cols-2">
       <div className="pt-4">
-        <div className="label-caps text-ink-3 mb-2">The answer</div>
-        <p className="text-[13.5px] leading-relaxed text-ink-2 bg-surface-2 rounded-[12px] px-3.5 py-3">
+        <div className="mb-2 label-caps text-ink-3">The answer</div>
+        <p className="rounded-[12px] bg-surface-2 px-3.5 py-3 text-[13.5px] leading-relaxed text-ink-2">
           {a.answer}
         </p>
         {a.errorSignature ? (
-          <p className="text-[12.5px] text-ink-2 mt-2">
-            <span className="label-caps text-ink-3 mr-1.5">Signature</span>
+          <p className="mt-2 text-[12.5px] text-ink-2">
+            <span className="mr-1.5 label-caps text-ink-3">Signature</span>
             {a.errorSignature}
           </p>
         ) : null}
       </div>
 
       <div className="pt-4">
-        <div className="label-caps text-ink-3 mb-2">Marking scheme, criterion by criterion</div>
+        <div className="mb-2 label-caps text-ink-3">
+          Marking scheme, criterion by criterion
+        </div>
         <ul className="flex flex-col gap-1.5">
-          {CRITERIA.map((c) => {
-            const met = a.criteriaMet.includes(c.id);
+          {CRITERIA.map((criterion) => {
+            const met = a.criteriaMet.includes(criterion.id);
             return (
               <li
-                key={c.id}
+                key={criterion.id}
                 className={cn(
-                  "flex items-center gap-2.5 text-[13px] rounded-[10px] px-2.5 py-1.5 border",
+                  "flex items-center gap-2.5 rounded-[10px] border px-2.5 py-1.5 text-[13px]",
                   met
                     ? "border-ok-line bg-ok-soft text-ink"
                     : "border-border bg-surface-2 text-ink-3",
@@ -520,27 +530,46 @@ function ExpandedPanel({ a }: { a: StudentAnswer }) {
               >
                 <span
                   className={cn(
-                    "grid place-items-center w-4 h-4 rounded-[5px] shrink-0 border",
-                    met ? "bg-ok border-ok text-white" : "border-border-strong",
+                    "grid h-4 w-4 shrink-0 place-items-center rounded-[5px] border",
+                    met ? "border-ok bg-ok text-white" : "border-border-strong",
                   )}
                   aria-hidden
                 >
                   {met ? <Check size={11} strokeWidth={3.2} /> : null}
                 </span>
-                <span className="flex-1 min-w-0 truncate">{c.label}</span>
-                <span className="tnum text-[12px] shrink-0">{c.marks}</span>
+                <span className="min-w-0 flex-1 truncate">{criterion.label}</span>
+                <span className="shrink-0 text-[12px] tnum">{criterion.marks}</span>
               </li>
             );
           })}
         </ul>
-        <p className="text-[12.5px] text-ink-2 mt-2.5">
-          <span className="label-caps text-ink-3 mr-1.5">Rationale</span>
+        <p className="mt-2.5 text-[12.5px] text-ink-2">
+          <span className="mr-1.5 label-caps text-ink-3">Rationale</span>
           {a.scoreRationale}
         </p>
-        <p className="text-[12px] text-ink-3 mt-2">
+        <p className="mt-2 text-[12px] text-ink-3">
           Scheme: {SESSION.courseCode} · {SESSION.maxScore} marks available
         </p>
       </div>
+    </div>
+  );
+}
+
+function ProgressCount({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: "warn";
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="truncate text-ink-3">{label}</dt>
+      <dd className={cn("mt-0.5 text-[18px] font-semibold text-ink tnum", tone && "text-warn")}>
+        {value}
+      </dd>
     </div>
   );
 }
