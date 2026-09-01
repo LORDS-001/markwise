@@ -17,6 +17,27 @@ vi.mock("@/lib/supabase/client", () => ({
 
 beforeEach(() => installMatchMedia(false));
 
+it("makes the existing skip-link target programmatically focusable", () => {
+  render(
+    <div id="main">
+      <ThemeProvider>
+        <AuthProvider>
+          <SessionProvider>
+            <AppShell>
+              <p>Content</p>
+            </AppShell>
+          </SessionProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </div>,
+  );
+
+  const mainTarget = document.getElementById("main");
+  expect(mainTarget).toHaveAttribute("tabindex", "-1");
+  mainTarget?.focus();
+  expect(mainTarget).toHaveFocus();
+});
+
 it("keeps child routes oriented under their labelled parent step", () => {
   render(
     <ThemeProvider>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { AppNavigation } from "@/components/app-navigation";
 import { OverlayPanel } from "@/components/overlay-panel";
@@ -13,6 +13,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const navigationTriggerRef = useRef<HTMLButtonElement>(null);
   const settingsReturnRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    document.getElementById("main")?.setAttribute("tabindex", "-1");
+  }, []);
 
   function openSettings(returnTarget: HTMLElement | null) {
     settingsReturnRef.current = returnTarget;
