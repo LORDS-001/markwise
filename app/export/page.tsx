@@ -250,7 +250,7 @@ export default function ExportPage() {
       <Card className="overflow-hidden">
         <CardHead
           title="Preview"
-          hint={`First 6 of ${rows.length} rows, exactly as they'll be written`}
+          hint={`First 6 of ${rows.length} reviewed rows shown here`}
           action={<Badge tone="brand">.{format}</Badge>}
         />
         <div className="overflow-x-auto scroll-thin">
@@ -320,13 +320,13 @@ export default function ExportPage() {
               {busy ? "Generating…" : `Download ${format.toUpperCase()}`}
             </Button>
           </div>
-          {error ? (
-            <p className="mx-5 mb-5 flex items-start gap-1.5 text-[13px] text-crit sm:mx-6" role="alert">
-              <TriangleAlert size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
-              {error}
-            </p>
-          ) : null}
         </Card>
+      ) : null}
+      {error ? (
+        <p className="flex items-start gap-1.5 px-1 text-[13px] text-crit" role="alert">
+          <TriangleAlert size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
+          {error}
+        </p>
       ) : null}
     </Page>
   );
@@ -347,31 +347,42 @@ function FormatCard({
   sub: string;
   body: string;
 }) {
+  const id = `format-${title.slice(1)}`;
+
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={active}
-      onClick={onSelect}
-      className={cn(
-        "text-left rounded-[16px] border p-4 transition-colors",
-        active
-          ? "border-brand bg-brand-soft/50 ring-1 ring-[var(--brand-line)]"
-          : "border-border bg-surface hover:border-border-strong hover:bg-surface-2",
-      )}
-    >
-      <div className="flex items-center gap-2.5 mb-1.5">
-        <span className={cn("shrink-0", active ? "text-brand" : "text-ink-3")}>{icon}</span>
-        <span className="font-display text-[18px] font-semibold">{title}</span>
-        {active ? (
-          <span className="ml-auto grid place-items-center w-5 h-5 rounded-full bg-brand text-on-brand shrink-0">
-            <Check size={13} strokeWidth={3} aria-hidden />
-          </span>
-        ) : null}
-      </div>
-      <div className="label-caps text-ink-3 mb-1.5">{sub}</div>
-      <p className="text-[13px] text-ink-2 leading-relaxed">{body}</p>
-    </button>
+    <div className="relative">
+      <input
+        id={id}
+        type="radio"
+        name="export-format"
+        value={title.slice(1)}
+        checked={active}
+        onChange={onSelect}
+        className="peer sr-only"
+      />
+      <label
+        htmlFor={id}
+        className={cn(
+          "block cursor-pointer rounded-[16px] border p-4 text-left transition-colors",
+          "peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--brand-line)] peer-focus-visible:ring-offset-2",
+          active
+            ? "border-brand bg-brand-soft/50 ring-1 ring-[var(--brand-line)]"
+            : "border-border bg-surface hover:border-border-strong hover:bg-surface-2",
+        )}
+      >
+        <div className="flex items-center gap-2.5 mb-1.5">
+          <span className={cn("shrink-0", active ? "text-brand" : "text-ink-3")}>{icon}</span>
+          <span className="font-display text-[18px] font-semibold">{title}</span>
+          {active ? (
+            <span className="ml-auto grid place-items-center w-5 h-5 rounded-full bg-brand text-on-brand shrink-0">
+              <Check size={13} strokeWidth={3} aria-hidden />
+            </span>
+          ) : null}
+        </div>
+        <div className="label-caps text-ink-3 mb-1.5">{sub}</div>
+        <p className="text-[13px] text-ink-2 leading-relaxed">{body}</p>
+      </label>
+    </div>
   );
 }
 
