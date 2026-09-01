@@ -38,3 +38,17 @@ it("keeps criterion descriptions shrinkable beside marks and remove controls", (
     expect(description).toHaveClass("min-w-0", "flex-1");
   }
 });
+
+it("keeps criterion mark fields at a bounded width", () => {
+  render(
+    <SessionProvider>
+      <SetupPage />
+    </SessionProvider>,
+  );
+
+  for (const marks of screen.getAllByRole("spinbutton", {
+    name: /Marks for criterion \d+/,
+  })) {
+    expect(marks).toHaveClass("!w-[74px]", "shrink-0");
+  }
+});

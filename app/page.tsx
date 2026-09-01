@@ -299,7 +299,7 @@ export default function SetupPage() {
                         ),
                       )
                     }
-                    className="w-[74px] shrink-0 tnum text-center"
+                    className="!w-[74px] shrink-0 tnum text-center"
                   />
                   <button
                     onClick={() => setCriteria((prev) => prev.filter((x) => x.id !== c.id))}
