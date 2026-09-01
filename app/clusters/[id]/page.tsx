@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   ArrowLeft,
-  ArrowRight,
   BookOpen,
   Check,
   Download,
@@ -17,6 +16,9 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { Disclosure } from "@/components/disclosure";
+import { ActionArea } from "@/components/page-structure";
+import { useSession } from "@/components/session-provider";
 import { Page } from "@/components/shell";
 import {
   Badge,
@@ -26,11 +28,11 @@ import {
   ConfidenceMeter,
   EmptyState,
   Input,
+  Stat,
   buttonClass,
   cn,
   toneColor,
 } from "@/components/ui";
-import { useSession } from "@/components/session-provider";
 import { TOTAL_ANSWERS } from "@/lib/mock";
 
 type Mode = null | "rename" | "merge" | "split" | "reject";
@@ -53,23 +55,23 @@ export default function ClusterDetailPage() {
   const [picked, setPicked] = useState<string[]>([]);
   const [splitName, setSplitName] = useState("");
 
-  const cluster = clusters.find((c) => c.id === params.id);
+  const cluster = clusters.find((candidate) => candidate.id === params.id);
   const members = useMemo(
-    () => answers.filter((a) => a.clusterId === params.id),
+    () => answers.filter((answer) => answer.clusterId === params.id),
     [answers, params.id],
   );
 
   if (!cluster) {
     return (
-      <Page eyebrow="Cluster" title="This cluster no longer exists">
+      <Page eyebrow="Cluster status" title="This cluster no longer exists">
         <Card>
           <EmptyState
             icon={<GitMerge size={26} strokeWidth={1.6} />}
             title="It was merged or rejected"
-            body="Its answers were moved to another cluster, so this page has nothing left to show. The map has the current grouping."
+            body="Its answers were moved to another cluster, so this page has nothing left to show. The misconception map has the current grouping."
             action={
               <Link href="/map" className={buttonClass("primary", "md")}>
-                Back to the map
+                Back to misconception map
               </Link>
             }
           />
@@ -79,28 +81,43 @@ export default function ClusterDetailPage() {
   }
 
   const pct = (members.length / TOTAL_ANSWERS) * 100;
-  const others = clusters.filter((c) => c.id !== cluster.id && c.memberIds.length > 0);
+  const averageLoss = members.length
+    ? members.reduce(
+        (total, member) => total + member.maxScore - member.provisionalScore,
+        0,
+      ) / members.length
+    : null;
+  const others = clusters.filter(
+    (candidate) => candidate.id !== cluster.id && candidate.memberIds.length > 0,
+  );
+  const signatures = Array.from(
+    new Set(
+      members
+        .map((member) => member.errorSignature)
+        .filter((signature): signature is string => Boolean(signature)),
+    ),
+  );
 
   function downloadRoster() {
     const header = "student_id,initials,provisional_score,max_score,confidence,misconception\n";
     const rows = members
-      .map((m) =>
+      .map((member) =>
         [
-          m.studentId,
-          m.initials,
-          m.provisionalScore,
-          m.maxScore,
-          m.confidence,
+          member.studentId,
+          member.initials,
+          member.provisionalScore,
+          member.maxScore,
+          member.confidence,
           `"${cluster!.label.replace(/"/g, '""')}"`,
         ].join(","),
       )
       .join("\n");
     const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `roster-${cluster!.id}.csv`;
-    a.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `roster-${cluster!.id}.csv`;
+    anchor.click();
     URL.revokeObjectURL(url);
   }
 
@@ -112,6 +129,13 @@ export default function ClusterDetailPage() {
     setMergeTarget("");
   }
 
+  function setAnswerPicked(answerId: string, selected: boolean) {
+    setPicked((current) => {
+      if (selected) return current.includes(answerId) ? current : [...current, answerId];
+      return current.filter((id) => id !== answerId);
+    });
+  }
+
   return (
     <Page
       eyebrow={
@@ -121,17 +145,263 @@ export default function ClusterDetailPage() {
         </Link>
       }
       title={
-        mode === "rename" ? (
-          <span className="flex flex-col sm:flex-row gap-2 sm:items-center">
+        <span className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+          <span>{cluster.label}</span>
+          <Badge tone="ok">Active cluster</Badge>
+        </span>
+      }
+      lead="Read the students' words first, then decide whether this grouping represents one shared misconception."
+      actions={
+        <Link
+          href={`/reteach/${cluster.id}`}
+          className={buttonClass(mode === "split" ? "secondary" : "primary", "md")}
+        >
+          <BookOpen size={16} strokeWidth={1.9} aria-hidden />
+          Generate reteach pack
+        </Link>
+      }
+    >
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Stat
+          label="Spread"
+          value={`${pct.toFixed(0)}%`}
+          sub={`${members.length} of ${TOTAL_ANSWERS} answers`}
+          tone="brand"
+        />
+        <Stat
+          label="Average loss"
+          value={averageLoss === null ? "—" : averageLoss.toFixed(1)}
+          sub="marks lost per affected answer"
+          tone="warn"
+        />
+        <Stat
+          label="Affected students"
+          value={members.length}
+          sub="in this misconception cluster"
+        />
+      </div>
+
+      <Card>
+        <CardHead
+          title="Verbatim evidence"
+          hint="Every answer in this cluster, with the phrase that triggered the grouping highlighted"
+          action={
+            <Badge tone="neutral">
+              <Quote size={11} strokeWidth={2.2} aria-hidden />
+              {members.length} answers
+            </Badge>
+          }
+        />
+        <ul className="divide-y divide-border">
+          {members.map((member) => {
+            const isPicked = picked.includes(member.id);
+            return (
+              <li
+                key={member.id}
+                className={cn(
+                  "px-5 py-4 transition-colors sm:px-6",
+                  mode === "split" && "cursor-pointer hover:bg-surface-2",
+                  isPicked && "bg-brand-soft/40",
+                )}
+                onClick={
+                  mode === "split"
+                    ? () => setAnswerPicked(member.id, !isPicked)
+                    : undefined
+                }
+              >
+                <div className="flex items-start gap-3">
+                  {mode === "split" ? (
+                    <input
+                      type="checkbox"
+                      checked={isPicked}
+                      onClick={(event) => event.stopPropagation()}
+                      onChange={(event) => setAnswerPicked(member.id, event.target.checked)}
+                      className="mt-1 h-4 w-4 shrink-0 accent-[var(--brand)]"
+                      aria-label={`Select ${member.initials} for split`}
+                    />
+                  ) : null}
+
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="font-mono text-[12.5px] text-ink-2">
+                        {member.studentId}
+                      </span>
+                      <span className="text-[12.5px] text-ink-3">{member.initials}</span>
+                      <Badge
+                        tone={
+                          member.provisionalScore >= 7
+                            ? "ok"
+                            : member.provisionalScore >= 4
+                              ? "warn"
+                              : "crit"
+                        }
+                      >
+                        {member.provisionalScore}/{member.maxScore}
+                      </Badge>
+                      <ConfidenceMeter value={member.confidence} />
+                    </div>
+
+                    <blockquote
+                      className="border-l-2 pl-3.5 text-[14px] leading-relaxed text-ink"
+                      style={{ borderColor: toneColor(cluster.tone) }}
+                    >
+                      <Highlighted
+                        text={member.answer}
+                        span={member.evidenceSpan}
+                        tone={cluster.tone}
+                      />
+                    </blockquote>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="flex items-center gap-2 border-t border-border px-5 py-4 text-[13px] text-ink-2 sm:px-6">
+          <Users size={15} strokeWidth={1.9} className="shrink-0 text-ink-3" aria-hidden />
+          Use the original responses—not the generated label—to decide whether this cluster is coherent.
+        </div>
+      </Card>
+
+      <Disclosure
+        title="Why these responses belong together"
+        description="Review the model's rationale and the recurring error signatures."
+      >
+        <p>{cluster.why}</p>
+        {signatures.length > 0 ? (
+          <div className="mt-4">
+            <p className="label-caps text-ink-3">Evidence signatures</p>
+            <ul className="mt-2 list-disc space-y-1.5 pl-5">
+              {signatures.map((signature) => (
+                <li key={signature}>{signature}</li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="mt-3 text-ink-3">No shared error signature was assigned.</p>
+        )}
+      </Disclosure>
+
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        <Card>
+          <CardHead
+            title="Affected students"
+            hint={`${members.length} in this cluster`}
+            action={
+              <Button variant="secondary" size="sm" onClick={downloadRoster}>
+                <Download size={14} strokeWidth={2} aria-hidden />
+                CSV
+              </Button>
+            }
+          />
+          <ul className="grid max-h-[320px] grid-cols-2 gap-x-3 gap-y-2 overflow-y-auto px-5 py-4 scroll-thin sm:grid-cols-3">
+            {members.map((member) => (
+              <li key={member.id} className="flex min-w-0 items-center gap-2">
+                <span
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-semibold text-ink-2"
+                  aria-hidden
+                >
+                  {member.initials.replace(/\./g, "")}
+                </span>
+                <span className="truncate font-mono text-[12.5px] text-ink-2">
+                  {member.studentId.split("/").slice(-1)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="px-5 pb-4 text-[12px] text-ink-3">
+            Demo class — initials and invented IDs only.
+          </p>
+        </Card>
+
+        <Card>
+          <CardHead
+            title="Downstream topics at risk"
+            hint={`Severity ${cluster.severity} of 5`}
+          />
+          {cluster.downstream.length > 0 ? (
+            <ul className="flex flex-col gap-2.5 px-5 py-4">
+              {cluster.downstream.map((topic) => (
+                <li key={topic} className="flex items-start gap-2.5 text-[13.5px]">
+                  <TriangleAlert
+                    size={15}
+                    strokeWidth={2}
+                    className="mt-0.5 shrink-0 text-warn"
+                    aria-hidden
+                  />
+                  <span>{topic}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-5 py-4 text-[13.5px] text-ink-2">
+              No downstream topics identified for this group.
+            </p>
+          )}
+          <div className="border-t border-border px-5 py-3 text-[12.5px] text-ink-3">
+            Damage score {cluster.severity * members.length} = severity {cluster.severity} ×{" "}
+            {members.length} students
+          </div>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHead title="Edit cluster" hint="Rename, merge, split, or reject this grouping." />
+        <div className="grid grid-cols-2 gap-2 px-5 py-4 sm:grid-cols-4">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setDraftName(cluster.label);
+              setMode("rename");
+            }}
+          >
+            <Pencil size={14} strokeWidth={2} aria-hidden />
+            Rename
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setMode(mode === "merge" ? null : "merge")}
+            disabled={others.length === 0}
+          >
+            <GitMerge size={14} strokeWidth={2} aria-hidden />
+            Merge
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setPicked([]);
+              setMode(mode === "split" ? null : "split");
+            }}
+            disabled={members.length < 2}
+          >
+            <Split size={14} strokeWidth={2} aria-hidden />
+            Split
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => setMode(mode === "reject" ? null : "reject")}
+            disabled={cluster.isOther}
+          >
+            <X size={14} strokeWidth={2.2} aria-hidden />
+            Reject
+          </Button>
+        </div>
+
+        {mode === "rename" ? (
+          <div className="flex flex-col gap-3 border-t border-border px-5 py-4">
             <Input
               autoFocus
               value={draftName}
-              onChange={(e) => setDraftName(e.target.value)}
-              className="text-[20px] font-display font-semibold h-12"
+              onChange={(event) => setDraftName(event.target.value)}
               aria-label="Cluster name"
             />
-            <span className="flex gap-2 shrink-0">
+            <div className="flex gap-2">
               <Button
+                variant="secondary"
                 size="sm"
                 onClick={() => {
                   if (draftName.trim()) renameCluster(cluster.id, draftName.trim());
@@ -144,368 +414,122 @@ export default function ClusterDetailPage() {
               <Button variant="ghost" size="sm" onClick={closePanel}>
                 Cancel
               </Button>
-            </span>
-          </span>
-        ) : (
-          cluster.label
-        )
-      }
-      lead={cluster.why}
-      actions={
-        <Link href={`/reteach/${cluster.id}`} className={buttonClass("primary", "md")}>
-          <BookOpen size={16} strokeWidth={1.9} aria-hidden />
-          Generate reteach pack
-        </Link>
-      }
-      aside={
-        <>
-          {/* Downstream damage */}
-          <Card>
-            <CardHead
-              title="Downstream topics at risk"
-              hint={`Severity ${cluster.severity} of 5`}
-            />
-            {cluster.downstream.length > 0 ? (
-              <ul className="px-5 py-4 flex flex-col gap-2.5">
-                {cluster.downstream.map((t) => (
-                  <li key={t} className="flex items-start gap-2.5 text-[13.5px]">
-                    <TriangleAlert
-                      size={15}
-                      strokeWidth={2}
-                      className="text-warn shrink-0 mt-0.5"
-                      aria-hidden
-                    />
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="px-5 py-4 text-[13.5px] text-ink-2">
-                No downstream topics identified for this group.
-              </p>
-            )}
-            <div className="px-5 py-3 border-t border-border text-[12.5px] text-ink-3">
-              Damage score {cluster.severity * members.length} = severity {cluster.severity} ×{" "}
-              {members.length} students
             </div>
-          </Card>
+          </div>
+        ) : null}
 
-          {/* Roster */}
-          <Card>
-            <CardHead
-              title="Affected students"
-              hint={`${members.length} in this cluster`}
-              action={
-                <Button variant="secondary" size="sm" onClick={downloadRoster}>
-                  <Download size={14} strokeWidth={2} aria-hidden />
-                  CSV
-                </Button>
-              }
-            />
-            <ul className="px-5 py-4 grid grid-cols-2 gap-x-3 gap-y-2 max-h-[260px] overflow-y-auto scroll-thin">
-              {members.map((m) => (
-                <li key={m.id} className="flex items-center gap-2 min-w-0">
-                  <span
-                    className="grid place-items-center w-6 h-6 rounded-full bg-surface-2 text-[10px] font-semibold text-ink-2 shrink-0"
-                    aria-hidden
-                  >
-                    {m.initials.replace(/\./g, "")}
-                  </span>
-                  <span className="text-[12.5px] text-ink-2 truncate font-mono">
-                    {m.studentId.split("/").slice(-1)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="px-5 pb-4 text-[12px] text-ink-3">
-              Demo class — initials and invented IDs only.
+        {mode === "merge" ? (
+          <div className="flex flex-col gap-3 border-t border-border px-5 py-4">
+            <p className="text-[13px] text-ink-2">
+              Move all {members.length} answers into another cluster. This one disappears.
             </p>
-          </Card>
+            <div className="flex flex-col gap-1.5">
+              {others.map((other) => (
+                <label
+                  key={other.id}
+                  className="flex cursor-pointer items-center gap-2.5 rounded-[10px] px-2 py-1.5 text-[13.5px] hover:bg-surface-2"
+                >
+                  <input
+                    type="radio"
+                    name="merge-target"
+                    checked={mergeTarget === other.id}
+                    onChange={() => setMergeTarget(other.id)}
+                    className="accent-[var(--brand)]"
+                  />
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: toneColor(other.tone) }}
+                    aria-hidden
+                  />
+                  <span className="min-w-0 truncate">{other.label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!mergeTarget}
+                onClick={() => {
+                  mergeCluster(cluster.id, mergeTarget);
+                  router.push(`/clusters/${mergeTarget}`);
+                }}
+              >
+                Merge into selected
+              </Button>
+              <Button variant="ghost" size="sm" onClick={closePanel}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
-          {/* Controls */}
-          <Card>
-            <CardHead title="Correct this cluster" hint="You have the final say" />
-            <div className="px-5 py-4 grid grid-cols-2 gap-2">
+        {mode === "split" ? (
+          <div className="border-t border-border p-4">
+            <ActionArea
+              className="border-brand-line bg-brand-soft/40"
+              note={
+                <div className="flex flex-col gap-2">
+                  <p>
+                    Select the answers that do not belong in the verbatim evidence above, then
+                    name their new cluster.
+                  </p>
+                  <Input
+                    value={splitName}
+                    onChange={(event) => setSplitName(event.target.value)}
+                    placeholder="Name the new cluster…"
+                    aria-label="New cluster name"
+                  />
+                </div>
+              }
+            >
               <Button
-                variant="secondary"
-                size="sm"
+                size="md"
+                disabled={picked.length === 0 || !splitName.trim()}
                 onClick={() => {
-                  setDraftName(cluster.label);
-                  setMode("rename");
+                  splitOut(cluster.id, picked, splitName.trim());
+                  closePanel();
                 }}
               >
-                <Pencil size={14} strokeWidth={2} aria-hidden />
-                Rename
+                Split {picked.length} selected
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setMode(mode === "merge" ? null : "merge")}
-                disabled={others.length === 0}
-              >
-                <GitMerge size={14} strokeWidth={2} aria-hidden />
-                Merge
+              <Button variant="secondary" size="md" onClick={closePanel}>
+                Cancel
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setPicked([]);
-                  setMode(mode === "split" ? null : "split");
-                }}
-                disabled={members.length < 2}
-              >
-                <Split size={14} strokeWidth={2} aria-hidden />
-                Split
-              </Button>
+            </ActionArea>
+          </div>
+        ) : null}
+
+        {mode === "reject" ? (
+          <div className="flex flex-col gap-3 border-t border-border px-5 py-4">
+            <p className="text-[13px] text-ink-2">
+              Rejecting sends these {members.length} answers to the one-off bucket. Nothing is
+              deleted, and their scores are untouched.
+            </p>
+            <div className="flex gap-2">
               <Button
                 variant="danger"
                 size="sm"
-                onClick={() => setMode(mode === "reject" ? null : "reject")}
-                disabled={cluster.isOther}
+                onClick={() => {
+                  rejectCluster(cluster.id);
+                  router.push("/map");
+                }}
               >
-                <X size={14} strokeWidth={2.2} aria-hidden />
-                Reject
+                Reject this cluster
+              </Button>
+              <Button variant="ghost" size="sm" onClick={closePanel}>
+                Keep it
               </Button>
             </div>
-
-            {mode === "merge" ? (
-              <div className="px-5 py-4 border-t border-border flex flex-col gap-3">
-                <p className="text-[13px] text-ink-2">
-                  Move all {members.length} answers into another cluster. This one disappears.
-                </p>
-                <div className="flex flex-col gap-1.5">
-                  {others.map((o) => (
-                    <label
-                      key={o.id}
-                      className="flex items-center gap-2.5 text-[13.5px] cursor-pointer rounded-[10px] px-2 py-1.5 hover:bg-surface-2"
-                    >
-                      <input
-                        type="radio"
-                        name="merge-target"
-                        checked={mergeTarget === o.id}
-                        onChange={() => setMergeTarget(o.id)}
-                        className="accent-[var(--brand)]"
-                      />
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ background: toneColor(o.tone) }}
-                        aria-hidden
-                      />
-                      <span className="min-w-0 truncate">{o.label}</span>
-                    </label>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    disabled={!mergeTarget}
-                    onClick={() => {
-                      mergeCluster(cluster.id, mergeTarget);
-                      router.push(`/clusters/${mergeTarget}`);
-                    }}
-                  >
-                    Merge into selected
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={closePanel}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-
-            {mode === "reject" ? (
-              <div className="px-5 py-4 border-t border-border flex flex-col gap-3">
-                <p className="text-[13px] text-ink-2">
-                  Rejecting sends these {members.length} answers to the one-off bucket. Nothing
-                  is deleted, and their scores are untouched.
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => {
-                      rejectCluster(cluster.id);
-                      router.push("/map");
-                    }}
-                  >
-                    Reject this cluster
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={closePanel}>
-                    Keep it
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </Card>
-        </>
-      }
-    >
-      {/* Headline numbers */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card className="px-5 py-4">
-          <div className="label-caps text-ink-3">Share of class</div>
-          <div
-            className="font-display text-[30px] font-semibold tnum leading-tight mt-0.5"
-            style={{ color: toneColor(cluster.tone) }}
-          >
-            {pct.toFixed(0)}%
           </div>
-          <div className="text-[12.5px] text-ink-2">
-            {members.length} of {TOTAL_ANSWERS} answers
-          </div>
-        </Card>
-        <Card className="px-5 py-4">
-          <div className="label-caps text-ink-3">Mean score here</div>
-          <div className="font-display text-[30px] font-semibold tnum leading-tight mt-0.5">
-            {members.length
-              ? (members.reduce((s, m) => s + m.provisionalScore, 0) / members.length).toFixed(1)
-              : "—"}
-            <span className="text-[16px] text-ink-3 font-normal"> / 10</span>
-          </div>
-          <div className="text-[12.5px] text-ink-2">Provisional, before your review</div>
-        </Card>
-        <Card className="px-5 py-4">
-          <div className="label-caps text-ink-3">Severity</div>
-          <div className="font-display text-[30px] font-semibold tnum leading-tight mt-0.5 text-warn">
-            {cluster.severity}
-            <span className="text-[16px] text-ink-3 font-normal"> / 5</span>
-          </div>
-          <div className="text-[12.5px] text-ink-2">
-            Blocks {cluster.downstream.length} later topic
-            {cluster.downstream.length === 1 ? "" : "s"}
-          </div>
-        </Card>
-      </div>
-
-      {/* Split bar */}
-      {mode === "split" ? (
-        <Card className="border-brand-line bg-brand-soft/50">
-          <div className="px-5 py-4 flex flex-col gap-3">
-            <div className="flex items-start gap-2.5">
-              <Split size={16} strokeWidth={2} className="text-brand shrink-0 mt-0.5" aria-hidden />
-              <p className="text-[13.5px]">
-                <b className="font-semibold">Select the answers that don&apos;t belong.</b>{" "}
-                They&apos;ll move into a new cluster of their own, and the counts on every screen
-                update.
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Input
-                value={splitName}
-                onChange={(e) => setSplitName(e.target.value)}
-                placeholder="Name the new cluster…"
-                aria-label="New cluster name"
-              />
-              <div className="flex gap-2 shrink-0">
-                <Button
-                  size="md"
-                  disabled={picked.length === 0 || !splitName.trim()}
-                  onClick={() => {
-                    splitOut(cluster.id, picked, splitName.trim());
-                    closePanel();
-                  }}
-                >
-                  Split {picked.length || ""} out
-                </Button>
-                <Button variant="ghost" size="md" onClick={closePanel}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Card>
-      ) : null}
-
-      {/* Evidence */}
-      <Card>
-        <CardHead
-          title="The evidence"
-          hint="Every answer in this cluster, verbatim, with the phrase that triggered the signature"
-          action={
-            <Badge tone="neutral">
-              <Quote size={11} strokeWidth={2.2} aria-hidden />
-              {members.length} answers
-            </Badge>
-          }
-        />
-        <ul className="divide-y divide-border">
-          {members.map((m) => {
-            const isPicked = picked.includes(m.id);
-            return (
-              <li
-                key={m.id}
-                className={cn(
-                  "px-5 sm:px-6 py-4 transition-colors",
-                  mode === "split" && "cursor-pointer hover:bg-surface-2",
-                  isPicked && "bg-brand-soft/40",
-                )}
-                onClick={
-                  mode === "split"
-                    ? () =>
-                        setPicked((p) =>
-                          p.includes(m.id) ? p.filter((x) => x !== m.id) : [...p, m.id],
-                        )
-                    : undefined
-                }
-              >
-                <div className="flex items-start gap-3">
-                  {mode === "split" ? (
-                    <input
-                      type="checkbox"
-                      checked={isPicked}
-                      onChange={() => {}}
-                      className="mt-1 accent-[var(--brand)] w-4 h-4 shrink-0"
-                      aria-label={`Select answer from ${m.studentId}`}
-                    />
-                  ) : null}
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
-                      <span className="font-mono text-[12.5px] text-ink-2">{m.studentId}</span>
-                      <span className="text-[12.5px] text-ink-3">{m.initials}</span>
-                      <Badge tone={m.provisionalScore >= 7 ? "ok" : m.provisionalScore >= 4 ? "warn" : "crit"}>
-                        {m.provisionalScore}/{m.maxScore}
-                      </Badge>
-                      <ConfidenceMeter value={m.confidence} />
-                    </div>
-
-                    <blockquote
-                      className="text-[14px] leading-relaxed text-ink border-l-2 pl-3.5"
-                      style={{ borderColor: toneColor(cluster.tone) }}
-                    >
-                      <Highlighted text={m.answer} span={m.evidenceSpan} tone={cluster.tone} />
-                    </blockquote>
-
-                    {m.errorSignature ? (
-                      <p className="text-[12.5px] text-ink-2 mt-2">
-                        <span className="label-caps text-ink-3 mr-1.5">Signature</span>
-                        {m.errorSignature}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-        <div className="px-5 sm:px-6 py-4 border-t border-border flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[13px] text-ink-2 flex items-center gap-2">
-            <Users size={15} strokeWidth={1.9} className="text-ink-3" aria-hidden />
-            This list is how you decide whether to trust the cluster.
-          </p>
-          <Link href={`/reteach/${cluster.id}`} className={buttonClass("secondary", "sm")}>
-            Teach against this
-            <ArrowRight size={14} strokeWidth={2} aria-hidden />
-          </Link>
-        </div>
+        ) : null}
       </Card>
     </Page>
   );
 }
 
 /** Renders the answer with its triggering span marked, falling back to plain
- *  text when the span can't be located. */
+ * text when the span can't be located. */
 function Highlighted({
   text,
   span,
