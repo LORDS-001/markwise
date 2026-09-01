@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { ArrowRight, MessageSquareQuote, Target, Users } from "lucide-react";
+import { Disclosure } from "@/components/disclosure";
 import { Page } from "@/components/shell";
 import { Badge, Card, EmptyState, buttonClass, cn, toneColor } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
@@ -65,7 +66,7 @@ export default function RevealPage() {
           <EmptyState
             icon={<Target size={26} strokeWidth={1.6} />}
             title="No prediction was entered"
-            body="The reveal compares your guess with the class's actual top misconception. Add a prediction on the setup screen before the next run — it takes one line, and it is the moment most lecturers remember."
+            body="The reveal compares your prediction with the leading misconception in the sample evidence. Add a prediction on the setup screen before the next preview."
             action={
               <div className="flex flex-wrap gap-2 justify-center">
                 <Link href="/" className={buttonClass("secondary", "md")}>
@@ -89,11 +90,11 @@ export default function RevealPage() {
         <Card>
           <EmptyState
             icon={<Target size={26} strokeWidth={1.6} />}
-            title="The pipeline hasn't run yet"
-            body="Run the batch first — the reveal needs the actual top cluster to compare your prediction against."
+            title="The sample analysis isn't ready yet"
+            body="Prepare the sample analysis before comparing your prediction with its leading misconception."
             action={
               <Link href="/processing" className={buttonClass("primary", "md")}>
-                Run the pipeline
+                Preview sample analysis
                 <ArrowRight size={16} strokeWidth={2} aria-hidden />
               </Link>
             }
@@ -107,21 +108,21 @@ export default function RevealPage() {
 
   const copy: Record<Verdict, { badge: string; head: string; body: string; tone: string }> = {
     matched: {
-      badge: "Matched",
-      head: "You called it.",
-      body: "Your instinct about this class lines up with what the answers actually show. The map below has the evidence.",
+      badge: "Match",
+      head: "Your prediction appears in the sample evidence.",
+      body: "The leading misconception and its evidence signatures contain the reasoning you expected.",
       tone: "ok",
     },
     partial: {
-      badge: "Partially matched",
-      head: "You were close, but not on it.",
-      body: "Part of your prediction appears in the top cluster and part of it doesn't. The difference is worth reading before Monday.",
+      badge: "Partial match",
+      head: "Part of your prediction appears in the sample evidence.",
+      body: "The leading misconception contains some of the reasoning you expected, but the sample evidence also points elsewhere.",
       tone: "warn",
     },
     missed: {
-      badge: "Missed",
-      head: "That isn't what went wrong.",
-      body: "The largest group of students failed for a different reason than you expected — and it is a reason you can teach against directly.",
+      badge: "Miss",
+      head: "The sample evidence points to a different misconception.",
+      body: "The leading misconception does not contain the reasoning you expected in your prediction.",
       tone: "crit",
     },
   };
@@ -130,72 +131,75 @@ export default function RevealPage() {
 
   return (
     <Page
-      eyebrow="Step 3 of 7 · shown once"
-      title="Your prediction, and the class"
+      eyebrow="Step 3 of 7 · sample results"
+      title="Compare your prediction"
+      lead="See whether the misconception you expected appears in the sample evidence."
       actions={
         <Link href="/map" className={buttonClass("primary", "md")}>
-          Open the misconception map
+          View misconception map
           <ArrowRight size={16} strokeWidth={2} aria-hidden />
         </Link>
       }
     >
-      <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr] items-stretch">
-        {/* Prediction */}
-        <Card className="flex flex-col">
-          <div className="px-5 sm:px-6 py-4 border-b border-border flex items-center gap-2">
-            <MessageSquareQuote size={16} strokeWidth={1.9} className="text-ink-3" aria-hidden />
-            <span className="label-caps text-ink-3">You predicted</span>
-          </div>
-          <div className="px-5 sm:px-6 py-6 flex-1 flex items-center">
-            <p className="font-display text-[20px] sm:text-[23px] leading-[1.35] text-ink-2 italic">
-              &ldquo;{prediction}&rdquo;
-            </p>
-          </div>
-          <div className="px-5 sm:px-6 py-3 border-t border-border text-[12.5px] text-ink-3">
-            Entered before the run, on the setup screen
-          </div>
-        </Card>
+      <Card>
+        <div className="grid lg:grid-cols-[1fr_auto_1fr] items-stretch">
+          {/* Prediction */}
+          <section className="flex flex-col">
+            <div className="px-5 sm:px-6 py-4 border-b border-border flex items-center gap-2">
+              <MessageSquareQuote size={16} strokeWidth={1.9} className="text-ink-3" aria-hidden />
+              <h2 className="text-[14px] font-semibold text-ink">Your prediction</h2>
+            </div>
+            <div className="px-5 sm:px-6 py-6 flex-1 flex items-center">
+              <p className="font-display text-[20px] sm:text-[23px] leading-[1.35] text-ink-2 italic">
+                &ldquo;{prediction}&rdquo;
+              </p>
+            </div>
+            <div className="px-5 sm:px-6 py-3 border-t border-border text-[12.5px] text-ink-3">
+              Entered before previewing the sample analysis
+            </div>
+          </section>
 
-        {/* Divider */}
-        <div className="hidden lg:flex flex-col items-center justify-center px-2">
-          <div className="flex-1 w-px bg-border" />
-          <span className="label-caps text-ink-3 py-3">vs</span>
-          <div className="flex-1 w-px bg-border" />
+          {/* Divider */}
+          <div className="hidden lg:flex flex-col items-center justify-center px-2">
+            <div className="flex-1 w-px bg-border" />
+            <span className="label-caps text-ink-3 py-3">vs</span>
+            <div className="flex-1 w-px bg-border" />
+          </div>
+
+          {/* Actual */}
+          <section
+            className="flex flex-col border-t border-border lg:border-l-[3px] lg:border-t-0"
+            style={{ borderLeftColor: toneColor(top.tone) }}
+          >
+            <div className="px-5 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Users size={16} strokeWidth={1.9} className="text-ink-3" aria-hidden />
+                <h2 className="text-[14px] font-semibold text-ink">What the sample shows</h2>
+              </div>
+              <Badge tone="neutral">Leading sample pattern</Badge>
+            </div>
+            <div className="px-5 sm:px-6 py-6 flex-1 flex flex-col justify-center gap-3">
+              <p className="font-display text-[20px] sm:text-[23px] leading-[1.35] font-semibold">
+                {top.label}
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span
+                  className="font-display text-[34px] font-semibold tnum leading-none"
+                  style={{ color: toneColor(top.tone) }}
+                >
+                  {share.toFixed(0)}%
+                </span>
+                <span className="text-[13.5px] text-ink-2">
+                  of sample answers — {top.memberIds.length} of {TOTAL_ANSWERS}
+                </span>
+              </div>
+            </div>
+            <div className="px-5 sm:px-6 py-3 border-t border-border text-[12.5px] text-ink-3">
+              Ranked by the number of sample answers affected
+            </div>
+          </section>
         </div>
-
-        {/* Actual */}
-        <Card
-          className="flex flex-col border-l-[3px]"
-          style={{ borderLeftColor: toneColor(top.tone) }}
-        >
-          <div className="px-5 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Users size={16} strokeWidth={1.9} className="text-ink-3" aria-hidden />
-              <span className="label-caps text-ink-3">The class actually</span>
-            </div>
-            <Badge tone="neutral">Largest cluster</Badge>
-          </div>
-          <div className="px-5 sm:px-6 py-6 flex-1 flex flex-col justify-center gap-3">
-            <p className="font-display text-[20px] sm:text-[23px] leading-[1.35] font-semibold">
-              {top.label}
-            </p>
-            <div className="flex items-baseline gap-2">
-              <span
-                className="font-display text-[34px] font-semibold tnum leading-none"
-                style={{ color: toneColor(top.tone) }}
-              >
-                {share.toFixed(0)}%
-              </span>
-              <span className="text-[13.5px] text-ink-2">
-                of the class — {top.memberIds.length} of {TOTAL_ANSWERS} answers
-              </span>
-            </div>
-          </div>
-          <div className="px-5 sm:px-6 py-3 border-t border-border text-[12.5px] text-ink-3">
-            Ranked by number of students affected
-          </div>
-        </Card>
-      </div>
+      </Card>
 
       {/* Verdict */}
       <Card
@@ -221,7 +225,7 @@ export default function RevealPage() {
           </div>
           <Link
             href={`/clusters/${top.id}`}
-            className={buttonClass("primary", "lg", "shrink-0 w-full sm:w-auto")}
+            className={buttonClass("secondary", "lg", "shrink-0 w-full sm:w-auto")}
           >
             Read the evidence
             <ArrowRight size={17} strokeWidth={2} aria-hidden />
@@ -229,12 +233,22 @@ export default function RevealPage() {
         </div>
       </Card>
 
+      <Disclosure
+        title="How the comparison is decided"
+        description="Optional detail about matching phrases"
+      >
+        <p>
+          The preview compares meaningful phrases in the prediction with the leading
+          misconception label and its evidence signatures.
+        </p>
+      </Disclosure>
+
       {/* Runners up */}
       {ranked.length > 1 ? (
         <Card>
           <div className="px-5 sm:px-6 py-4 border-b border-border">
             <h2 className="font-display text-[17px] font-semibold">
-              The rest of what it found
+              Other patterns in the sample
             </h2>
           </div>
           <ul className="divide-y divide-border">
@@ -253,7 +267,7 @@ export default function RevealPage() {
                     {c.label}
                   </span>
                   <span className="tnum text-[13px] text-ink-2 shrink-0">
-                    {c.memberIds.length} students ·{" "}
+                    {c.memberIds.length} sample answers ·{" "}
                     {((c.memberIds.length / TOTAL_ANSWERS) * 100).toFixed(0)}%
                   </span>
                   <ArrowRight size={15} strokeWidth={2} className="text-ink-3 shrink-0" aria-hidden />
@@ -263,10 +277,6 @@ export default function RevealPage() {
           </ul>
         </Card>
       ) : null}
-
-      <p className="text-center text-[13px] text-ink-3 pb-2">
-        The reveal is shown once per run. You can always reach it again from the sidebar.
-      </p>
     </Page>
   );
 }
