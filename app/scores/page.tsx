@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Check,
@@ -53,6 +53,9 @@ export default function ScoresPage() {
   const [onlyUnreviewed, setOnlyUnreviewed] = useState(false);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+  const [reviewFocusRequest, setReviewFocusRequest] = useState(0);
+  const desktopRowsRef = useRef<HTMLTableSectionElement>(null);
+  const mobileRowsRef = useRef<HTMLUListElement>(null);
 
   const clusterOf = useMemo(() => {
     const clusterMap = new Map(clusters.map((cluster) => [cluster.id, cluster]));
@@ -98,6 +101,23 @@ export default function ScoresPage() {
     (answer) =>
       answer.status === "unreviewed" && answer.confidence >= CONFIDENCE_THRESHOLD,
   );
+  const hasSearchQuery = query.trim().length > 0;
+
+  useEffect(() => {
+    if (reviewFocusRequest === 0) return;
+
+    const isDesktop =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(min-width: 1024px)").matches
+        : window.innerWidth >= 1024;
+    const reviewRows = isDesktop ? desktopRowsRef.current : mobileRowsRef.current;
+    const unresolvedRow = reviewRows?.querySelector<HTMLElement>(
+      '[data-review-row="unreviewed"]',
+    );
+
+    unresolvedRow?.focus();
+    unresolvedRow?.scrollIntoView?.({ block: "nearest" });
+  }, [reviewFocusRequest]);
 
   const shared = {
     clusterOf,
@@ -204,6 +224,7 @@ export default function ScoresPage() {
                     onClick={() => {
                       setQuery("");
                       setOnlyUnreviewed(true);
+                      setReviewFocusRequest((request) => request + 1);
                     }}
                   >
                     Review remaining
@@ -229,7 +250,7 @@ export default function ScoresPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody ref={desktopRowsRef} className="divide-y divide-border">
                   {rows.map((answer) => (
                     <TableRow key={answer.id} a={answer} {...shared} />
                   ))}
@@ -237,7 +258,7 @@ export default function ScoresPage() {
               </table>
             </div>
 
-            <ul className="divide-y divide-border lg:hidden">
+            <ul ref={mobileRowsRef} className="divide-y divide-border lg:hidden">
               {rows.map((answer) => (
                 <MobileRow key={answer.id} a={answer} {...shared} />
               ))}
@@ -245,7 +266,11 @@ export default function ScoresPage() {
 
             {rows.length === 0 ? (
               <p className="px-5 py-10 text-center text-[14px] text-ink-2">
-                Every row has been reviewed. Clear the filter to see them all.
+                {hasSearchQuery
+                  ? `No responses match "${query.trim()}". Try a different search or clear it.`
+                  : onlyUnreviewed && remainingCount === 0
+                    ? "Every row has been reviewed. Clear the filter to see them all."
+                    : "No responses are available for review."}
               </p>
             ) : null}
           </Card>
@@ -308,6 +333,11 @@ function TableRow({ a, clusterOf, setScore, setStatus, open, setOpen }: RowProps
   return (
     <>
       <tr
+        data-review-row={a.status}
+        tabIndex={-1}
+        aria-label={
+          a.status === "unreviewed" ? `Review unresolved response from ${a.initials}` : undefined
+        }
         className={cn(
           "h-12 transition-colors",
           low && a.status === "unreviewed" && "bg-warn-soft/45",
@@ -373,7 +403,14 @@ function MobileRow({ a, clusterOf, setScore, setStatus, open, setOpen }: RowProp
   const expanded = open === a.id;
 
   return (
-    <li className={cn(low && a.status === "unreviewed" && "bg-warn-soft/45")}>
+    <li
+      data-review-row={a.status}
+      tabIndex={-1}
+      aria-label={
+        a.status === "unreviewed" ? `Review unresolved response from ${a.initials}` : undefined
+      }
+      className={cn(low && a.status === "unreviewed" && "bg-warn-soft/45")}
+    >
       <div className="flex flex-col gap-3 px-4 py-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
