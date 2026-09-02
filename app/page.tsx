@@ -1,6 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   ClipboardList,
@@ -58,6 +65,8 @@ export default function SetupPage() {
   const [csvRows, setCsvRows] = useState(0);
   const [csvError, setCsvError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const csvReadGenerationRef = useRef(0);
+  const activeCsvReaderRef = useRef<FileReader | null>(null);
   const answerTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const answerCount = useMemo(() => {
@@ -74,11 +83,27 @@ export default function SetupPage() {
     scheme.trim().length > 0 &&
     answerCount > 1;
 
+  const invalidateCsvRead = useCallback(() => {
+    csvReadGenerationRef.current += 1;
+    const reader = activeCsvReaderRef.current;
+    activeCsvReaderRef.current = null;
+    if (!reader) return;
+
+    try {
+      reader.abort();
+    } catch {
+      // A reader may finish between invalidation and abort. It is already stale.
+    }
+  }, []);
+
+  useEffect(() => () => invalidateCsvRead(), [invalidateCsvRead]);
+
   function clearCsvFileSelection() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
   function loadDemo() {
+    invalidateCsvRead();
     setQuestion(SESSION.question);
     setScheme(
       "Full marks require the reactance computed from X_L = 2πfL, the impedance combined in quadrature as Z = √(R² + X_L²), the current from I = V/Z, the phase angle from φ = arctan(X_L/R) stated as the angle between supply voltage and current, and correct units throughout.",
@@ -96,6 +121,7 @@ export default function SetupPage() {
   }
 
   function clearAll() {
+    invalidateCsvRead();
     setQuestion("");
     setScheme("");
     setCriteria([{ id: "c-1", label: "", marks: 1 }]);
@@ -110,6 +136,7 @@ export default function SetupPage() {
   }
 
   function onFile(file: File | undefined) {
+    invalidateCsvRead();
     if (!file) return;
     setCsvError(null);
     setCsvName(null);
@@ -120,18 +147,30 @@ export default function SetupPage() {
       return;
     }
     const reader = new FileReader();
+    const generation = csvReadGenerationRef.current;
+    activeCsvReaderRef.current = reader;
+    const isCurrentRead = () =>
+      csvReadGenerationRef.current === generation && activeCsvReaderRef.current === reader;
     reader.onload = () => {
+      if (!isCurrentRead()) return;
+
       try {
         const text = String(reader.result ?? "");
         const rows = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        if (!isCurrentRead()) return;
+        activeCsvReaderRef.current = null;
         setCsvName(file.name);
         setCsvRows(Math.max(0, rows.length - 1));
       } catch {
+        if (!isCurrentRead()) return;
+        invalidateCsvRead();
         clearCsvFileSelection();
         setCsvError("That file couldn't be read. Try re-exporting it as CSV.");
       }
     };
     reader.onerror = () => {
+      if (!isCurrentRead()) return;
+      invalidateCsvRead();
       clearCsvFileSelection();
       setCsvError("That file couldn't be read. Try re-exporting it as CSV.");
     };
