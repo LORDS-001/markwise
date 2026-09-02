@@ -41,6 +41,30 @@ describe("tracked UI review runner contract", () => {
     expect(matrix.DESKTOP_ASIDE_SELECTOR).toBe('aside[class~="lg:block"]');
   });
 
+  it("keeps the theme trace safe before the document root exists", () => {
+    const source = matrix.createThemeTraceSource({ preference: "light" });
+    const runAtDocumentStart = new Function(
+      "document",
+      "localStorage",
+      "window",
+      "MutationObserver",
+      "requestAnimationFrame",
+      "setTimeout",
+      source,
+    );
+
+    expect(() =>
+      runAtDocumentStart(
+        { documentElement: null },
+        { setItem() {} },
+        {},
+        class MutationObserver {},
+        () => undefined,
+        () => undefined,
+      ),
+    ).not.toThrow();
+  });
+
   it("keeps all eleven keyboard-only workflow groups named and ordered", () => {
     expect(keyboard.GROUP_NAMES).toEqual([
       "Skip link",

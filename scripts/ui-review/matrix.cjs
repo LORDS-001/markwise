@@ -150,8 +150,8 @@ async function createContactSheet(cdp, screenshotManifest) {
   };
 }
 
-async function installThemeTrace(cdp, appearance) {
-  const source = `(() => {
+function createThemeTraceSource(appearance) {
+  return `(() => {
     try { localStorage.setItem("markwise-theme", ${JSON.stringify(appearance.preference)}); } catch {}
     window.__uiReviewThemeTrace = [];
     const record = (kind) => window.__uiReviewThemeTrace.push({
@@ -159,12 +159,24 @@ async function installThemeTrace(cdp, appearance) {
       theme: document.documentElement.getAttribute("data-theme"),
       at: performance.now(),
     });
-    new MutationObserver(() => record("mutation")).observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
+    const observeRoot = () => {
+      if (!document.documentElement) {
+        setTimeout(observeRoot, 0);
+        return;
+      }
+      record("observer-start");
+      new MutationObserver(() => record("mutation")).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-theme"],
+      });
+    };
+    observeRoot();
     requestAnimationFrame(() => record("first-animation-frame"));
   })();`;
+}
+
+async function installThemeTrace(cdp, appearance) {
+  const source = createThemeTraceSource(appearance);
   return cdp.send("Page.addScriptToEvaluateOnNewDocument", { source });
 }
 
@@ -320,7 +332,9 @@ async function runMatrix(options = {}) {
       consoleMessages.push({ type: event.type, text: event.args?.map((arg) => arg.value || arg.description).join(" ") });
     }
   });
-  cdp.on("Runtime.exceptionThrown", (event) => runtimeErrors.push(event.exceptionDetails?.text || "Runtime exception"));
+  cdp.on("Runtime.exceptionThrown", (event) => runtimeErrors.push(
+    event.exceptionDetails?.exception?.description || event.exceptionDetails?.text || "Runtime exception",
+  ));
   cdp.on("Log.entryAdded", (event) => {
     if (["error", "warning"].includes(event.entry?.level)) consoleMessages.push({ type: event.entry.level, text: event.entry.text });
   });
@@ -456,6 +470,7 @@ module.exports = {
   SUPPORTED_INK_SURFACES,
   VIEWPORTS,
   contrastRatio,
+  createThemeTraceSource,
   runMatrix,
   shouldCaptureScreenshot,
 };
