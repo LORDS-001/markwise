@@ -80,5 +80,8 @@ describe("tracked UI review runner contract", () => {
       "Export workflow",
     ]);
     expect(keyboard.KEY_DEFINITIONS.Enter.text).toBe("\r");
+    expect(keyboard.HYDRATION_READY_EXPRESSION).toBe(
+      "document.readyState === 'complete' && !!document.querySelector('main#main')",
+    );
   });
 });

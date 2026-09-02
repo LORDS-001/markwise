@@ -23,6 +23,8 @@ const GROUP_NAMES = [
   "Scores workflow",
   "Export workflow",
 ];
+const HYDRATION_READY_EXPRESSION =
+  "document.readyState === 'complete' && !!document.querySelector('main#main')";
 
 const KEY_DEFINITIONS = {
   Tab: { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 },
@@ -285,7 +287,7 @@ async function runKeyboard(options = {}) {
       await setViewport(cdp, 1440, 1000);
       await navigate(cdp, `${origin}/`);
       await evaluate(cdp, "localStorage.setItem('markwise-theme','system'); location.reload(); true");
-      await waitFor(cdp, "document.readyState === 'complete' && document.querySelector('main#main')");
+      await waitFor(cdp, HYDRATION_READY_EXPRESSION);
       await tabTo(cdp, context, named(/^Settings$/), "Settings trigger");
       await activate(cdp, context);
       await tabTo(cdp, context, named(/^Use device setting$/), "checked system radio");
@@ -578,4 +580,9 @@ if (require.main === module) {
   });
 }
 
-module.exports = { GROUP_NAMES, KEY_DEFINITIONS, runKeyboard };
+module.exports = {
+  GROUP_NAMES,
+  HYDRATION_READY_EXPRESSION,
+  KEY_DEFINITIONS,
+  runKeyboard,
+};
