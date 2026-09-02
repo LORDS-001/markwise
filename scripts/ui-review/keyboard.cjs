@@ -243,6 +243,15 @@ function historyEntryForPath(entries, pathname) {
   });
 }
 
+function visibleStatusCountExpression(label) {
+  return `(() => [...document.querySelectorAll('button')].filter((button) => {
+    const rect = button.getBoundingClientRect();
+    const style = getComputedStyle(button);
+    return button.textContent.trim() === ${JSON.stringify(label)} &&
+      rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+  }).length)()`;
+}
+
 async function runKeyboard(options = {}) {
   const debugPort = Number(options.debugPort || process.argv[2] || 9222);
   const outputName = options.outputName || process.argv[3] || "chrome-keyboard.json";
@@ -529,15 +538,17 @@ async function runKeyboard(options = {}) {
       await tabTo(cdp, context, named(/^Edited$/), "Edited status");
       await activate(cdp, context);
       await tabTo(cdp, context, named(/^Flag for a second look$/), "specific flag action");
-      const beforeFlagged = await evaluate(cdp, "[...document.querySelectorAll('button')].filter((button) => /Flagged/.test(button.textContent)).length");
+      const flaggedCount = visibleStatusCountExpression("Flagged");
+      const beforeFlagged = await evaluate(cdp, flaggedCount);
       await activate(cdp, context);
-      await assertEval(cdp, context, "specific row becomes flagged", `[...document.querySelectorAll('button')].filter((button) => /Flagged/.test(button.textContent)).length === ${beforeFlagged + 1}`);
+      await assertEval(cdp, context, "specific row becomes flagged", `${flaggedCount} === ${beforeFlagged + 1}`);
       await tabTo(cdp, context, named(/^Flagged$/), "Flagged status");
       await activate(cdp, context);
       await tabTo(cdp, context, named(/^Accept$/), "specific accept action");
-      const beforeAccepted = await evaluate(cdp, "[...document.querySelectorAll('button')].filter((button) => /Accepted/.test(button.textContent)).length");
+      const acceptedCount = visibleStatusCountExpression("Accepted");
+      const beforeAccepted = await evaluate(cdp, acceptedCount);
       await activate(cdp, context);
-      await assertEval(cdp, context, "specific row becomes accepted", `[...document.querySelectorAll('button')].filter((button) => /Accepted/.test(button.textContent)).length === ${beforeAccepted + 1}`);
+      await assertEval(cdp, context, "specific row becomes accepted", `${acceptedCount} === ${beforeAccepted + 1}`);
       await tabTo(cdp, context, named(/^Search responses$/), "return to search", { shift: true });
       await replaceText(cdp, context, "");
       await tabTo(cdp, context, named(/Only unreviewed/), "status filter");
@@ -666,5 +677,6 @@ module.exports = {
   historyEntryForPath,
   isRadioSnapshot,
   printableKeyPayload,
+  visibleStatusCountExpression,
   runKeyboard,
 };

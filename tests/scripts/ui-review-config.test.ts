@@ -108,5 +108,8 @@ describe("tracked UI review runner contract", () => {
       ),
     ).toEqual({ id: 1, url: "http://127.0.0.1:3017/clusters/cl-phase" });
     expect(keyboard.REJECT_DESTINATION).toBe("/map");
+    const visibleFlagged = keyboard.visibleStatusCountExpression("Flagged");
+    expect(visibleFlagged).toContain("getBoundingClientRect");
+    expect(visibleFlagged).toContain('"Flagged"');
   });
 });
