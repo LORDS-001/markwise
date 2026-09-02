@@ -27,6 +27,7 @@ const HYDRATION_READY_EXPRESSION =
   "document.readyState === 'complete' && !!document.querySelector('main#main')";
 const SPLIT_MEMBER_TAB_OPTIONS = { shift: true };
 const MERGE_RETURN_KEY = { key: "ArrowLeft", modifiers: 1, isSystemKey: true };
+const REJECT_DESTINATION = "/map";
 
 const KEY_DEFINITIONS = {
   Tab: { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 },
@@ -483,8 +484,13 @@ async function runKeyboard(options = {}) {
       await activate(cdp, context);
       await tabTo(cdp, context, named(/Reject this cluster/), "Cluster reject confirmation");
       await activate(cdp, context);
-      await waitFor(cdp, "/This cluster no longer exists/.test(document.querySelector('h1')?.textContent || '')");
-      await assertEval(cdp, context, "rejected cluster fallback", "document.body.innerText.includes('It was merged or rejected')");
+      await waitPath(cdp, REJECT_DESTINATION);
+      await assertEval(
+        cdp,
+        context,
+        "cluster rejection returns to the current map without the rejected cluster",
+        "location.pathname === '/map' && !document.body.innerText.includes('Impedance and resistance are the same quantity')",
+      );
     });
 
     await group("Reteach workflow", async (context) => {
@@ -654,6 +660,7 @@ module.exports = {
   HYDRATION_READY_EXPRESSION,
   KEY_DEFINITIONS,
   MERGE_RETURN_KEY,
+  REJECT_DESTINATION,
   SPLIT_MEMBER_TAB_OPTIONS,
   focusSignature,
   historyEntryForPath,

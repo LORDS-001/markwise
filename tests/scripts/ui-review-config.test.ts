@@ -107,5 +107,6 @@ describe("tracked UI review runner contract", () => {
         "/clusters/cl-phase",
       ),
     ).toEqual({ id: 1, url: "http://127.0.0.1:3017/clusters/cl-phase" });
+    expect(keyboard.REJECT_DESTINATION).toBe("/map");
   });
 });
