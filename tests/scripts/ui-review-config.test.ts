@@ -221,4 +221,25 @@ describe("tracked UI review runner contract", () => {
     expect(options).toEqual({ shift: true });
     expect(keyboard.tabTraversalModifiers(options)).toBe(8);
   });
+
+  it("reaches Merge from the restored Split action without crossing document-root focus", async () => {
+    const calls: unknown[][] = [];
+    const reached = { name: "Merge" };
+    const result = await keyboard.tabToClusterMergeAfterSplit(
+      "cdp",
+      "context",
+      (...args: unknown[]) => {
+        calls.push(args);
+        return Promise.resolve(reached);
+      },
+    );
+
+    expect(result).toBe(reached);
+    expect(calls).toHaveLength(1);
+    const [, , predicate, label, options] = calls[0];
+    expect((predicate as (snapshot: { name: string }) => boolean)(reached)).toBe(true);
+    expect(label).toBe("Cluster merge action");
+    expect(options).toEqual({ shift: true });
+    expect(keyboard.tabTraversalModifiers(options)).toBe(8);
+  });
 });

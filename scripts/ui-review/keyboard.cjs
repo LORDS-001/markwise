@@ -256,6 +256,16 @@ async function tabToMapAfterSplits(cdp, context, tabToImpl = tabTo) {
   );
 }
 
+async function tabToClusterMergeAfterSplit(cdp, context, tabToImpl = tabTo) {
+  return tabToImpl(
+    cdp,
+    context,
+    named(/^Merge$/),
+    "Cluster merge action",
+    { shift: true },
+  );
+}
+
 async function assertEval(cdp, context, label, expression) {
   const result = await evaluate(cdp, expression);
   invariant(Boolean(result), `${label} failed; value ${JSON.stringify(result)}`);
@@ -531,7 +541,7 @@ async function runKeyboard(options = {}) {
       await waitFor(cdp, "document.activeElement?.tagName === 'BUTTON' && document.activeElement.textContent.trim() === 'Split'");
       await tabTo(cdp, context, named(/^Split$/), "Cluster restored Split action");
       await assertEval(cdp, context, "cluster split changes roster", "!document.body.innerText.includes('Split 1 selected')");
-      await tabTo(cdp, context, named(/^Merge$/), "Cluster merge action");
+      await tabToClusterMergeAfterSplit(cdp, context);
       await activate(cdp, context);
       await tabTo(cdp, context, isRadioSnapshot, "Cluster merge target");
       await activate(cdp, context, "Space");
@@ -761,6 +771,7 @@ module.exports = {
   replacementPlan,
   tabToProcessingCompletion,
   tabToMapAfterSplits,
+  tabToClusterMergeAfterSplit,
   tabTraversalModifiers,
   visibleStatusCountExpression,
   runKeyboard,
