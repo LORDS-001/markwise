@@ -28,6 +28,10 @@ const HYDRATION_READY_EXPRESSION =
 const SPLIT_MEMBER_TAB_OPTIONS = { shift: true };
 const EXPORT_READY_TAB_OPTIONS = { shift: true };
 const REVIEWER_VALIDATION_VALUE = "";
+const ACCOUNT_DEMO_EXPRESSION = `!!document.querySelector('[title="Demo preview"]') && (() => {
+  const region = document.querySelector('[aria-label="Account connection"]');
+  return !!region && !region.querySelector('input[type=email]');
+})()`;
 const MERGE_RETURN_KEY = { key: "ArrowLeft", modifiers: 1, isSystemKey: true };
 const REJECT_DESTINATION = "/map";
 const SCORES_EVIDENCE_EXPRESSION = `document.activeElement.getAttribute('aria-expanded') === 'true' && (() => {
@@ -619,7 +623,7 @@ async function runKeyboard(options = {}) {
       await waitFor(cdp, "!![...document.querySelectorAll('button')].find((button) => /Download DOCX/.test(button.textContent) && !button.disabled)", 20_000);
       await waitForObserved(() => downloads.length > beforeDocx, "DOCX browser download");
       assertObserved(context, "DOCX download event", downloads.at(-1)?.suggestedFilename.endsWith(".docx"));
-      await assertEval(cdp, context, "demo account state remains truthful", "document.querySelector('[aria-label=\"Account connection\"]')?.innerText.includes('Demo preview') && !document.querySelector('[aria-label=\"Account connection\"] input[type=email]')");
+      await assertEval(cdp, context, "demo account state remains truthful", ACCOUNT_DEMO_EXPRESSION);
     });
 
     await delay(500);
@@ -682,6 +686,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  ACCOUNT_DEMO_EXPRESSION,
   EXPORT_READY_TAB_OPTIONS,
   GROUP_NAMES,
   HYDRATION_READY_EXPRESSION,
