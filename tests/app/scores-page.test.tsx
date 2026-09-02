@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import ScoresPage from "@/app/scores/page";
 import { SessionProvider, useSession } from "@/components/session-provider";
@@ -173,6 +174,38 @@ it.each([
 );
 
 it(
+  "restores status focus inside the activated mobile renderer",
+  async () => {
+    const user = userEvent.setup();
+    renderScores();
+    const toolbar = screen.getByRole("toolbar", { name: "Score review controls" });
+    await user.type(
+      within(toolbar).getByRole("searchbox", { name: "Search responses" }),
+      "EEE/022/0103",
+    );
+    const score = screen
+      .getAllByRole("spinbutton", { name: "Score for A.O." })
+      .find((input) => input.closest("li"));
+    const row = score?.closest("li") as HTMLLIElement;
+
+    await user.clear(score!);
+    await user.type(score!, "7");
+    await user.tab();
+    expect(within(row).getByRole("button", { name: "Edited" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    const mobileAccept = within(row).getByRole("button", { name: "Accept" });
+    expect(mobileAccept).toHaveFocus();
+    expect(
+      within(screen.getByRole("table", { name: "Student score review" })).getByRole("button", {
+        name: "Accept",
+      }),
+    ).not.toHaveFocus();
+  },
+  TEST_TIMEOUT,
+);
+
+it(
   "does not steal focus from score editing after Review remaining",
   () => {
     installMatchMedia(true);
@@ -320,6 +353,71 @@ it(
     fireEvent.click(within(row).getByRole("button", { name: "Accepted" }));
     fireEvent.click(within(row).getByRole("button", { name: "Flag for a second look" }));
     expect(within(row).getByRole("button", { name: "Flagged" })).toBeVisible();
+  },
+  TEST_TIMEOUT,
+);
+
+it.each([
+  { actionName: "Accept", reviewedName: "Accepted" },
+  { actionName: "Flag for a second look", reviewedName: "Flagged" },
+])(
+  "keeps keyboard focus through Edited, unreviewed, and $reviewedName status replacements",
+  async ({ actionName, reviewedName }) => {
+    const user = userEvent.setup();
+    renderScores();
+    const toolbar = screen.getByRole("toolbar", { name: "Score review controls" });
+    const search = within(toolbar).getByRole("searchbox", { name: "Search responses" });
+    await user.type(search, "EEE/022/0103");
+    const table = screen.getByRole("table", { name: "Student score review" });
+    const row = table.querySelector("tbody > tr") as HTMLTableRowElement;
+    const score = within(row).getByRole("spinbutton", { name: "Score for A.O." });
+
+    await user.clear(score);
+    await user.type(score, "7");
+    expect(score).toHaveFocus();
+
+    await user.tab();
+    const edited = within(row).getByRole("button", { name: "Edited" });
+    expect(edited).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    const accept = within(row).getByRole("button", { name: "Accept" });
+    expect(accept).toHaveFocus();
+    if (actionName === "Flag for a second look") {
+      await user.tab();
+    }
+    const action = within(row).getByRole("button", { name: actionName });
+    expect(action).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    const reviewed = within(row).getByRole("button", { name: reviewedName });
+    expect(reviewed).toHaveFocus();
+    expect(document.body).not.toHaveFocus();
+  },
+  TEST_TIMEOUT,
+);
+
+it(
+  "returns focus to Search responses when accepting removes the focused filtered row",
+  async () => {
+    const user = userEvent.setup();
+    renderScores();
+    const toolbar = screen.getByRole("toolbar", { name: "Score review controls" });
+    const search = within(toolbar).getByRole("searchbox", { name: "Search responses" });
+    await user.type(search, "EEE/022/0103");
+    await user.click(within(toolbar).getByRole("checkbox", { name: /Only unreviewed/ }));
+    const table = screen.getByRole("table", { name: "Student score review" });
+    const row = table.querySelector("tbody > tr") as HTMLTableRowElement;
+    const score = within(row).getByRole("spinbutton", { name: "Score for A.O." });
+
+    await user.click(score);
+    await user.tab();
+    expect(within(row).getByRole("button", { name: "Accept" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    expect(table.querySelectorAll("tbody > tr")).toHaveLength(0);
+    expect(search).toHaveFocus();
+    expect(document.body).not.toHaveFocus();
   },
   TEST_TIMEOUT,
 );

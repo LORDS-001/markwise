@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Check,
@@ -35,6 +35,13 @@ import {
 import type { StudentAnswer } from "@/lib/types";
 
 type SortKey = "confidence" | "score" | "cluster";
+type StatusFocusTarget = "accept" | "reviewed";
+type StatusChange = (
+  id: string,
+  status: StudentAnswer["status"],
+  container: HTMLDivElement | null,
+  target: StatusFocusTarget,
+) => void;
 
 export default function ScoresPage() {
   const {
@@ -54,8 +61,13 @@ export default function ScoresPage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const [reviewFocusRequest, setReviewFocusRequest] = useState(0);
+  const searchRef = useRef<HTMLInputElement>(null);
   const desktopRowsRef = useRef<HTMLTableSectionElement>(null);
   const mobileRowsRef = useRef<HTMLUListElement>(null);
+  const statusFocusIntentRef = useRef<{
+    container: HTMLDivElement | null;
+    target: StatusFocusTarget;
+  } | null>(null);
 
   const clusterOf = useMemo(() => {
     const clusterMap = new Map(clusters.map((cluster) => [cluster.id, cluster]));
@@ -119,10 +131,28 @@ export default function ScoresPage() {
     unresolvedRow?.scrollIntoView?.({ block: "nearest" });
   }, [reviewFocusRequest]);
 
+  useLayoutEffect(() => {
+    const intent = statusFocusIntentRef.current;
+    if (!intent) return;
+    statusFocusIntentRef.current = null;
+
+    const replacement = intent.container?.isConnected
+      ? intent.container.querySelector<HTMLElement>(
+          `[data-status-focus="${intent.target}"]`,
+        )
+      : null;
+    (replacement ?? searchRef.current)?.focus();
+  }, [answers]);
+
+  const changeStatusWithFocus: StatusChange = (id, status, container, target) => {
+    statusFocusIntentRef.current = { container, target };
+    setStatus(id, status);
+  };
+
   const shared = {
     clusterOf,
     setScore,
-    setStatus,
+    changeStatusWithFocus,
     open,
     setOpen,
   };
@@ -164,6 +194,7 @@ export default function ScoresPage() {
             >
               <div className="flex flex-1 flex-wrap items-center gap-3">
                 <input
+                  ref={searchRef}
                   type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
@@ -323,12 +354,12 @@ type RowProps = {
   a: StudentAnswer;
   clusterOf: (id: string | null) => { label: string; tone: number } | undefined;
   setScore: (id: string, score: number) => void;
-  setStatus: (id: string, status: StudentAnswer["status"]) => void;
+  changeStatusWithFocus: StatusChange;
   open: string | null;
   setOpen: (value: string | null) => void;
 };
 
-function TableRow({ a, clusterOf, setScore, setStatus, open, setOpen }: RowProps) {
+function TableRow({ a, clusterOf, setScore, changeStatusWithFocus, open, setOpen }: RowProps) {
   const low = a.confidence < CONFIDENCE_THRESHOLD;
   const cluster = clusterOf(a.clusterId);
   const expanded = open === a.id;
@@ -371,7 +402,7 @@ function TableRow({ a, clusterOf, setScore, setStatus, open, setOpen }: RowProps
           <ConfidenceMeter value={a.confidence} />
         </td>
         <td className="px-3 py-1.5">
-          <StatusCell a={a} setStatus={setStatus} />
+          <StatusCell a={a} changeStatus={changeStatusWithFocus} />
         </td>
         <td className="px-2 py-1.5">
           <button
@@ -400,7 +431,7 @@ function TableRow({ a, clusterOf, setScore, setStatus, open, setOpen }: RowProps
   );
 }
 
-function MobileRow({ a, clusterOf, setScore, setStatus, open, setOpen }: RowProps) {
+function MobileRow({ a, clusterOf, setScore, changeStatusWithFocus, open, setOpen }: RowProps) {
   const low = a.confidence < CONFIDENCE_THRESHOLD;
   const cluster = clusterOf(a.clusterId);
   const expanded = open === a.id;
@@ -425,7 +456,7 @@ function MobileRow({ a, clusterOf, setScore, setStatus, open, setOpen }: RowProp
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <ScoreInput a={a} setScore={setScore} />
-          <StatusCell a={a} setStatus={setStatus} />
+          <StatusCell a={a} changeStatus={changeStatusWithFocus} />
         </div>
 
         <p className="line-clamp-2 text-[12.5px] leading-relaxed text-ink-2" title={a.answer}>
@@ -534,47 +565,58 @@ function ClusterCell({
 
 function StatusCell({
   a,
-  setStatus,
+  changeStatus,
 }: {
   a: StudentAnswer;
-  setStatus: (id: string, status: StudentAnswer["status"]) => void;
+  changeStatus: StatusChange;
 }) {
-  if (a.status === "unreviewed") {
-    return (
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setStatus(a.id, "accepted")}
-          className="inline-flex h-7 items-center gap-1 rounded-[9px] border border-border-strong bg-surface px-2 text-[12px] font-medium transition-colors hover:border-brand hover:bg-brand hover:text-on-brand"
-        >
-          <Check size={13} strokeWidth={2.6} aria-hidden />
-          Accept
-        </button>
-        <button
-          type="button"
-          onClick={() => setStatus(a.id, "flagged")}
-          aria-label="Flag for a second look"
-          title="Flag for a second look"
-          className="grid h-7 w-7 place-items-center rounded-[9px] text-ink-3 transition-colors hover:bg-warn-soft hover:text-warn"
-        >
-          <Flag size={13} strokeWidth={2.2} aria-hidden />
-        </button>
-      </div>
-    );
-  }
-
+  const containerRef = useRef<HTMLDivElement>(null);
   const tone = a.status === "flagged" ? "warn" : a.status === "edited" ? "brand" : "ok";
+
   return (
-    <button
-      type="button"
-      onClick={() => setStatus(a.id, "unreviewed")}
-      title="Undo — set back to unreviewed"
-      className="text-left"
-    >
-      <Badge tone={tone}>
-        {a.status === "accepted" ? "Accepted" : a.status === "edited" ? "Edited" : "Flagged"}
-      </Badge>
-    </button>
+    <div ref={containerRef} className="flex items-center gap-1">
+      {a.status === "unreviewed" ? (
+        <>
+          <button
+            key="accept"
+            type="button"
+            data-status-focus="accept"
+            onClick={() => changeStatus(a.id, "accepted", containerRef.current, "reviewed")}
+            className="inline-flex h-7 items-center gap-1 rounded-[9px] border border-border-strong bg-surface px-2 text-[12px] font-medium transition-colors hover:border-brand hover:bg-brand hover:text-on-brand"
+          >
+            <Check size={13} strokeWidth={2.6} aria-hidden />
+            Accept
+          </button>
+          <button
+            key="flag"
+            type="button"
+            onClick={() => changeStatus(a.id, "flagged", containerRef.current, "reviewed")}
+            aria-label="Flag for a second look"
+            title="Flag for a second look"
+            className="grid h-7 w-7 place-items-center rounded-[9px] text-ink-3 transition-colors hover:bg-warn-soft hover:text-warn"
+          >
+            <Flag size={13} strokeWidth={2.2} aria-hidden />
+          </button>
+        </>
+      ) : (
+        <button
+          key="reviewed"
+          type="button"
+          data-status-focus="reviewed"
+          onClick={() => changeStatus(a.id, "unreviewed", containerRef.current, "accept")}
+          title="Undo — set back to unreviewed"
+          className="text-left"
+        >
+          <Badge tone={tone}>
+            {a.status === "accepted"
+              ? "Accepted"
+              : a.status === "edited"
+                ? "Edited"
+                : "Flagged"}
+          </Badge>
+        </button>
+      )}
+    </div>
   );
 }
 
