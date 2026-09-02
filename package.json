@@ -12,7 +12,8 @@
     "lint": "eslint",
     "test": "vitest",
     "test:run": "vitest run",
-    "typecheck": "tsc --noEmit --incremental false"
+    "typecheck": "tsc --noEmit --incremental false",
+    "pipeline": "tsx --env-file-if-exists=.env.local scripts/pipeline/run.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",
@@ -38,6 +39,7 @@
     "eslint-config-next": "16.3.3",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.11"
