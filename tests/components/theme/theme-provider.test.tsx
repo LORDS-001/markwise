@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider, useTheme } from "@/components/theme/theme-provider";
@@ -47,6 +47,95 @@ describe("ThemeProvider", () => {
     act(() => media.setMatches(true));
     expect(screen.getByLabelText("resolved theme")).toHaveTextContent("dark");
     expect(document.documentElement).toHaveAttribute("data-theme", "dark");
+  });
+
+  it("falls back to light when creating the system media query throws", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "system");
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn(() => {
+        throw new Error("media queries blocked");
+      }),
+    });
+
+    expect(() =>
+      render(
+        <ThemeProvider>
+          <Probe />
+        </ThemeProvider>,
+      ),
+    ).not.toThrow();
+    expect(screen.getByLabelText("preference")).toHaveTextContent("system");
+    expect(screen.getByLabelText("resolved theme")).toHaveTextContent("light");
+    expect(document.documentElement).toHaveAttribute("data-theme", "light");
+  });
+
+  it("uses and symmetrically cleans up the legacy media-query listener API", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "system");
+    let matches = false;
+    const listeners = new Set<(event: MediaQueryListEvent) => void>();
+    const query = {
+      get matches() {
+        return matches;
+      },
+      addListener(listener: (event: MediaQueryListEvent) => void) {
+        listeners.add(listener);
+      },
+      removeListener(listener: (event: MediaQueryListEvent) => void) {
+        listeners.delete(listener);
+      },
+    } as MediaQueryList;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn(() => query),
+    });
+
+    const view = render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    expect(listeners.size).toBe(1);
+
+    act(() => {
+      matches = true;
+      listeners.forEach((listener) =>
+        listener({ matches, media: "(prefers-color-scheme: dark)" } as MediaQueryListEvent),
+      );
+    });
+    expect(screen.getByLabelText("resolved theme")).toHaveTextContent("dark");
+
+    view.unmount();
+    expect(listeners.size).toBe(0);
+  });
+
+  it("synchronously reads the live query state when system tracking starts", async () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "system");
+    const initialQuery = { matches: false } as MediaQueryList;
+    let liveSnapshotRead = false;
+    const liveQuery = {
+      get matches() {
+        liveSnapshotRead = true;
+        return true;
+      },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    } as unknown as MediaQueryList;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn().mockReturnValueOnce(initialQuery).mockReturnValue(liveQuery),
+    });
+
+    render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+
+    expect(liveSnapshotRead).toBe(true);
+    await waitFor(() =>
+      expect(screen.getByLabelText("resolved theme")).toHaveTextContent("dark"),
+    );
   });
 
   it("removes the media listener after leaving system preference", async () => {

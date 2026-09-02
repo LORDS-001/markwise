@@ -69,12 +69,50 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (preference !== "system") return;
     if (typeof window.matchMedia !== "function") return;
-    const query = window.matchMedia(DARK_MEDIA_QUERY);
+
+    let query: MediaQueryList;
+    let matches: boolean;
+    try {
+      query = window.matchMedia(DARK_MEDIA_QUERY);
+      matches = query.matches;
+    } catch {
+      return;
+    }
+
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setSystemPrefersDark(matches);
+    });
+
     const onChange = (event: MediaQueryListEvent) => {
       setSystemPrefersDark(event.matches);
     };
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
+
+    if (
+      typeof query.addEventListener === "function" &&
+      typeof query.removeEventListener === "function"
+    ) {
+      query.addEventListener("change", onChange);
+      return () => {
+        active = false;
+        query.removeEventListener("change", onChange);
+      };
+    }
+
+    if (
+      typeof query.addListener === "function" &&
+      typeof query.removeListener === "function"
+    ) {
+      query.addListener(onChange);
+      return () => {
+        active = false;
+        query.removeListener(onChange);
+      };
+    }
+
+    return () => {
+      active = false;
+    };
   }, [preference]);
 
   const setPreference = useCallback((next: ThemePreference) => {

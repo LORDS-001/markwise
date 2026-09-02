@@ -3,8 +3,8 @@
 /* ============================================================
    Markwise design tokens
 
-   Light only, by design — `color-scheme: light` pins it regardless
-   of the operating system setting.
+   Light and dark palettes are selected by the root `data-theme`
+   attribute, with matching native `color-scheme` rendering.
 
    Typography and structure follow the Sluice reference: two type
    roles carry the page (large display at tight negative tracking,
@@ -34,11 +34,12 @@
   --surface-3: #e5eaed;
   --border: #dce2e6;
   --border-strong: #c7d0d7;
+  --control-border: #79858e;
 
   /* text */
   --ink: #0f1e3d;
   --ink-2: #59667a;
-  --ink-3: #8793a4;
+  --ink-3: #5d697b;
 
   /* primary action — the mark's navy */
   --primary: #0f1e3d;
@@ -46,7 +47,7 @@
   --on-primary: #ffffff;
 
   /* accent — the mark's cyan, darkened for text */
-  --brand: #0c7c90;
+  --brand: #0b768a;
   --brand-hover: #09697c;
   --brand-soft: #e4f3f6;
   --brand-line: #b5dce4;
@@ -67,6 +68,9 @@
   --c1: #0e8ca3;
   --c2: #3a5ba8;
   --c3: #b0621f;
+  --on-c1: #07101f;
+  --on-c2: #ffffff;
+  --on-c3: #ffffff;
   --c4: #7b4a93;
   --c5: #4f7a34;
   --c6: #a8324f;
@@ -93,9 +97,10 @@
   --surface-3: #1d2c44;
   --border: #25364d;
   --border-strong: #354a64;
+  --control-border: #66778e;
   --ink: #f4f7fb;
   --ink-2: #b1bed0;
-  --ink-3: #7f8ea5;
+  --ink-3: #8798af;
   --primary: #17a3ba;
   --primary-hover: #32b4c9;
   --on-primary: #061018;
@@ -116,6 +121,9 @@
   --c1: #35b8cb;
   --c2: #809df2;
   --c3: #e49a58;
+  --on-c1: #061018;
+  --on-c2: #061018;
+  --on-c3: #061018;
   --c4: #c493d8;
   --c5: #87b96d;
   --c6: #e57491;
@@ -131,6 +139,7 @@
   --color-surface-3: var(--surface-3);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-control-border: var(--control-border);
 
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
@@ -155,6 +164,10 @@
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --color-ok-line: var(--ok-line);
+
+  --color-on-c1: var(--on-c1);
+  --color-on-c2: var(--on-c2);
+  --color-on-c3: var(--on-c3);
 
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
