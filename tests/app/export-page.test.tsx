@@ -135,6 +135,30 @@ it("orders the ready flow and keeps exactly one primary through validation and c
   expect(container.querySelectorAll('[data-variant="primary"]')).toHaveLength(1);
 }, 15_000);
 
+it("uses control and brand boundaries for native format options", async () => {
+  renderReadyExport();
+  await waitForReadyExport();
+
+  const xlsx = screen.getByRole<HTMLInputElement>("radio", { name: /\.xlsx/i });
+  const docx = screen.getByRole<HTMLInputElement>("radio", { name: /\.docx/i });
+  const selectedLabel = xlsx.labels?.item(0);
+  const inactiveLabel = docx.labels?.item(0);
+  expect(selectedLabel).not.toBeNull();
+  expect(inactiveLabel).not.toBeNull();
+  expect(selectedLabel).toHaveClass(
+    "border-brand",
+    "ring-1",
+    "ring-[var(--brand-line)]",
+    "peer-focus-visible:ring-[var(--brand-line)]",
+  );
+  expect(inactiveLabel).toHaveClass(
+    "border-control-border",
+    "hover:border-brand",
+    "peer-focus-visible:ring-[var(--brand-line)]",
+  );
+  expect(inactiveLabel).not.toHaveClass("border-border", "hover:border-border-strong");
+});
+
 it("uses native radio keyboard behavior and dispatches both formats with reviewed data", async () => {
   const user = userEvent.setup();
   renderReadyExport();

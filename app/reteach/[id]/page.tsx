@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   ArrowLeft,
+  ArrowRight,
+  BookOpen,
   Check,
   CircleCheck,
   CircleX,
@@ -22,21 +24,14 @@ import {
   CardHead,
   EmptyState,
   buttonClass,
-  toneColor,
 } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
+import { clusterToneClasses } from "@/lib/cluster-tone";
 import { RETEACH_PACKS, TOTAL_ANSWERS } from "@/lib/mock";
-
-function clusterForegroundClass(tone: number) {
-  if (tone === 1) return "text-on-c1";
-  if (tone === 2) return "text-on-c2";
-  if (tone === 3) return "text-on-c3";
-  return "text-white";
-}
 
 export default function ReteachPackPage() {
   const params = useParams<{ id: string }>();
-  const { clusters, answers } = useSession();
+  const { clusters, answers, processed } = useSession();
   const [copied, setCopied] = useState(false);
 
   const cluster = clusters.find((c) => c.id === params.id);
@@ -45,6 +40,26 @@ export default function ReteachPackPage() {
     [answers, params.id],
   );
   const pack = RETEACH_PACKS[params.id];
+
+  if (!processed) {
+    return (
+      <Page eyebrow="Step 5 of 7" title="Reteach pack">
+        <Card>
+          <EmptyState
+            icon={<BookOpen size={26} strokeWidth={1.6} />}
+            title="The sample teaching packs aren't ready yet"
+            body="Prepare the sample analysis before choosing a seeded teaching pack to preview."
+            action={
+              <Link href="/processing" className={buttonClass("primary", "md")}>
+                Preview sample analysis
+                <ArrowRight size={16} strokeWidth={2} aria-hidden />
+              </Link>
+            }
+          />
+        </Card>
+      </Page>
+    );
+  }
 
   if (!cluster) {
     return (
@@ -91,6 +106,7 @@ export default function ReteachPackPage() {
   }
 
   const markdown = buildMarkdown(cluster.label, pack, members.length);
+  const toneClasses = clusterToneClasses(cluster.tone);
 
   async function copyPack() {
     try {
@@ -142,8 +158,7 @@ export default function ReteachPackPage() {
             <CardHead title="Who this is for" hint="Attach the roster when you send it" />
             <div className="px-5 py-4 flex items-center gap-4">
               <span
-                className={`grid place-items-center w-12 h-12 rounded-full shrink-0 font-display text-[18px] font-semibold ${clusterForegroundClass(cluster.tone)}`}
-                style={{ background: toneColor(cluster.tone) }}
+                className={`grid place-items-center w-12 h-12 rounded-full shrink-0 font-display text-[18px] font-semibold ${toneClasses.backgroundClass} ${toneClasses.foregroundClass}`}
                 aria-hidden
               >
                 {members.length}
@@ -242,8 +257,7 @@ export default function ReteachPackPage() {
                   <div className="flex flex-col gap-4">
                     <div className="flex gap-3">
                       <span
-                        className={`grid place-items-center w-7 h-7 rounded-full shrink-0 text-[13px] font-semibold tnum ${clusterForegroundClass(cluster.tone)}`}
-                        style={{ background: toneColor(cluster.tone) }}
+                        className={`grid place-items-center w-7 h-7 rounded-full shrink-0 text-[13px] font-semibold tnum ${toneClasses.backgroundClass} ${toneClasses.foregroundClass}`}
                         aria-hidden
                       >
                         {i + 1}

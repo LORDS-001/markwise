@@ -17,18 +17,12 @@ import {
 } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
 import { canRenderBubbleMap, placeBubbles } from "@/lib/cluster-layout";
+import { clusterToneClasses } from "@/lib/cluster-tone";
 import { TOTAL_ANSWERS } from "@/lib/mock";
 import type { SortMode } from "@/lib/types";
 
 const MAP_WIDTH = 1000;
 const MAP_HEIGHT = 420;
-
-function clusterForegroundClass(tone: number) {
-  if (tone === 1) return "text-on-c1";
-  if (tone === 2) return "text-on-c2";
-  if (tone === 3) return "text-on-c3";
-  return "text-white";
-}
 
 export default function MapPage() {
   const router = useRouter();
@@ -190,6 +184,7 @@ export default function MapPage() {
         {ranked.length > 0 ? (
           <ul className="divide-y divide-border">
             {ranked.map((c, i) => {
+              const toneClasses = clusterToneClasses(c.tone);
               const pct = (c.memberIds.length / TOTAL_ANSWERS) * 100;
               const damage = c.severity * c.memberIds.length;
               const clusterAnswers = answers.filter((answer) =>
@@ -220,9 +215,9 @@ export default function MapPage() {
                       <span
                         className={cn(
                           "grid place-items-center w-7 h-7 rounded-full shrink-0 text-[12px] font-semibold tnum",
-                          clusterForegroundClass(c.tone),
+                          toneClasses.backgroundClass,
+                          toneClasses.foregroundClass,
                         )}
-                        style={{ background: toneColor(c.tone) }}
                         aria-hidden
                       >
                         {i + 1}

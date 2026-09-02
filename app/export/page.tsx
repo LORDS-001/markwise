@@ -368,10 +368,10 @@ function FormatCard({
         htmlFor={id}
         className={cn(
           "block cursor-pointer rounded-[16px] border p-4 text-left transition-colors",
-          "peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--brand-line)] peer-focus-visible:ring-offset-2",
+          "hover:border-brand peer-focus-visible:border-brand peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--brand-line)] peer-focus-visible:ring-offset-2",
           active
             ? "border-brand bg-brand-soft/50 ring-1 ring-[var(--brand-line)]"
-            : "border-border bg-surface hover:border-border-strong hover:bg-surface-2",
+            : "border-control-border bg-surface hover:bg-surface-2",
         )}
       >
         <span className="mb-1.5 flex items-center gap-2.5">

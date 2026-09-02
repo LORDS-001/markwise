@@ -12,7 +12,7 @@ const state = vi.hoisted(() => {
     severity: 2,
     downstream: [],
     isOther: false,
-    tone: (index % 6) + 1,
+    tone: index % 7,
   }));
   return {
     session: {
@@ -55,6 +55,18 @@ it("falls back to the complete ranked list when the bubble map is too dense", ()
   render(<MapPage />);
   expect(screen.getByText("Map hidden at this cluster count")).toBeVisible();
   expect(screen.getAllByRole("link", { name: /Misconception/i })).toHaveLength(13);
+});
+
+it("pairs rank badges with every supported cluster tone", () => {
+  render(<MapPage />);
+  const links = screen.getAllByRole("link", { name: /Misconception/i });
+
+  for (const tone of [0, 1, 2, 3, 4, 5, 6]) {
+    const badge = links[tone].querySelector("span.rounded-full");
+    expect(badge).not.toBeNull();
+    expect(badge).toHaveClass(`bg-[var(--c${tone})]`, `text-on-c${tone}`);
+    expect(badge).not.toHaveClass("text-white");
+  }
 });
 
 it("keeps sample mechanics inside the prioritisation disclosure and explains their scope", async () => {

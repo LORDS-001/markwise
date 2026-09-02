@@ -5,8 +5,9 @@ import { useMemo } from "react";
 import { ArrowRight, BookOpen, Users } from "lucide-react";
 import { Disclosure } from "@/components/disclosure";
 import { Page } from "@/components/shell";
-import { Card, EmptyState, buttonClass, cn, toneColor } from "@/components/ui";
+import { Card, EmptyState, buttonClass, cn } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
+import { clusterToneClasses } from "@/lib/cluster-tone";
 import { TOTAL_ANSWERS } from "@/lib/mock";
 
 export default function ReteachIndexPage() {
@@ -61,6 +62,7 @@ export default function ReteachIndexPage() {
         <Card>
           <ul className="divide-y divide-border">
             {ranked.map((c, index) => {
+              const toneClasses = clusterToneClasses(c.tone);
               const pct = (c.memberIds.length / TOTAL_ANSWERS) * 100;
               const clusterAnswers = answers.filter((answer) => c.memberIds.includes(answer.id));
               const averageLoss =
@@ -79,15 +81,9 @@ export default function ReteachIndexPage() {
                     <span
                       className={cn(
                         "grid w-7 h-7 rounded-full shrink-0 place-items-center text-[12px] font-semibold tnum",
-                        c.tone === 1
-                          ? "text-on-c1"
-                          : c.tone === 2
-                            ? "text-on-c2"
-                            : c.tone === 3
-                              ? "text-on-c3"
-                              : "text-white",
+                        toneClasses.backgroundClass,
+                        toneClasses.foregroundClass,
                       )}
-                      style={{ background: toneColor(c.tone) }}
                       aria-hidden
                     >
                       {index + 1}

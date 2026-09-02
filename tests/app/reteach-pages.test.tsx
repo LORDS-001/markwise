@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import ReteachIndexPage from "@/app/reteach/page";
@@ -36,6 +36,33 @@ function WithSplitCluster({ children }: { children: ReactNode }) {
   return children;
 }
 
+function WithSplitToneClusters({ children }: { children: ReactNode }) {
+  const { clusters, splitOut } = useSession();
+  const memberIds = useRef(
+    clusters.find((cluster) => cluster.id === "cl-impedance")?.memberIds.slice(0, 3) ?? [],
+  );
+  useEffect(() => {
+    let cancelled = false;
+    async function createSplits() {
+      for (const [index, label] of [
+        "Tone four split",
+        "Tone five split",
+        "Tone six split",
+      ].entries()) {
+        await new Promise((resolve) => window.setTimeout(resolve, 20));
+        if (cancelled) return;
+        const memberId = memberIds.current[index];
+        if (memberId) splitOut("cl-impedance", [memberId], label);
+      }
+    }
+    void createSplits();
+    return () => {
+      cancelled = true;
+    };
+  }, [splitOut]);
+  return children;
+}
+
 function primaryActions(container: HTMLElement) {
   return container.querySelectorAll('[data-variant="primary"], a.bg-primary');
 }
@@ -50,6 +77,30 @@ it("presents the cluster choices under one page heading", () => {
     "Choose a misconception to reteach",
   );
   expect(screen.getAllByRole("link", { name: /View pack/i }).length).toBeGreaterThan(0);
+});
+
+it("uses exhaustive foregrounds for seeded and split-created cluster ranks", async () => {
+  render(
+    <SessionProvider>
+      <WithSplitToneClusters>
+        <ReteachIndexPage />
+      </WithSplitToneClusters>
+    </SessionProvider>,
+  );
+
+  const expectations = [
+    ["Other / one-off errors", 0],
+    ["Tone four split", 4],
+    ["Tone five split", 5],
+    ["Tone six split", 6],
+  ] as const;
+  for (const [label, tone] of expectations) {
+    const link = await screen.findByRole("link", { name: new RegExp(label, "i") });
+    const badge = link.querySelector("span.rounded-full");
+    expect(badge).not.toBeNull();
+    expect(badge).toHaveClass(`bg-[var(--c${tone})]`, `text-on-c${tone}`);
+    expect(badge).not.toHaveClass("text-white");
+  }
 });
 
 it("makes copy the sole primary lesson action while keeping downloads secondary", () => {
@@ -79,6 +130,20 @@ it("makes copy the sole primary lesson action while keeping downloads secondary"
   expect(primaryActions(container)).toHaveLength(1);
 });
 
+it("uses mapped cluster classes for lesson counts and diagnostic ranks", () => {
+  render(
+    <SessionProvider>
+      <ReteachPackPage />
+    </SessionProvider>,
+  );
+
+  for (const label of ["11", "1", "2"]) {
+    const badge = screen.getByText(label, { selector: "span.rounded-full" });
+    expect(badge).toHaveClass("bg-[var(--c2)]", "text-on-c2");
+    expect(badge).not.toHaveClass("text-white");
+  }
+});
+
 it("shows a clear sample-preview recovery state before processing", async () => {
   const { container } = render(
     <SessionProvider>
@@ -101,6 +166,31 @@ it("shows a clear sample-preview recovery state before processing", async () => 
     "/processing",
   );
   expect(primaryActions(container).length).toBeLessThanOrEqual(1);
+});
+
+it("guards a direct teaching-pack route before sample processing", async () => {
+  const { container } = render(
+    <SessionProvider>
+      <BeforeProcessing>
+        <ReteachPackPage />
+      </BeforeProcessing>
+    </SessionProvider>,
+  );
+
+  expect(
+    await screen.findByRole("heading", { name: "The sample teaching packs aren't ready yet" }),
+  ).toBeVisible();
+  expect(
+    screen.getByText(
+      "Prepare the sample analysis before choosing a seeded teaching pack to preview.",
+    ),
+  ).toBeVisible();
+  expect(screen.getByRole("link", { name: "Preview sample analysis" })).toHaveAttribute(
+    "href",
+    "/processing",
+  );
+  expect(primaryActions(container)).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: "Copy lesson" })).not.toBeInTheDocument();
 });
 
 it("keeps a missing sample pack clear and limited to one recovery action", async () => {
