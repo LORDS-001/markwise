@@ -151,7 +151,51 @@ describe("tracked UI review runner contract", () => {
     expect(keyboard.ACCOUNT_DEMO_EXPRESSION).toContain("input[type=email]");
   });
 
-  it("traverses backward from the processing disclosure to its completed header action", () => {
-    expect(keyboard.PROCESSING_COMPLETION_TAB_OPTIONS).toEqual({ shift: true });
+  it("binds processing completion traversal to shifted CDP Tab payloads", async () => {
+    const calls: unknown[][] = [];
+    const reached = { name: "Compare my prediction" };
+    const result = await keyboard.tabToProcessingCompletion(
+      "cdp",
+      "context",
+      (...args: unknown[]) => {
+        calls.push(args);
+        return Promise.resolve(reached);
+      },
+    );
+
+    expect(result).toBe(reached);
+    expect(calls).toHaveLength(1);
+    const [cdp, context, predicate, label, options] = calls[0];
+    expect(cdp).toBe("cdp");
+    expect(context).toBe("context");
+    expect(predicate).toEqual(expect.any(Function));
+    expect((predicate as (snapshot: { name: string }) => boolean)(reached)).toBe(true);
+    expect(label).toBe("completed onward link");
+    expect(options).toEqual({ shift: true });
+
+    const modifiers = keyboard.tabTraversalModifiers(options);
+    expect(modifiers).toBe(8);
+    expect(keyboard.keyDispatchPayloads("Tab", modifiers)).toEqual([
+      {
+        type: "rawKeyDown",
+        key: "Tab",
+        code: "Tab",
+        windowsVirtualKeyCode: 9,
+        modifiers: 8,
+        isSystemKey: false,
+        autoRepeat: false,
+        isKeypad: false,
+      },
+      {
+        type: "keyUp",
+        key: "Tab",
+        code: "Tab",
+        windowsVirtualKeyCode: 9,
+        modifiers: 8,
+        isSystemKey: false,
+        autoRepeat: false,
+        isKeypad: false,
+      },
+    ]);
   });
 });

@@ -123,10 +123,9 @@ function recordFocus(context, snapshot, reason) {
   context.focus.push({ reason, ...snapshot });
 }
 
-async function press(cdp, context, keyName, modifiers = 0) {
+function keyDispatchPayloads(keyName, modifiers = 0) {
   const definition = KEY_DEFINITIONS[keyName];
   invariant(definition, `Unknown key ${keyName}`);
-  const shift = Boolean(modifiers & 8);
   const control = Boolean(modifiers & 2);
   const alt = Boolean(modifiers & 1);
   const meta = Boolean(modifiers & 4);
@@ -137,11 +136,20 @@ async function press(cdp, context, keyName, modifiers = 0) {
     autoRepeat: false,
     isKeypad: false,
   };
-  await cdp.send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...base });
+  const payloads = [{ type: "rawKeyDown", ...base }];
   if (definition.text && !control && !alt && !meta) {
-    await cdp.send("Input.dispatchKeyEvent", { type: "char", ...base, text: definition.text });
+    payloads.push({ type: "char", ...base, text: definition.text });
   }
-  await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", ...base });
+  payloads.push({ type: "keyUp", ...base });
+  return payloads;
+}
+
+async function press(cdp, context, keyName, modifiers = 0) {
+  const shift = Boolean(modifiers & 8);
+  const control = Boolean(modifiers & 2);
+  for (const payload of keyDispatchPayloads(keyName, modifiers)) {
+    await cdp.send("Input.dispatchKeyEvent", payload);
+  }
   await delay(30);
   const after = await focusSnapshot(cdp);
   context.keys.push({ key: keyName, shift, control, after: { name: after.name, tag: after.tag, role: after.role, pathname: after.pathname } });
@@ -198,8 +206,12 @@ function isDocumentRootFocus(snapshot) {
   return snapshot.tag === "BODY" || snapshot.tag === "HTML";
 }
 
+function tabTraversalModifiers(options = {}) {
+  return options.shift ? 8 : 0;
+}
+
 async function tabTo(cdp, context, predicate, label, options = {}) {
-  const shift = options.shift ? 8 : 0;
+  const shift = tabTraversalModifiers(options);
   const maximum = options.maximum || 100;
   const seen = new Set();
   for (let index = 0; index < maximum; index += 1) {
@@ -222,6 +234,16 @@ async function tabTo(cdp, context, predicate, label, options = {}) {
     if (predicate(next)) return next;
   }
   throw new Error(`Could not reach ${label} within ${maximum} Tab stops`);
+}
+
+async function tabToProcessingCompletion(cdp, context, tabToImpl = tabTo) {
+  return tabToImpl(
+    cdp,
+    context,
+    named(/Compare my prediction/),
+    "completed onward link",
+    PROCESSING_COMPLETION_TAB_OPTIONS,
+  );
 }
 
 async function assertEval(cdp, context, label, expression) {
@@ -416,13 +438,7 @@ async function runKeyboard(options = {}) {
       await activate(cdp, context);
       await assertEval(cdp, context, "processing disclosure expands", "document.activeElement.closest('details')?.open === true");
       await waitFor(cdp, "/Sample analysis ready/.test(document.querySelector('h1')?.textContent || '')", 15_000);
-      await tabTo(
-        cdp,
-        context,
-        named(/Compare my prediction/),
-        "completed onward link",
-        PROCESSING_COMPLETION_TAB_OPTIONS,
-      );
+      await tabToProcessingCompletion(cdp, context);
       await activate(cdp, context);
       await waitPath(cdp, "/reveal");
       await assertEval(cdp, context, "completed processing continues to Reveal", "location.pathname === '/reveal' && /Compare your prediction/.test(document.querySelector('h1')?.textContent)");
@@ -729,9 +745,12 @@ module.exports = {
   focusSignature,
   historyEntryForPath,
   isRadioSnapshot,
+  keyDispatchPayloads,
   printableKeyPayload,
   recordFocus,
   replacementPlan,
+  tabToProcessingCompletion,
+  tabTraversalModifiers,
   visibleStatusCountExpression,
   runKeyboard,
 };
