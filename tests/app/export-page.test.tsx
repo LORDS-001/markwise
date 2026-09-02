@@ -64,10 +64,12 @@ function expectBefore(first: Element, second: Element) {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((next, fail) => {
     resolve = next;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 it("keeps the locked route accurate and offers one primary recovery action", () => {
@@ -157,6 +159,54 @@ it("keeps keyboard focus on the reviewer confirmation replacement in both direct
   expect(document.body).not.toHaveFocus();
 });
 
+it("keeps the keyboard-activated download focusable and guarded through success and failure", async () => {
+  const user = userEvent.setup();
+  const successfulExport = deferred<void>();
+  downloadMocks.downloadXlsx.mockReturnValueOnce(successfulExport.promise);
+  renderReadyExport();
+  await waitForReadyExport();
+
+  await user.click(screen.getByRole("textbox", { name: "Confirmed by" }));
+  await user.tab();
+  await user.keyboard("{Enter}");
+  expect(screen.getByRole("button", { name: "Reopen for edits" })).toHaveFocus();
+  await user.tab();
+  expect(screen.getByRole("radio", { name: /\.xlsx/i })).toHaveFocus();
+  await user.tab();
+
+  const download = screen.getByRole("button", { name: "Download XLSX" });
+  expect(download).toHaveFocus();
+  await user.keyboard("{Enter}");
+
+  const pendingDownload = screen.getByRole("button", { name: /^Generating/ });
+  expect(pendingDownload).toBeEnabled();
+  expect(pendingDownload).toHaveAttribute("aria-disabled", "true");
+  expect(pendingDownload).toHaveFocus();
+  await user.keyboard("{Enter}");
+  expect(downloadMocks.downloadXlsx).toHaveBeenCalledTimes(1);
+
+  await act(async () => {
+    successfulExport.resolve();
+    await successfulExport.promise;
+  });
+  const readyDownload = screen.getByRole("button", { name: "Download XLSX" });
+  expect(readyDownload).toBeEnabled();
+  expect(readyDownload).not.toHaveAttribute("aria-disabled", "true");
+  expect(readyDownload).toHaveFocus();
+
+  const failedExport = deferred<void>();
+  downloadMocks.downloadXlsx.mockReturnValueOnce(failedExport.promise);
+  await user.keyboard("{Enter}");
+  expect(screen.getByRole("button", { name: /^Generating/ })).toHaveFocus();
+
+  await act(async () => {
+    failedExport.reject(new Error("generation failed"));
+  });
+  expect(await screen.findByRole("alert")).toHaveTextContent("The file couldn't be generated");
+  expect(screen.getByRole("button", { name: "Download XLSX" })).toHaveFocus();
+  expect(document.body).not.toHaveFocus();
+});
+
 it("uses control and brand boundaries for native format options", async () => {
   renderReadyExport();
   await waitForReadyExport();
@@ -216,7 +266,10 @@ it("uses native radio keyboard behavior and dispatches both formats with reviewe
   const xlsxWork = deferred<void>();
   downloadMocks.downloadXlsx.mockReturnValueOnce(xlsxWork.promise);
   await user.click(screen.getByRole("button", { name: "Download XLSX" }));
-  expect(screen.getByRole("button", { name: "Generating…" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Generating…" })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
 
   const reviewedRows = buildRows(
     ANSWERS.map((answer) => ({ ...answer, status: "accepted" })),

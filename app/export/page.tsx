@@ -86,6 +86,8 @@ export default function ExportPage() {
   );
 
   async function runExport() {
+    if (busy) return;
+
     setBusy(true);
     setError(null);
     try {
@@ -343,7 +345,12 @@ export default function ExportPage() {
                 Generate the selected {format.toUpperCase()} file in this tab.
               </p>
             </div>
-            <Button size="lg" onClick={runExport} disabled={busy} className="shrink-0">
+            <Button
+              size="lg"
+              onClick={runExport}
+              aria-disabled={busy}
+              className="shrink-0 aria-disabled:pointer-events-none aria-disabled:opacity-45"
+            >
               {busy ? "Generating…" : `Download ${format.toUpperCase()}`}
             </Button>
           </div>
