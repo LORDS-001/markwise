@@ -28,6 +28,10 @@ const HYDRATION_READY_EXPRESSION =
 const SPLIT_MEMBER_TAB_OPTIONS = { shift: true };
 const MERGE_RETURN_KEY = { key: "ArrowLeft", modifiers: 1, isSystemKey: true };
 const REJECT_DESTINATION = "/map";
+const SCORES_EVIDENCE_EXPRESSION = `document.activeElement.getAttribute('aria-expanded') === 'true' && (() => {
+  const panel = document.querySelector('td[colspan="8"]');
+  return !!panel && panel.textContent.includes('Marking scheme, criterion by criterion');
+})()`;
 
 const KEY_DEFINITIONS = {
   Tab: { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 },
@@ -558,7 +562,7 @@ async function runKeyboard(options = {}) {
       await assertEval(cdp, context, "Scores status filter clears", "document.activeElement.checked === false");
       await tabTo(cdp, context, named(/^Expand answer$/), "evidence expansion");
       await activate(cdp, context);
-      await assertEval(cdp, context, "Scores evidence expands", "document.activeElement.getAttribute('aria-expanded') === 'true' && document.body.innerText.includes('Marking scheme, criterion by criterion')");
+      await assertEval(cdp, context, "Scores evidence expands", SCORES_EVIDENCE_EXPRESSION);
       await tabTo(cdp, context, named(/^Accept high-confidence$/), "bulk accept", { shift: true });
       await activate(cdp, context);
       await assertEval(cdp, context, "bulk acceptance changes exact review count", "!document.body.innerText.includes('Accept high-confidence') && document.querySelectorAll('tr[data-review-row=\"accepted\"]').length > 1");
@@ -672,6 +676,7 @@ module.exports = {
   KEY_DEFINITIONS,
   MERGE_RETURN_KEY,
   REJECT_DESTINATION,
+  SCORES_EVIDENCE_EXPRESSION,
   SPLIT_MEMBER_TAB_OPTIONS,
   focusSignature,
   historyEntryForPath,

@@ -111,5 +111,6 @@ describe("tracked UI review runner contract", () => {
     const visibleFlagged = keyboard.visibleStatusCountExpression("Flagged");
     expect(visibleFlagged).toContain("getBoundingClientRect");
     expect(visibleFlagged).toContain('"Flagged"');
+    expect(keyboard.SCORES_EVIDENCE_EXPRESSION).toContain('td[colspan="8"]');
   });
 });
