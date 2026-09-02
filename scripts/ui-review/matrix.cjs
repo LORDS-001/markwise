@@ -69,6 +69,7 @@ const CONTRAST_PAIRS = [
   })),
 ];
 const REDUCED_MOTION_ROUTE = "/";
+const DESKTOP_ASIDE_SELECTOR = 'aside[class~="lg:block"]';
 
 function shouldCaptureScreenshot({ route, viewport, appearance }) {
   const explicit = appearance.id === "light" || appearance.id === "dark";
@@ -218,7 +219,7 @@ async function collectPageState(cdp, contrastPairs) {
     const main = document.querySelector("main#main");
     const heading = main?.querySelector("h1");
     const shell = main?.closest(".bg-shell");
-    const desktopAside = document.querySelector("aside.hidden.lg\\:block");
+    const desktopAside = document.querySelector(${JSON.stringify(DESKTOP_ASIDE_SELECTOR)});
     const mobileNav = document.querySelector('button[aria-label="Open navigation"]');
     const setupDescriptions = [...document.querySelectorAll('input[aria-label^="Criterion "][aria-label$=" description"]')];
     const setupMarks = [...document.querySelectorAll('input[aria-label^="Marks for criterion "]')];
@@ -448,6 +449,7 @@ if (require.main === module) {
 module.exports = {
   APPEARANCES,
   CONTRAST_PAIRS,
+  DESKTOP_ASIDE_SELECTOR,
   INPUT_SURFACES,
   REDUCED_MOTION_ROUTE,
   ROUTES,

@@ -38,6 +38,7 @@ describe("tracked UI review runner contract", () => {
       ]),
     );
     expect(matrix.REDUCED_MOTION_ROUTE).toBe("/");
+    expect(matrix.DESKTOP_ASIDE_SELECTOR).toBe('aside[class~="lg:block"]');
   });
 
   it("keeps all eleven keyboard-only workflow groups named and ordered", () => {
