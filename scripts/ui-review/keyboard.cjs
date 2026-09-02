@@ -27,6 +27,7 @@ const HYDRATION_READY_EXPRESSION =
   "document.readyState === 'complete' && !!document.querySelector('main#main')";
 const SPLIT_MEMBER_TAB_OPTIONS = { shift: true };
 const EXPORT_READY_TAB_OPTIONS = { shift: true };
+const NAVIGATION_TAB_OPTIONS = { documentRootBoundary: "navigation/bootstrap" };
 const REVIEWER_VALIDATION_VALUE = "";
 const ACCOUNT_DEMO_EXPRESSION = `!!document.querySelector('[title="Demo preview"]') && (() => {
   const region = document.querySelector('[aria-label="Account connection"]');
@@ -112,13 +113,11 @@ async function focusSnapshot(cdp) {
 }
 
 function recordFocus(context, snapshot, reason) {
-  const focusableDocumentRoot = snapshot.tag === "BODY" || snapshot.tag === "HTML";
-  invariant(snapshot.visible || focusableDocumentRoot, `${reason}: focused element is not visible: ${JSON.stringify(snapshot)}`);
-  invariant(snapshot.onScreen || focusableDocumentRoot, `${reason}: focused element is offscreen: ${JSON.stringify(snapshot)}`);
-  if (!focusableDocumentRoot) {
-    invariant(snapshot.focusVisible, `${reason}: :focus-visible did not match: ${snapshot.name}`);
-    invariant(snapshot.visibleFocusTreatment, `${reason}: no computed focus treatment: ${snapshot.name}`);
-  }
+  invariant(!isDocumentRootFocus(snapshot), `${reason}: document root is not valid focus evidence`);
+  invariant(snapshot.visible, `${reason}: focused element is not visible: ${JSON.stringify(snapshot)}`);
+  invariant(snapshot.onScreen, `${reason}: focused element is offscreen: ${JSON.stringify(snapshot)}`);
+  invariant(snapshot.focusVisible, `${reason}: :focus-visible did not match: ${snapshot.name}`);
+  invariant(snapshot.visibleFocusTreatment, `${reason}: no computed focus treatment: ${snapshot.name}`);
   if (snapshot.dialogOpen) invariant(snapshot.insideOpenDialog, `${reason}: focus escaped modal: ${snapshot.name}`);
   context.focus.push({ reason, ...snapshot });
 }
@@ -182,6 +181,7 @@ async function replaceText(cdp, context, value) {
 }
 
 function focusSignature(snapshot) {
+  if (isDocumentRootFocus(snapshot)) return "DOCUMENT_ROOT";
   return [
     snapshot.tag,
     snapshot.role,
@@ -193,6 +193,10 @@ function focusSignature(snapshot) {
   ].join("|");
 }
 
+function isDocumentRootFocus(snapshot) {
+  return snapshot.tag === "BODY" || snapshot.tag === "HTML";
+}
+
 async function tabTo(cdp, context, predicate, label, options = {}) {
   const shift = options.shift ? 8 : 0;
   const maximum = options.maximum || 100;
@@ -202,6 +206,13 @@ async function tabTo(cdp, context, predicate, label, options = {}) {
     if (predicate(current)) {
       recordFocus(context, current, `matched ${label}`);
       return current;
+    }
+    if (isDocumentRootFocus(current)) {
+      invariant(
+        index === 0 &&
+          options.documentRootBoundary === NAVIGATION_TAB_OPTIONS.documentRootBoundary,
+        `Unexpected document root focus before ${label}`,
+      );
     }
     const signature = focusSignature(current);
     if (seen.has(signature) && index > 1) throw new Error(`Focus wrapped before ${label}; current ${JSON.stringify(current)}`);
@@ -322,7 +333,7 @@ async function runKeyboard(options = {}) {
     await group("Desktop and mobile navigation", async (context) => {
       await setViewport(cdp, 1440, 1000);
       await navigate(cdp, `${origin}/`);
-      await tabTo(cdp, context, named(/^Score review/), "desktop Score review");
+      await tabTo(cdp, context, named(/^Score review/), "desktop Score review", NAVIGATION_TAB_OPTIONS);
       await activate(cdp, context);
       await waitPath(cdp, "/scores");
       await assertEval(cdp, context, "desktop navigation activation", "location.pathname === '/scores'");
@@ -351,7 +362,7 @@ async function runKeyboard(options = {}) {
       await navigate(cdp, `${origin}/`);
       await evaluate(cdp, "localStorage.setItem('markwise-theme','system'); location.reload(); true");
       await waitFor(cdp, HYDRATION_READY_EXPRESSION);
-      await tabTo(cdp, context, named(/^Settings$/), "Settings trigger");
+      await tabTo(cdp, context, named(/^Settings$/), "Settings trigger", NAVIGATION_TAB_OPTIONS);
       await activate(cdp, context);
       await tabTo(cdp, context, named(/^Use device setting$/), "checked system radio");
       await assertEval(cdp, context, "system radio is seeded checked", "document.activeElement.checked && document.activeElement.value === 'system'");
@@ -372,7 +383,7 @@ async function runKeyboard(options = {}) {
     await group("Setup workflow", async (context) => {
       await setViewport(cdp, 1440, 1000);
       await navigate(cdp, `${origin}/`);
-      await tabTo(cdp, context, named(/^Subject/), "Subject field");
+      await tabTo(cdp, context, named(/^Subject/), "Subject field", NAVIGATION_TAB_OPTIONS);
       await replaceText(cdp, context, "Circuit analysis");
       await tabTo(cdp, context, named(/^Level/), "Level field");
       await replaceText(cdp, context, "300 level");
@@ -400,7 +411,7 @@ async function runKeyboard(options = {}) {
     });
 
     await group("Processing workflow", async (context) => {
-      await tabTo(cdp, context, named(/How processing works/), "processing disclosure");
+      await tabTo(cdp, context, named(/How processing works/), "processing disclosure", NAVIGATION_TAB_OPTIONS);
       await activate(cdp, context);
       await assertEval(cdp, context, "processing disclosure expands", "document.activeElement.closest('details')?.open === true");
       await waitFor(cdp, "/Sample analysis ready/.test(document.querySelector('h1')?.textContent || '')", 15_000);
@@ -411,7 +422,7 @@ async function runKeyboard(options = {}) {
     });
 
     await group("Reveal workflow", async (context) => {
-      await tabTo(cdp, context, named(/View misconception map/), "Reveal map link");
+      await tabTo(cdp, context, named(/View misconception map/), "Reveal map link", NAVIGATION_TAB_OPTIONS);
       await assertEval(cdp, context, "comparison content precedes map action", "document.body.innerText.includes('Your prediction') && document.body.innerText.includes('What the sample shows')");
       await activate(cdp, context);
       await waitPath(cdp, "/map");
@@ -419,7 +430,7 @@ async function runKeyboard(options = {}) {
     });
 
     await group("Map workflow", async (context) => {
-      await tabTo(cdp, context, named(/^By spread$/), "Map active sort radio");
+      await tabTo(cdp, context, named(/^By spread$/), "Map active sort radio", NAVIGATION_TAB_OPTIONS);
       await press(cdp, context, "ArrowRight");
       await assertEval(cdp, context, "Map ArrowRight selects damage", "document.activeElement.getAttribute('role') === 'radio' && document.activeElement.getAttribute('aria-checked') === 'true' && /By damage/.test(document.activeElement.textContent)");
       await press(cdp, context, "ArrowLeft");
@@ -428,7 +439,13 @@ async function runKeyboard(options = {}) {
       await activate(cdp, context);
       await waitPath(cdp, "/clusters/cl-impedance");
       for (let index = 1; index <= 10; index += 1) {
-        await tabTo(cdp, context, named(/^Split$/), `Split action ${index}`);
+        await tabTo(
+          cdp,
+          context,
+          named(/^Split$/),
+          `Split action ${index}`,
+          index === 1 ? NAVIGATION_TAB_OPTIONS : {},
+        );
         await activate(cdp, context);
         await tabTo(
           cdp,
@@ -443,19 +460,21 @@ async function runKeyboard(options = {}) {
         await tabTo(cdp, context, named(/^Split 1 selected$/), `split confirm ${index}`);
         await activate(cdp, context);
         await waitFor(cdp, "!document.querySelector('input[aria-label=\"New cluster name\"]')");
+        await waitFor(cdp, "document.activeElement?.tagName === 'BUTTON' && document.activeElement.textContent.trim() === 'Split'");
+        await tabTo(cdp, context, named(/^Split$/), `restored Split action ${index}`);
       }
       await tabTo(cdp, context, named(/^Misconception map/), "Map navigation after splits");
       await activate(cdp, context);
       await waitPath(cdp, "/map");
       await assertEval(cdp, context, "actual 13-cluster fallback is keyboard reachable", "document.body.innerText.includes('Map hidden at this cluster count') && document.querySelectorAll('a[href^=\"/clusters/\"]').length >= 13");
-      await tabTo(cdp, context, (item) => item.href?.startsWith("/clusters/") && /Fallback/.test(item.name), "fallback ranked cluster link");
+      await tabTo(cdp, context, (item) => item.href?.startsWith("/clusters/") && /Fallback/.test(item.name), "fallback ranked cluster link", NAVIGATION_TAB_OPTIONS);
       await activate(cdp, context);
       await assertEval(cdp, context, "fallback cluster link activates", "location.pathname.startsWith('/clusters/')");
     });
 
     await group("Cluster workflow", async (context) => {
       await navigate(cdp, `${origin}/clusters/cl-phase`);
-      await tabTo(cdp, context, named(/^Rename$/), "Rename action");
+      await tabTo(cdp, context, named(/^Rename$/), "Rename action", NAVIGATION_TAB_OPTIONS);
       await activate(cdp, context);
       await tabTo(cdp, context, named(/^Cluster name$/), "Cluster name");
       await replaceText(cdp, context, "Phase relationship model");
@@ -476,6 +495,8 @@ async function runKeyboard(options = {}) {
       await typeText(cdp, context, "Phase subset");
       await tabTo(cdp, context, named(/^Split 1 selected$/), "Cluster split confirm");
       await activate(cdp, context);
+      await waitFor(cdp, "document.activeElement?.tagName === 'BUTTON' && document.activeElement.textContent.trim() === 'Split'");
+      await tabTo(cdp, context, named(/^Split$/), "Cluster restored Split action");
       await assertEval(cdp, context, "cluster split changes roster", "!document.body.innerText.includes('Split 1 selected')");
       await tabTo(cdp, context, named(/^Merge$/), "Cluster merge action");
       await activate(cdp, context);
@@ -507,7 +528,7 @@ async function runKeyboard(options = {}) {
       await waitFor(cdp, "/This cluster no longer exists/.test(document.querySelector('h1')?.textContent || '')");
       await assertEval(cdp, context, "merged cluster fallback", "document.body.innerText.includes('It was merged or rejected') && !!document.querySelector('a[href=\"/map\"]')");
       await navigate(cdp, `${origin}/clusters/cl-impedance`);
-      await tabTo(cdp, context, named(/^Reject$/), "Cluster reject action");
+      await tabTo(cdp, context, named(/^Reject$/), "Cluster reject action", NAVIGATION_TAB_OPTIONS);
       await activate(cdp, context);
       await tabTo(cdp, context, named(/Reject this cluster/), "Cluster reject confirmation");
       await activate(cdp, context);
@@ -522,7 +543,7 @@ async function runKeyboard(options = {}) {
 
     await group("Reteach workflow", async (context) => {
       await navigate(cdp, `${origin}/reteach/cl-arithmetic`);
-      await tabTo(cdp, context, named(/^Copy lesson$/), "Copy lesson");
+      await tabTo(cdp, context, named(/^Copy lesson$/), "Copy lesson", NAVIGATION_TAB_OPTIONS);
       await activate(cdp, context);
       await assertEval(cdp, context, "copy action reports completion", "document.body.innerText.includes('Copied')");
       await tabTo(cdp, context, named(/^Download Markdown$/), "Markdown download");
@@ -539,7 +560,7 @@ async function runKeyboard(options = {}) {
 
     await group("Scores workflow", async (context) => {
       await navigate(cdp, `${origin}/scores`);
-      await tabTo(cdp, context, named(/^Confidence$/), "Scores active sort radio");
+      await tabTo(cdp, context, named(/^Confidence$/), "Scores active sort radio", NAVIGATION_TAB_OPTIONS);
       await press(cdp, context, "ArrowRight");
       await assertEval(cdp, context, "Scores selects Score sort", "document.activeElement.getAttribute('aria-checked') === 'true' && document.activeElement.textContent.trim() === 'Score'");
       await press(cdp, context, "ArrowRight");
@@ -593,7 +614,7 @@ async function runKeyboard(options = {}) {
     });
 
     await group("Export workflow", async (context) => {
-      await tabTo(cdp, context, named(/^Confirmed by$/), "reviewer input");
+      await tabTo(cdp, context, named(/^Confirmed by$/), "reviewer input", NAVIGATION_TAB_OPTIONS);
       await replaceText(cdp, context, REVIEWER_VALIDATION_VALUE);
       await assertEval(cdp, context, "blank reviewer keeps confirmation disabled", "!![...document.querySelectorAll('button')].find((button) => /Confirm reviewer/.test(button.textContent) && button.disabled)");
       await replaceText(cdp, context, "Prof. Keyboard Reviewer");
@@ -692,6 +713,7 @@ module.exports = {
   HYDRATION_READY_EXPRESSION,
   KEY_DEFINITIONS,
   MERGE_RETURN_KEY,
+  NAVIGATION_TAB_OPTIONS,
   REJECT_DESTINATION,
   REVIEWER_VALIDATION_VALUE,
   SCORES_EVIDENCE_EXPRESSION,
@@ -700,6 +722,7 @@ module.exports = {
   historyEntryForPath,
   isRadioSnapshot,
   printableKeyPayload,
+  recordFocus,
   replacementPlan,
   visibleStatusCountExpression,
   runKeyboard,

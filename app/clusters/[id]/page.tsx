@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   BookOpen,
@@ -36,6 +36,15 @@ import {
 import { TOTAL_ANSWERS } from "@/lib/mock";
 
 type Mode = null | "rename" | "merge" | "split" | "reject";
+type PanelMode = Exclude<Mode, null>;
+
+const PANEL_TRIGGER_IDS: Record<PanelMode, string> = {
+  rename: "cluster-rename-trigger",
+  merge: "cluster-merge-trigger",
+  split: "cluster-split-trigger",
+  reject: "cluster-reject-trigger",
+};
+const FOCUS_RECOVERY_ID = "cluster-focus-recovery";
 
 export default function ClusterDetailPage() {
   const params = useParams<{ id: string }>();
@@ -54,12 +63,28 @@ export default function ClusterDetailPage() {
   const [mergeTarget, setMergeTarget] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   const [splitName, setSplitName] = useState("");
+  const restoreFocusMode = useRef<PanelMode | null>(null);
 
   const cluster = clusters.find((candidate) => candidate.id === params.id);
   const members = useMemo(
     () => answers.filter((answer) => answer.clusterId === params.id),
     [answers, params.id],
   );
+
+  useEffect(() => {
+    const closedMode = restoreFocusMode.current;
+    if (mode !== null || !closedMode) return;
+
+    const trigger = document.getElementById(PANEL_TRIGGER_IDS[closedMode]);
+    const target =
+      trigger instanceof HTMLButtonElement && !trigger.disabled
+        ? trigger
+        : document.getElementById(FOCUS_RECOVERY_ID);
+    if (target instanceof HTMLElement) {
+      target.focus();
+      restoreFocusMode.current = null;
+    }
+  }, [cluster, mode]);
 
   if (!cluster) {
     return (
@@ -70,7 +95,11 @@ export default function ClusterDetailPage() {
             title="It was merged or rejected"
             body="Its answers were moved to another cluster, so this page has nothing left to show. The misconception map has the current grouping."
             action={
-              <Link href="/map" className={buttonClass("primary", "md")}>
+              <Link
+                id={FOCUS_RECOVERY_ID}
+                href="/map"
+                className={buttonClass("primary", "md")}
+              >
                 Back to misconception map
               </Link>
             }
@@ -122,6 +151,7 @@ export default function ClusterDetailPage() {
   }
 
   function closePanel() {
+    if (mode) restoreFocusMode.current = mode;
     setMode(null);
     setPicked([]);
     setDraftName("");
@@ -139,7 +169,11 @@ export default function ClusterDetailPage() {
   return (
     <Page
       eyebrow={
-        <Link href="/map" className="inline-flex items-center gap-1 hover:text-brand-hover">
+        <Link
+          id={FOCUS_RECOVERY_ID}
+          href="/map"
+          className="inline-flex items-center gap-1 hover:text-brand-hover"
+        >
           <ArrowLeft size={13} strokeWidth={2.2} aria-hidden />
           Misconception map
         </Link>
@@ -349,6 +383,7 @@ export default function ClusterDetailPage() {
         <CardHead title="Edit cluster" hint="Rename, merge, split, or reject this grouping." />
         <div className="grid grid-cols-2 gap-2 px-5 py-4 sm:grid-cols-4">
           <Button
+            id={PANEL_TRIGGER_IDS.rename}
             variant="secondary"
             size="sm"
             onClick={() => {
@@ -360,6 +395,7 @@ export default function ClusterDetailPage() {
             Rename
           </Button>
           <Button
+            id={PANEL_TRIGGER_IDS.merge}
             variant="secondary"
             size="sm"
             onClick={() => setMode(mode === "merge" ? null : "merge")}
@@ -369,6 +405,7 @@ export default function ClusterDetailPage() {
             Merge
           </Button>
           <Button
+            id={PANEL_TRIGGER_IDS.split}
             variant="secondary"
             size="sm"
             onClick={() => {
@@ -381,6 +418,7 @@ export default function ClusterDetailPage() {
             Split
           </Button>
           <Button
+            id={PANEL_TRIGGER_IDS.reject}
             variant="danger"
             size="sm"
             onClick={() => setMode(mode === "reject" ? null : "reject")}

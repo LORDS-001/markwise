@@ -96,6 +96,31 @@ describe("tracked UI review runner contract", () => {
     ).not.toBe(
       keyboard.focusSignature({ tag: "A", name: "Map", href: "/map", rect: { left: 10, top: 120 } }),
     );
+    expect(
+      keyboard.focusSignature({ tag: "BODY", name: "", rect: { left: 0, top: 0 } }),
+    ).toBe(
+      keyboard.focusSignature({ tag: "BODY", name: "", rect: { left: 0, top: -900 } }),
+    );
+    const rootFocusContext = { focus: [] };
+    expect(() =>
+      keyboard.recordFocus(
+        rootFocusContext,
+        {
+          tag: "BODY",
+          name: "",
+          visible: true,
+          onScreen: true,
+          focusVisible: false,
+          visibleFocusTreatment: false,
+          dialogOpen: false,
+        },
+        "Tab",
+      ),
+    ).toThrow(/document root/i);
+    expect(rootFocusContext.focus).toEqual([]);
+    expect(keyboard.NAVIGATION_TAB_OPTIONS).toEqual({
+      documentRootBoundary: "navigation/bootstrap",
+    });
     const printable = keyboard.printableKeyPayload("a");
     expect(printable.keyEvent).not.toHaveProperty("text");
     expect(printable.charEvent).toHaveProperty("text", "a");
