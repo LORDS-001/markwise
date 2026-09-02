@@ -185,7 +185,11 @@ export default function ProcessingPage() {
             } else if (event.type === "result") {
               const result = event.result as PipelineResult;
               setLiveResult(result);
-              applyRun(result, (event.sessionId as string | null) ?? null);
+              applyRun(
+                result,
+                (event.sessionId as string | null) ?? null,
+                pendingRun!.input,
+              );
             }
           }
         }

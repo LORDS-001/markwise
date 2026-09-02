@@ -94,7 +94,11 @@ interface SessionState {
   setConfirmedBy: (value: string) => void;
 
   startRun: (run: PendingRun) => void;
-  applyRun: (result: PipelineResult, sessionId: string | null) => void;
+  applyRun: (
+    result: PipelineResult,
+    sessionId: string | null,
+    context: RunContext,
+  ) => void;
   setReteachPack: (clusterId: string, pack: ReteachPack) => void;
 }
 
@@ -458,18 +462,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const applyRun = useCallback(
-    (result: PipelineResult, newSessionId: string | null) => {
+    (
+      result: PipelineResult,
+      newSessionId: string | null,
+      runContext: RunContext,
+    ) => {
       setAnswers(result.answers);
       setClusters(result.clusters);
       setReteachPacks(result.reteachPacks ?? {});
       setSessionId(newSessionId);
+      // Taken as an argument rather than read back out of pendingRun inside a
+      // state updater: updaters must stay pure, and React would run that one
+      // twice in development, calling setContext as a side effect each time.
+      setContext(runContext);
       setIsDemo(false);
       setProcessed(true);
       setConfirmed(false);
-      setPendingRun((pending) => {
-        if (pending) setContext(pending.input);
-        return null;
-      });
+      setPendingRun(null);
     },
     [],
   );
