@@ -136,6 +136,35 @@ it("moves and activates answer tabs with the tablist keyboard model", async () =
   expect(paste).toHaveFocus();
 });
 
+it("does not count hidden pasted answers while the unsupported Photos mode is active", async () => {
+  const user = userEvent.setup();
+  renderSetup();
+
+  expect(screen.getByRole("button", { name: "Preview sample analysis" })).toBeEnabled();
+  expect(screen.getByText("40 detected")).toBeVisible();
+
+  await user.click(screen.getByRole("tab", { name: /Photos/ }));
+
+  expect(screen.getByRole("button", { name: "Preview sample analysis" })).toBeDisabled();
+  expect(screen.queryByText("40 detected")).not.toBeInTheDocument();
+});
+
+it("clears a rejected file selection so the same path can be chosen again", async () => {
+  const user = userEvent.setup({ applyAccept: false });
+  const { container } = renderSetup();
+  await user.click(screen.getByRole("tab", { name: "CSV upload" }));
+  const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]');
+  const rejected = new File(["not a spreadsheet"], "answers.txt", { type: "text/plain" });
+
+  await user.upload(fileInput!, rejected);
+
+  expect(screen.getByRole("alert")).toHaveAccessibleName("CSV upload failed");
+  expect(fileInput).toHaveValue("");
+
+  await user.upload(fileInput!, rejected);
+  expect(screen.getByRole("alert")).toHaveAccessibleName("CSV upload failed");
+});
+
 it("explains an invalid CSV without introducing a competing primary action and recovers", async () => {
   const user = userEvent.setup({ applyAccept: false });
   const { container } = renderSetup();

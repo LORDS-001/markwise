@@ -62,6 +62,7 @@ export default function SetupPage() {
 
   const answerCount = useMemo(() => {
     if (mode === "csv") return csvRows;
+    if (mode === "photo") return 0;
     return paste.split("\n").filter((l) => l.trim().length > 0).length;
   }, [mode, paste, csvRows]);
 
@@ -470,7 +471,11 @@ export default function SetupPage() {
                   accept=".csv,text/csv"
                   required={mode === "csv"}
                   className="sr-only"
-                  onChange={(e) => onFile(e.target.files?.[0])}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    onFile(file);
+                  }}
                 />
                 {csvName ? (
                   <div className="flex items-center gap-2 text-[13.5px]">
