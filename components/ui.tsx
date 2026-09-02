@@ -1,4 +1,10 @@
-import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type {
+  ReactNode,
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  KeyboardEvent,
+  TextareaHTMLAttributes,
+} from "react";
 
 export function cn(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(" ");
@@ -174,10 +180,12 @@ export function Stat({
 
 export function Progress({
   value,
+  label,
   tone = "brand",
   className,
 }: {
   value: number;
+  label: string;
   tone?: "brand" | "ok" | "warn";
   className?: string;
 }) {
@@ -187,6 +195,7 @@ export function Progress({
     <div
       className={cn("h-1.5 w-full rounded-full bg-surface-3 overflow-hidden", className)}
       role="progressbar"
+      aria-label={label}
       aria-valuenow={Math.round(pct)}
       aria-valuemin={0}
       aria-valuemax={100}
@@ -209,20 +218,52 @@ export function Segmented<T extends string>({
   options: { value: T; label: string }[];
   label?: string;
 }) {
+  function moveSelection(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex: number | undefined;
+    switch (event.key) {
+      case "ArrowLeft":
+      case "ArrowUp":
+        nextIndex = (index - 1 + options.length) % options.length;
+        break;
+      case "ArrowRight":
+      case "ArrowDown":
+        nextIndex = (index + 1) % options.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = options.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    const radios = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+      '[role="radio"]',
+    );
+    radios?.[nextIndex]?.focus();
+    onChange(options[nextIndex].value);
+  }
+
   return (
     <div
       role="radiogroup"
       aria-label={label}
       className="inline-flex bg-surface-2 border border-border rounded-full p-1 gap-1"
     >
-      {options.map((o) => {
+      {options.map((o, index) => {
         const active = o.value === value;
         return (
           <button
             key={o.value}
+            type="button"
             role="radio"
             aria-checked={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => onChange(o.value)}
+            onKeyDown={(event) => moveSelection(event, index)}
             className={cn(
               "px-3.5 h-7 text-[12.5px] font-semibold rounded-full transition-colors",
               active
@@ -261,6 +302,12 @@ export function Field({
         <label htmlFor={htmlFor} className="text-[13px] font-bold text-ink">
           {label}
           {required ? <span className="text-crit ml-1" aria-hidden>*</span> : null}
+          {required ? (
+            <>
+              {" "}
+              <span className="sr-only">(required)</span>
+            </>
+          ) : null}
         </label>
         {counter ? <span className="text-[12px] text-ink-3 tnum">{counter}</span> : null}
       </div>
@@ -271,7 +318,7 @@ export function Field({
 }
 
 const inputBase =
-  "w-full bg-surface border border-border rounded-[var(--r-input)] px-3.5 py-2.5 text-[14px] text-ink " +
+  "w-full bg-surface border border-control-border rounded-[var(--r-input)] px-3.5 py-2.5 text-[14px] text-ink " +
   "placeholder:text-ink-3 transition-colors hover:border-border-strong focus:border-brand focus:outline-none " +
   "focus:ring-2 focus:ring-[var(--brand-line)]";
 

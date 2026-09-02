@@ -41,6 +41,9 @@ it("keeps optional processing mechanics collapsed during an active preview", asy
   expect(
     screen.getByText("Keep this page open while the preview is prepared."),
   ).toBeVisible();
+  expect(
+    screen.getByRole("progressbar", { name: "Sample analysis progress" }),
+  ).toBeVisible();
 });
 
 it("completes the existing preview lifecycle and keeps the reveal destination", async () => {

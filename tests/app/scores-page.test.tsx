@@ -70,7 +70,7 @@ it(
     expect(
       screen.getByRole("heading", { level: 1, name: "Review provisional scores" }),
     ).toBeVisible();
-    expect(screen.getByRole("progressbar")).toBeVisible();
+    expect(screen.getByRole("progressbar", { name: "Score review progress" })).toBeVisible();
     expect(screen.getByText("How confidence is used")).toBeVisible();
 
     const table = screen.getByRole("table", { name: "Student score review" });

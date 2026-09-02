@@ -143,7 +143,11 @@ export default function ProcessingPage() {
               {Math.round(pct)}% · {(elapsed / 1000).toFixed(1)}s
             </span>
           </div>
-          <Progress value={pct} tone={done ? "ok" : "brand"} />
+          <Progress
+            value={pct}
+            label="Sample analysis progress"
+            tone={done ? "ok" : "brand"}
+          />
         </div>
 
         <ol className="divide-y divide-border">

@@ -147,6 +147,7 @@ export default function ScoresPage() {
           <div className="sm:w-[min(32%,280px)]">
             <Progress
               value={(reviewedCount / TOTAL_ANSWERS) * 100}
+              label="Score review progress"
               tone={exportReady ? "ok" : "brand"}
             />
           </div>

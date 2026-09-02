@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   ClipboardList,
@@ -31,6 +31,12 @@ import { ANSWERS, CRITERIA, SESSION } from "@/lib/mock";
 
 type InputMode = "paste" | "csv" | "photo";
 
+const ANSWER_INPUT_MODES = [
+  { id: "paste", label: "Paste", icon: ClipboardList },
+  { id: "csv", label: "CSV upload", icon: FileSpreadsheet },
+  { id: "photo", label: "Photos", icon: ImageIcon },
+] as const;
+
 const DEMO_PASTE = ANSWERS.map((a) => `${a.studentId} | ${a.answer}`).join("\n");
 
 export default function SetupPage() {
@@ -52,6 +58,7 @@ export default function SetupPage() {
   const [csvRows, setCsvRows] = useState(0);
   const [csvError, setCsvError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const answerTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const answerCount = useMemo(() => {
     if (mode === "csv") return csvRows;
@@ -60,7 +67,11 @@ export default function SetupPage() {
 
   const maxScore = criteria.reduce((sum, c) => sum + c.marks, 0);
   const ready =
-    question.trim().length > 0 && scheme.trim().length > 0 && answerCount > 1;
+    subject.trim().length > 0 &&
+    level.trim().length > 0 &&
+    question.trim().length > 0 &&
+    scheme.trim().length > 0 &&
+    answerCount > 1;
 
   function loadDemo() {
     setQuestion(SESSION.question);
@@ -94,6 +105,8 @@ export default function SetupPage() {
   function onFile(file: File | undefined) {
     if (!file) return;
     setCsvError(null);
+    setCsvName(null);
+    setCsvRows(0);
     if (!/\.csv$/i.test(file.name)) {
       setCsvError("That file isn't a .csv. Export your sheet as CSV and try again.");
       return;
@@ -112,6 +125,30 @@ export default function SetupPage() {
     reader.onerror = () =>
       setCsvError("That file couldn't be read. Try re-exporting it as CSV.");
     reader.readAsText(file);
+  }
+
+  function moveAnswerTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex: number;
+    switch (event.key) {
+      case "ArrowLeft":
+        nextIndex = (index - 1 + ANSWER_INPUT_MODES.length) % ANSWER_INPUT_MODES.length;
+        break;
+      case "ArrowRight":
+        nextIndex = (index + 1) % ANSWER_INPUT_MODES.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = ANSWER_INPUT_MODES.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    setMode(ANSWER_INPUT_MODES[nextIndex].id);
+    answerTabRefs.current[nextIndex]?.focus();
   }
 
   function run() {
@@ -160,7 +197,7 @@ export default function SetupPage() {
                 </Button>
                 {!ready ? (
                   <p className="mt-2 text-center text-[12px] leading-snug text-ink-3">
-                    Add a question, a marking scheme, and at least two answers.
+                    Add a subject, level, question, marking scheme, and at least two answers.
                   </p>
                 ) : (
                   <p className="mt-2 text-center text-[12px] leading-snug text-ink-3">
@@ -196,6 +233,7 @@ export default function SetupPage() {
           <Field label="Subject" required htmlFor="subject" hint="Used to judge which later topics a belief will break.">
             <Input
               id="subject"
+              required
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Electrical Engineering — AC circuit analysis"
@@ -204,6 +242,7 @@ export default function SetupPage() {
           <Field label="Level" required htmlFor="level" hint="Sets the expected depth of the answer.">
             <Input
               id="level"
+              required
               value={level}
               onChange={(e) => setLevel(e.target.value)}
               placeholder="300 level (Year 3)"
@@ -222,6 +261,7 @@ export default function SetupPage() {
           <Field label="Question text" required htmlFor="question">
             <Textarea
               id="question"
+              required
               rows={4}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
@@ -242,6 +282,7 @@ export default function SetupPage() {
           <Field label="Model answer or scheme" required htmlFor="scheme">
             <Textarea
               id="scheme"
+              required
               rows={4}
               value={scheme}
               onChange={(e) => setScheme(e.target.value)}
@@ -343,21 +384,23 @@ export default function SetupPage() {
           aria-label="Answer input method"
           className="flex gap-1 px-5 pt-4 border-b border-border"
         >
-          {(
-            [
-              { id: "paste", label: "Paste", icon: ClipboardList },
-              { id: "csv", label: "CSV upload", icon: FileSpreadsheet },
-              { id: "photo", label: "Photos", icon: ImageIcon },
-            ] as const
-          ).map((t) => {
+          {ANSWER_INPUT_MODES.map((t, index) => {
             const active = mode === t.id;
             const Icon = t.icon;
             return (
               <button
                 key={t.id}
+                ref={(node) => {
+                  answerTabRefs.current[index] = node;
+                }}
+                id={`answer-tab-${t.id}`}
+                type="button"
                 role="tab"
                 aria-selected={active}
+                aria-controls={`answer-panel-${t.id}`}
+                tabIndex={active ? 0 : -1}
                 onClick={() => setMode(t.id)}
+                onKeyDown={(event) => moveAnswerTab(event, index)}
                 className={cn(
                   "inline-flex items-center gap-1.5 px-3 py-2 text-[13.5px] font-medium border-b-2 -mb-px transition-colors",
                   active
@@ -376,15 +419,22 @@ export default function SetupPage() {
         </div>
 
         <div className="px-5 py-5">
-          {mode === "paste" ? (
+          <div
+            id="answer-panel-paste"
+            role="tabpanel"
+            aria-labelledby="answer-tab-paste"
+            hidden={mode !== "paste"}
+          >
             <Field
               label="Answers"
+              required={mode === "paste"}
               hint="Format: student ID, a pipe, then the answer. One per line."
               htmlFor="paste"
               counter={`${answerCount} lines`}
             >
               <Textarea
                 id="paste"
+                required={mode === "paste"}
                 rows={9}
                 value={paste}
                 onChange={(e) => setPaste(e.target.value)}
@@ -392,43 +442,77 @@ export default function SetupPage() {
                 placeholder={"EEE/022/0103 | Z = R = 30 Ω so I = 240/30 = 8 A…"}
               />
             </Field>
-          ) : null}
+          </div>
 
-          {mode === "csv" ? (
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="flex flex-col items-center gap-2 border-2 border-dashed border-border-strong rounded-[16px] px-6 py-10 text-center hover:border-brand hover:bg-brand-soft/40 transition-colors"
-              >
-                <Upload size={22} strokeWidth={1.7} className="text-ink-3" aria-hidden />
-                <span className="text-[14px] font-medium">Choose a CSV file</span>
-                <span className="text-[13px] text-ink-2 max-w-[42ch]">
-                  Two columns: student identifier and answer text. The header row is skipped.
-                </span>
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="sr-only"
-                onChange={(e) => onFile(e.target.files?.[0])}
-              />
-              {csvName ? (
-                <div className="flex items-center gap-2 text-[13.5px]">
-                  <FileSpreadsheet size={16} strokeWidth={1.9} className="text-brand" aria-hidden />
-                  <span className="font-medium truncate">{csvName}</span>
-                  <Badge tone="ok">{csvRows} rows</Badge>
-                </div>
-              ) : null}
-              {csvError ? (
-                <p className="text-[13px] text-crit" role="alert">
-                  {csvError}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+          <div
+            id="answer-panel-csv"
+            role="tabpanel"
+            aria-labelledby="answer-tab-csv"
+            hidden={mode !== "csv"}
+          >
+            <Field label="CSV file" required={mode === "csv"} htmlFor="answers-csv">
+              <div className="flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="flex flex-col items-center gap-2 border-2 border-dashed border-control-border rounded-[16px] px-6 py-10 text-center hover:border-brand hover:bg-brand-soft/40 transition-colors"
+                >
+                  <Upload size={22} strokeWidth={1.7} className="text-ink-3" aria-hidden />
+                  <span className="text-[14px] font-medium">Choose a CSV file</span>
+                  <span className="text-[13px] text-ink-2 max-w-[42ch]">
+                    Two columns: student identifier and answer text. The header row is skipped.
+                  </span>
+                </button>
+                <input
+                  ref={fileRef}
+                  id="answers-csv"
+                  type="file"
+                  accept=".csv,text/csv"
+                  required={mode === "csv"}
+                  className="sr-only"
+                  onChange={(e) => onFile(e.target.files?.[0])}
+                />
+                {csvName ? (
+                  <div className="flex items-center gap-2 text-[13.5px]">
+                    <FileSpreadsheet size={16} strokeWidth={1.9} className="text-brand" aria-hidden />
+                    <span className="font-medium truncate">{csvName}</span>
+                    <Badge tone="ok">{csvRows} rows</Badge>
+                  </div>
+                ) : null}
+                {csvError ? (
+                  <div
+                    className="rounded-[12px] border border-crit-line bg-crit-soft px-4 py-3 text-[13px] text-crit"
+                    role="alert"
+                    aria-labelledby="csv-error-title"
+                    aria-describedby="csv-error-explanation"
+                  >
+                    <h3 id="csv-error-title" className="font-semibold">
+                      CSV upload failed
+                    </h3>
+                    <p id="csv-error-explanation" className="mt-1">
+                      {csvError}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => fileRef.current?.click()}
+                    >
+                      Choose another CSV
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            </Field>
+          </div>
 
-          {mode === "photo" ? (
+          <div
+            id="answer-panel-photo"
+            role="tabpanel"
+            aria-labelledby="answer-tab-photo"
+            hidden={mode !== "photo"}
+          >
             <div className="flex flex-col items-center gap-2 border border-dashed border-border-strong rounded-[16px] px-6 py-10 text-center">
               <ImageIcon size={22} strokeWidth={1.7} className="text-ink-3" aria-hidden />
               <p className="text-[14px] font-medium">Handwritten scripts aren&apos;t supported yet</p>
@@ -440,7 +524,7 @@ export default function SetupPage() {
                 Upload a CSV instead
               </Button>
             </div>
-          ) : null}
+          </div>
         </div>
       </Card>
 
