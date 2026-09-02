@@ -150,4 +150,8 @@ describe("tracked UI review runner contract", () => {
     expect(keyboard.ACCOUNT_DEMO_EXPRESSION).toContain('[title="Demo preview"]');
     expect(keyboard.ACCOUNT_DEMO_EXPRESSION).toContain("input[type=email]");
   });
+
+  it("traverses backward from the processing disclosure to its completed header action", () => {
+    expect(keyboard.PROCESSING_COMPLETION_TAB_OPTIONS).toEqual({ shift: true });
+  });
 });

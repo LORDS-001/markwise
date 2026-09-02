@@ -26,6 +26,7 @@ const GROUP_NAMES = [
 const HYDRATION_READY_EXPRESSION =
   "document.readyState === 'complete' && !!document.querySelector('main#main')";
 const SPLIT_MEMBER_TAB_OPTIONS = { shift: true };
+const PROCESSING_COMPLETION_TAB_OPTIONS = { shift: true };
 const EXPORT_READY_TAB_OPTIONS = { shift: true };
 const NAVIGATION_TAB_OPTIONS = { documentRootBoundary: "navigation/bootstrap" };
 const REVIEWER_VALIDATION_VALUE = "";
@@ -415,7 +416,13 @@ async function runKeyboard(options = {}) {
       await activate(cdp, context);
       await assertEval(cdp, context, "processing disclosure expands", "document.activeElement.closest('details')?.open === true");
       await waitFor(cdp, "/Sample analysis ready/.test(document.querySelector('h1')?.textContent || '')", 15_000);
-      await tabTo(cdp, context, named(/Compare my prediction/), "completed onward link");
+      await tabTo(
+        cdp,
+        context,
+        named(/Compare my prediction/),
+        "completed onward link",
+        PROCESSING_COMPLETION_TAB_OPTIONS,
+      );
       await activate(cdp, context);
       await waitPath(cdp, "/reveal");
       await assertEval(cdp, context, "completed processing continues to Reveal", "location.pathname === '/reveal' && /Compare your prediction/.test(document.querySelector('h1')?.textContent)");
@@ -714,6 +721,7 @@ module.exports = {
   KEY_DEFINITIONS,
   MERGE_RETURN_KEY,
   NAVIGATION_TAB_OPTIONS,
+  PROCESSING_COMPLETION_TAB_OPTIONS,
   REJECT_DESTINATION,
   REVIEWER_VALIDATION_VALUE,
   SCORES_EVIDENCE_EXPRESSION,
