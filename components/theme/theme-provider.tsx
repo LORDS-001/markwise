@@ -55,6 +55,47 @@ function browserStorage() {
   }
 }
 
+function subscribeToSystemPreference(
+  query: MediaQueryList,
+  onChange: (event: MediaQueryListEvent) => void,
+) {
+  try {
+    if (
+      typeof query.addEventListener === "function" &&
+      typeof query.removeEventListener === "function"
+    ) {
+      query.addEventListener("change", onChange);
+      return () => {
+        try {
+          query.removeEventListener("change", onChange);
+        } catch {
+          // The media-query boundary is optional; cleanup must stay best-effort.
+        }
+      };
+    }
+  } catch {
+    // Fall through to the legacy API when modern registration is unavailable.
+  }
+
+  try {
+    if (
+      typeof query.addListener === "function" &&
+      typeof query.removeListener === "function"
+    ) {
+      query.addListener(onChange);
+      return () => {
+        try {
+          query.removeListener(onChange);
+        } catch {
+          // The media-query boundary is optional; cleanup must stay best-effort.
+        }
+      };
+    }
+  } catch {
+    // System tracking safely retains the last snapshot without a listener.
+  }
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [preference, setPreferenceState] =
     useState<ThemePreference>(browserPreference);
@@ -87,31 +128,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const onChange = (event: MediaQueryListEvent) => {
       setSystemPrefersDark(event.matches);
     };
-
-    if (
-      typeof query.addEventListener === "function" &&
-      typeof query.removeEventListener === "function"
-    ) {
-      query.addEventListener("change", onChange);
-      return () => {
-        active = false;
-        query.removeEventListener("change", onChange);
-      };
-    }
-
-    if (
-      typeof query.addListener === "function" &&
-      typeof query.removeListener === "function"
-    ) {
-      query.addListener(onChange);
-      return () => {
-        active = false;
-        query.removeListener(onChange);
-      };
-    }
+    const unsubscribe = subscribeToSystemPreference(query, onChange);
 
     return () => {
       active = false;
+      unsubscribe?.();
     };
   }, [preference]);
 

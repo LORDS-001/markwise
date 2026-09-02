@@ -72,9 +72,13 @@
   --on-c2: #ffffff;
   --on-c3: #ffffff;
   --c4: #7b4a93;
+  --on-c4: #ffffff;
   --c5: #4f7a34;
+  --on-c5: #ffffff;
   --c6: #a8324f;
+  --on-c6: #ffffff;
   --c0: #93a0b0;
+  --on-c0: #07101f;
 
   /* radii */
   --r-card: 14px;
@@ -125,9 +129,13 @@
   --on-c2: #061018;
   --on-c3: #061018;
   --c4: #c493d8;
+  --on-c4: #061018;
   --c5: #87b96d;
+  --on-c5: #061018;
   --c6: #e57491;
+  --on-c6: #061018;
   --c0: #8b99ac;
+  --on-c0: #061018;
   --shadow-panel: 0 24px 72px rgb(0 0 0 / 0.45);
 }
 
@@ -165,9 +173,13 @@
   --color-ok-soft: var(--ok-soft);
   --color-ok-line: var(--ok-line);
 
+  --color-on-c0: var(--on-c0);
   --color-on-c1: var(--on-c1);
   --color-on-c2: var(--on-c2);
   --color-on-c3: var(--on-c3);
+  --color-on-c4: var(--on-c4);
+  --color-on-c5: var(--on-c5);
+  --color-on-c6: var(--on-c6);
 
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;

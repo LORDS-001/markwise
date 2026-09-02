@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import type { Cluster } from "@/lib/types";
 
 const css = readFileSync("app/globals.css", "utf8");
 
 type ThemeName = "light" | "dark";
+const clusterTones = [0, 1, 2, 3, 4, 5, 6] satisfies Cluster["tone"][];
 
 function themeTokens(theme: ThemeName) {
   const selector =
@@ -91,9 +93,9 @@ describe.each(["light", "dark"] as const)("%s theme contrast", (theme) => {
     }
   });
 
-  it("provides readable foregrounds for the first three cluster colours", () => {
-    for (const tone of ["c1", "c2", "c3"]) {
-      expectPair(theme, tokens, `on-${tone}`, tone, 4.5);
+  it("provides readable foregrounds for every supported cluster colour", () => {
+    for (const tone of clusterTones) {
+      expectPair(theme, tokens, `on-c${tone}`, `c${tone}`, 4.5);
     }
   });
 });

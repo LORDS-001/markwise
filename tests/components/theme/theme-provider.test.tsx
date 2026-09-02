@@ -109,6 +109,98 @@ describe("ThemeProvider", () => {
     expect(listeners.size).toBe(0);
   });
 
+  it("keeps the snapshot when modern listener registration throws", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "system");
+    const query = {
+      matches: true,
+      addEventListener() {
+        throw new Error("modern registration blocked");
+      },
+      removeEventListener() {},
+    } as unknown as MediaQueryList;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn(() => query),
+    });
+
+    expect(() =>
+      render(
+        <ThemeProvider>
+          <Probe />
+        </ThemeProvider>,
+      ),
+    ).not.toThrow();
+    expect(screen.getByLabelText("resolved theme")).toHaveTextContent("dark");
+  });
+
+  it("does not surface modern listener cleanup failures", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "system");
+    const query = {
+      matches: false,
+      addEventListener() {},
+      removeEventListener() {
+        throw new Error("modern cleanup blocked");
+      },
+    } as unknown as MediaQueryList;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn(() => query),
+    });
+
+    const view = render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    expect(() => view.unmount()).not.toThrow();
+  });
+
+  it("keeps the snapshot when legacy listener registration throws", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "system");
+    const query = {
+      matches: true,
+      addListener() {
+        throw new Error("legacy registration blocked");
+      },
+      removeListener() {},
+    } as unknown as MediaQueryList;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn(() => query),
+    });
+
+    expect(() =>
+      render(
+        <ThemeProvider>
+          <Probe />
+        </ThemeProvider>,
+      ),
+    ).not.toThrow();
+    expect(screen.getByLabelText("resolved theme")).toHaveTextContent("dark");
+  });
+
+  it("does not surface legacy listener cleanup failures", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "system");
+    const query = {
+      matches: false,
+      addListener() {},
+      removeListener() {
+        throw new Error("legacy cleanup blocked");
+      },
+    } as unknown as MediaQueryList;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn(() => query),
+    });
+
+    const view = render(
+      <ThemeProvider>
+        <Probe />
+      </ThemeProvider>,
+    );
+    expect(() => view.unmount()).not.toThrow();
+  });
+
   it("synchronously reads the live query state when system tracking starts", async () => {
     localStorage.setItem(THEME_STORAGE_KEY, "system");
     const initialQuery = { matches: false } as MediaQueryList;
