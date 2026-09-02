@@ -26,6 +26,7 @@ const GROUP_NAMES = [
 const HYDRATION_READY_EXPRESSION =
   "document.readyState === 'complete' && !!document.querySelector('main#main')";
 const SPLIT_MEMBER_TAB_OPTIONS = { shift: true };
+const MERGE_RETURN_KEY = { key: "ArrowLeft", modifiers: 1 };
 
 const KEY_DEFINITIONS = {
   Tab: { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 },
@@ -443,6 +444,10 @@ async function runKeyboard(options = {}) {
       await activate(cdp, context, "Space");
       await tabTo(cdp, context, named(/Merge into selected/), "Cluster merge confirm");
       await activate(cdp, context);
+      await waitPath(cdp, "/clusters/cl-impedance");
+      await assertEval(cdp, context, "cluster merge navigates to selected target", "location.pathname === '/clusters/cl-impedance'");
+      await press(cdp, context, MERGE_RETURN_KEY.key, MERGE_RETURN_KEY.modifiers);
+      await waitPath(cdp, "/clusters/cl-phase");
       await waitFor(cdp, "/This cluster no longer exists/.test(document.querySelector('h1')?.textContent || '')");
       await assertEval(cdp, context, "merged cluster fallback", "document.body.innerText.includes('It was merged or rejected') && !!document.querySelector('a[href=\"/map\"]')");
       await navigate(cdp, `${origin}/clusters/cl-impedance`);
@@ -619,6 +624,7 @@ module.exports = {
   GROUP_NAMES,
   HYDRATION_READY_EXPRESSION,
   KEY_DEFINITIONS,
+  MERGE_RETURN_KEY,
   SPLIT_MEMBER_TAB_OPTIONS,
   focusSignature,
   isRadioSnapshot,
