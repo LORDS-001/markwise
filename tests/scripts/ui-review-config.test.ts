@@ -93,6 +93,10 @@ describe("tracked UI review runner contract", () => {
     expect(printable.keyEvent).not.toHaveProperty("text");
     expect(printable.charEvent).toHaveProperty("text", "a");
     expect(keyboard.isRadioSnapshot({ tag: "INPUT", type: "radio", role: null })).toBe(true);
-    expect(keyboard.MERGE_RETURN_KEY).toEqual({ key: "ArrowLeft", modifiers: 1 });
+    expect(keyboard.MERGE_RETURN_KEY).toEqual({
+      key: "ArrowLeft",
+      modifiers: 1,
+      isSystemKey: true,
+    });
   });
 });

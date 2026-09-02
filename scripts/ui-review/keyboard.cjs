@@ -26,7 +26,7 @@ const GROUP_NAMES = [
 const HYDRATION_READY_EXPRESSION =
   "document.readyState === 'complete' && !!document.querySelector('main#main')";
 const SPLIT_MEMBER_TAB_OPTIONS = { shift: true };
-const MERGE_RETURN_KEY = { key: "ArrowLeft", modifiers: 1 };
+const MERGE_RETURN_KEY = { key: "ArrowLeft", modifiers: 1, isSystemKey: true };
 
 const KEY_DEFINITIONS = {
   Tab: { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 },
@@ -122,6 +122,7 @@ async function press(cdp, context, keyName, modifiers = 0) {
   const base = {
     ...definition,
     modifiers,
+    isSystemKey: alt,
     autoRepeat: false,
     isKeypad: false,
   };
