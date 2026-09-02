@@ -92,5 +92,6 @@ describe("tracked UI review runner contract", () => {
     const printable = keyboard.printableKeyPayload("a");
     expect(printable.keyEvent).not.toHaveProperty("text");
     expect(printable.charEvent).toHaveProperty("text", "a");
+    expect(keyboard.isRadioSnapshot({ tag: "INPUT", type: "radio", role: null })).toBe(true);
   });
 });

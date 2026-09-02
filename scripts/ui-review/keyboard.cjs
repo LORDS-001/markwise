@@ -75,6 +75,7 @@ async function focusSnapshot(cdp) {
     const meaningfulShadow = style && style.boxShadow !== "none";
     return {
       tag: element?.tagName || null,
+      type: element?.getAttribute?.("type") || null,
       role: element?.getAttribute?.("role") || null,
       id: element?.id || null,
       name: name.slice(0, 180),
@@ -223,6 +224,10 @@ async function waitPath(cdp, pathname) {
 
 function named(pattern) {
   return (snapshot) => pattern.test(snapshot.name);
+}
+
+function isRadioSnapshot(snapshot) {
+  return snapshot.role === "radio" || (snapshot.tag === "INPUT" && snapshot.type === "radio");
 }
 
 async function runKeyboard(options = {}) {
@@ -434,7 +439,7 @@ async function runKeyboard(options = {}) {
       await assertEval(cdp, context, "cluster split changes roster", "!document.body.innerText.includes('Split 1 selected')");
       await tabTo(cdp, context, named(/^Merge$/), "Cluster merge action");
       await activate(cdp, context);
-      await tabTo(cdp, context, (item) => item.role === "radio", "Cluster merge target");
+      await tabTo(cdp, context, isRadioSnapshot, "Cluster merge target");
       await activate(cdp, context, "Space");
       await tabTo(cdp, context, named(/Merge into selected/), "Cluster merge confirm");
       await activate(cdp, context);
@@ -616,6 +621,7 @@ module.exports = {
   KEY_DEFINITIONS,
   SPLIT_MEMBER_TAB_OPTIONS,
   focusSignature,
+  isRadioSnapshot,
   printableKeyPayload,
   runKeyboard,
 };
