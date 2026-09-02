@@ -162,9 +162,17 @@ async function typeText(cdp, context, value) {
   await delay(40);
 }
 
+function replacementPlan(value) {
+  return value === "" ? ["KeyA", "Backspace"] : ["KeyA", "Text"];
+}
+
 async function replaceText(cdp, context, value) {
   await press(cdp, context, "KeyA", 2);
-  await typeText(cdp, context, value);
+  if (replacementPlan(value).includes("Backspace")) {
+    await press(cdp, context, "Backspace");
+  } else {
+    await typeText(cdp, context, value);
+  }
 }
 
 function focusSignature(snapshot) {
@@ -682,6 +690,7 @@ module.exports = {
   historyEntryForPath,
   isRadioSnapshot,
   printableKeyPayload,
+  replacementPlan,
   visibleStatusCountExpression,
   runKeyboard,
 };
