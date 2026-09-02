@@ -26,6 +26,7 @@ const GROUP_NAMES = [
 const HYDRATION_READY_EXPRESSION =
   "document.readyState === 'complete' && !!document.querySelector('main#main')";
 const SPLIT_MEMBER_TAB_OPTIONS = { shift: true };
+const EXPORT_READY_TAB_OPTIONS = { shift: true };
 const MERGE_RETURN_KEY = { key: "ArrowLeft", modifiers: 1, isSystemKey: true };
 const REJECT_DESTINATION = "/map";
 const SCORES_EVIDENCE_EXPRESSION = `document.activeElement.getAttribute('aria-expanded') === 'true' && (() => {
@@ -581,7 +582,7 @@ async function runKeyboard(options = {}) {
         await activate(cdp, context);
       }
       await assertEval(cdp, context, "Scores reaches export-ready state", "document.querySelectorAll('tr[data-review-row=\"unreviewed\"]').length === 0 && !![...document.querySelectorAll('a')].find((link) => /Continue to export/.test(link.textContent))");
-      await tabTo(cdp, context, named(/Continue to export/), "Continue to export");
+      await tabTo(cdp, context, named(/Continue to export/), "Continue to export", EXPORT_READY_TAB_OPTIONS);
       await activate(cdp, context);
       await waitPath(cdp, "/export");
     });
@@ -679,6 +680,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  EXPORT_READY_TAB_OPTIONS,
   GROUP_NAMES,
   HYDRATION_READY_EXPRESSION,
   KEY_DEFINITIONS,
