@@ -206,12 +206,17 @@ it("keeps a missing sample pack clear and limited to one recovery action", async
   );
 
   expect(
-    await screen.findByRole("heading", { name: "No sample pack for this cluster yet" }),
+    await screen.findByRole("heading", { name: "No pack for this cluster yet" }),
   ).toBeVisible();
   expect(
     screen.getByText(
-      "This cluster was created by a split or merge, so a sample pack is not available for it yet.",
+      "Generate a five-minute micro-lesson written against this specific belief, plus two diagnostic questions to confirm the fix landed.",
     ),
+  ).toBeVisible();
+  // A cluster with no pack is now an invitation to generate one, not a dead
+  // end — but generating stays the single primary action on the screen.
+  expect(
+    screen.getByRole("button", { name: "Generate reteach pack" }),
   ).toBeVisible();
   expect(screen.getAllByRole("link", { name: "Choose another cluster" })).toHaveLength(1);
   expect(primaryActions(container).length).toBeLessThanOrEqual(1);

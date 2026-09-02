@@ -9,9 +9,15 @@ scores fall out of the same pass as a byproduct.
 
 ## Status
 
-Frontend UI for all eight screens, running on seeded demo data, plus
-anonymous-first auth. The model pipeline (extraction, embedding, clustering,
-labelling, damage ranking) is not wired yet — `lib/mock.ts` stands in for it.
+All eight screens, the model pipeline, and Supabase persistence are wired.
+
+With no `GEMINI_API_KEY` the app runs on the seeded demo class alone, so the
+deployed demo cannot be taken down by a missing variable. With a key, Run the
+pipeline marks a real batch: extraction, embedding, agglomerative clustering,
+labelling, and prerequisite damage ranking, with live stage progress.
+
+Reteach packs are generated per cluster on request. Handwritten-script OCR is
+still not supported — typed and CSV input are the guaranteed path.
 
 ## Screens
 
@@ -30,7 +36,13 @@ labelling, damage ranking) is not wired yet — `lib/mock.ts` stands in for it.
 ## Stack
 
 Next.js 16 (App Router) · TypeScript · Tailwind v4 · lucide-react ·
-SheetJS (.xlsx) · docx (.docx)
+SheetJS (.xlsx) · docx (.docx) · Gemini (extraction, labelling, pedagogy) ·
+Supabase (Postgres, pgvector, RLS)
+
+Clustering is agglomerative average-linkage on cosine distance, written by
+hand in `lib/pipeline/cluster.ts` — the number of misconceptions in a class is
+unknown ahead of time and is the thing being discovered, so k-means would
+presuppose the answer.
 
 Design tokens live in `app/globals.css`; both light and dark themes are defined
 token-level. Shared primitives are in `components/ui.tsx`, the shell and page
@@ -65,12 +77,32 @@ To connect it:
 
 1. Create a project at supabase.com, then copy `.env.example` to `.env.local`
    and fill in the URL and anon key from Project settings → API.
-2. Run `supabase/migrations/0001_init.sql` in the SQL editor.
+2. Run the migrations in `supabase/migrations/` in order, in the SQL editor.
 3. Enable anonymous sign-ins: Authentication → Sign In / Up → Anonymous.
 
 Once the app is live, schedule `public.prune_abandoned_anonymous_users()` —
 anonymous sign-in creates a user per visitor, and abandoned ones accumulate.
 It only removes anonymous users with no sessions attached.
+
+## The pipeline
+
+Add `GEMINI_API_KEY` to `.env.local` (aistudio.google.com/apikey). Without it
+the app stays on the demo class and the run endpoint returns 503 rather than
+failing halfway.
+
+`npm run pipeline` runs the whole thing as a bare console script with no UI,
+which is how the extraction prompt and the distance threshold get tuned:
+
+```bash
+npm run pipeline                       # the seeded 40
+npm run pipeline -- --csv answers.csv  # your own batch
+npm run pipeline -- --json out.json    # dump the full result
+```
+
+Read the printed signatures first. If they describe answers ("used the wrong
+formula") rather than state beliefs ("believes reactance does not oppose
+current"), fix the prompt in `lib/pipeline/prompts.ts` before touching the
+threshold — descriptions will not cluster no matter what the threshold is.
 
 ## Demo data
 

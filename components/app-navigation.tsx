@@ -19,7 +19,6 @@ import { useAuth } from "@/components/auth-provider";
 import { MarkwiseLogo } from "@/components/logo";
 import { useSession } from "@/components/session-provider";
 import { cn } from "@/components/ui";
-import { SESSION, TOTAL_ANSWERS } from "@/lib/mock";
 
 export const STEPS = [
   { href: "/", label: "Setup", icon: FileText, blurb: "Question & answers" },
@@ -49,7 +48,14 @@ export function isChildRoute(pathname: string) {
 }
 
 function useStepState() {
-  const { processed, reviewedCount, needsAttention, exportReady, confirmed } = useSession();
+  const {
+    processed,
+    reviewedCount,
+    needsAttention,
+    exportReady,
+    confirmed,
+    totalAnswers,
+  } = useSession();
 
   return (href: string): { done: boolean; count?: number; warn?: boolean } => {
     switch (href) {
@@ -62,7 +68,7 @@ function useStepState() {
       case "/scores":
         return {
           done: exportReady,
-          count: TOTAL_ANSWERS - reviewedCount,
+          count: totalAnswers - reviewedCount,
           warn: needsAttention > 0,
         };
       case "/export":
@@ -82,6 +88,7 @@ export function AppNavigation({
 }) {
   const pathname = usePathname();
   const stepState = useStepState();
+  const { courseCode, courseTitle } = useSession();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -93,7 +100,7 @@ export function AppNavigation({
         <span className="min-w-0">
           <MarkwiseLogo className="max-w-full" />
           <span className="mt-0.5 block truncate text-[11px] leading-tight text-ink-3">
-            {SESSION.courseCode} · {SESSION.courseTitle}
+            {[courseCode, courseTitle].filter(Boolean).join(" · ")}
           </span>
         </span>
       </Link>

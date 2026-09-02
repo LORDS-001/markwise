@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Git worktrees are complete checkouts of this same repo, build output and
+    // dependencies included. Linting one from its parent reports every problem
+    // twice and buries the real ones — each checkout lints itself.
+    ".worktrees/**",
   ]),
 ]);
 

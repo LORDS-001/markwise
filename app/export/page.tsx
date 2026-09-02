@@ -24,7 +24,6 @@ import {
 } from "@/components/ui";
 import { AccountLink } from "@/components/account-link";
 import { useSession } from "@/components/session-provider";
-import { SESSION, TOTAL_ANSWERS } from "@/lib/mock";
 import {
   buildRows,
   classStats,
@@ -46,6 +45,11 @@ export default function ExportPage() {
     setConfirmed,
     confirmedBy,
     setConfirmedBy,
+    totalAnswers,
+    context,
+    courseCode,
+    courseTitle,
+    sessionId,
   } = useSession();
 
   const [format, setFormat] = useState<Format>("xlsx");
@@ -67,6 +71,19 @@ export default function ExportPage() {
   function updateConfirmation(nextConfirmed: boolean) {
     confirmationFocusIntentRef.current = nextConfirmed ? "reopen" : "confirm";
     setConfirmed(nextConfirmed);
+
+    // The provenance footer claims the batch was confirmed by a named person
+    // on a date, so a saved run records who and when — the claim has to be
+    // backed by something more durable than this tab.
+    if (nextConfirmed && sessionId) {
+      void import("@/app/actions")
+        .then((actions) =>
+          actions.confirmBatchAction({ sessionId, confirmedBy }),
+        )
+        .catch(() => {
+          // The export itself is unaffected; it carries the footer regardless.
+        });
+    }
   }
 
   const rows = useMemo(() => buildRows(answers, clusters), [answers, clusters]);
@@ -80,9 +97,9 @@ export default function ExportPage() {
         .map((c) => ({
           label: c.label,
           count: c.memberIds.length,
-          pct: (c.memberIds.length / TOTAL_ANSWERS) * 100,
+          pct: (c.memberIds.length / totalAnswers) * 100,
         })),
-    [clusters],
+    [clusters, totalAnswers],
   );
 
   async function runExport() {
@@ -93,15 +110,15 @@ export default function ExportPage() {
     try {
       if (format === "xlsx") {
         await downloadXlsx(rows, stats, {
-          courseCode: SESSION.courseCode,
-          question: SESSION.question,
+          courseCode,
+          question: context.question,
           lecturer: confirmedBy,
         });
       } else {
         await downloadDocx(rows, stats, {
-          courseCode: SESSION.courseCode,
-          courseTitle: SESSION.courseTitle,
-          question: SESSION.question,
+          courseCode,
+          courseTitle,
+          question: context.question,
           lecturer: confirmedBy,
           topMisconceptions,
         });
@@ -129,7 +146,7 @@ export default function ExportPage() {
                 <span className="label-caps text-warn">Blocked</span>
               </div>
               <h2 className="font-display text-[22px] font-semibold">
-                {TOTAL_ANSWERS - reviewedCount} of {TOTAL_ANSWERS} rows still need you
+                {totalAnswers - reviewedCount} of {totalAnswers} rows still need you
               </h2>
               <p className="text-[14px] text-ink-2 mt-1.5 max-w-[60ch]">
                 {needsAttention > 0
@@ -138,7 +155,7 @@ export default function ExportPage() {
               </p>
               <div className="mt-4 max-w-sm">
                 <Progress
-                  value={(reviewedCount / TOTAL_ANSWERS) * 100}
+                  value={(reviewedCount / totalAnswers) * 100}
                   tone="warn"
                   label="Score review progress"
                 />
@@ -187,7 +204,7 @@ export default function ExportPage() {
             <div>
               <h2 className="font-display text-[16px] font-bold">Review complete</h2>
               <p className="mt-1 text-[13px] text-ink-2">
-                All {TOTAL_ANSWERS} rows have a lecturer-reviewed score and are ready to export.
+                All {totalAnswers} rows have a lecturer-reviewed score and are ready to export.
               </p>
             </div>
           </div>
@@ -224,7 +241,7 @@ export default function ExportPage() {
             <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2 text-[13.5px] font-medium text-ok">
                 <ShieldCheck size={16} strokeWidth={2} aria-hidden />
-                All {TOTAL_ANSWERS} rows reviewed and confirmed
+                All {totalAnswers} rows reviewed and confirmed
               </div>
               <Button
                 variant="ghost"

@@ -34,6 +34,11 @@ import {
   cn,
 } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
+import {
+  answersFromCsv,
+  answersFromPaste,
+} from "@/lib/pipeline/parse-answers";
+import type { RawAnswer } from "@/lib/pipeline/types";
 import { ANSWERS, CRITERIA, SESSION } from "@/lib/mock";
 
 type InputMode = "paste" | "csv" | "photo";
@@ -48,7 +53,7 @@ const DEMO_PASTE = ANSWERS.map((a) => `${a.studentId} | ${a.answer}`).join("\n")
 
 export default function SetupPage() {
   const router = useRouter();
-  const { prediction, setPrediction, setProcessed } = useSession();
+  const { prediction, setPrediction, startRun } = useSession();
 
   const [question, setQuestion] = useState(SESSION.question);
   const [scheme, setScheme] = useState(
@@ -62,25 +67,33 @@ export default function SetupPage() {
   const [mode, setMode] = useState<InputMode>("paste");
   const [paste, setPaste] = useState(DEMO_PASTE);
   const [csvName, setCsvName] = useState<string | null>(null);
-  const [csvRows, setCsvRows] = useState(0);
+  // The parsed rows, not just a count. Counting lines and then discarding the
+  // file meant the pipeline had nothing to read when the run started.
+  const [csvAnswers, setCsvAnswers] = useState<RawAnswer[]>([]);
   const [csvError, setCsvError] = useState<string | null>(null);
+  const csvRows = csvAnswers.length;
   const fileRef = useRef<HTMLInputElement>(null);
   const csvReadGenerationRef = useRef(0);
   const activeCsvReaderRef = useRef<FileReader | null>(null);
   const answerTabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
+  // Counted the same way the pipeline will read them, so the number shown on
+  // screen is the number of answers that actually get marked.
   const answerCount = useMemo(() => {
     if (mode === "csv") return csvRows;
     if (mode === "photo") return 0;
-    return paste.split("\n").filter((l) => l.trim().length > 0).length;
+    return answersFromPaste(paste).length;
   }, [mode, paste, csvRows]);
 
   const maxScore = criteria.reduce((sum, c) => sum + c.marks, 0);
+  const namedCriteria = criteria.filter((c) => c.label.trim().length > 0).length;
   const ready =
     subject.trim().length > 0 &&
     level.trim().length > 0 &&
     question.trim().length > 0 &&
     scheme.trim().length > 0 &&
+    namedCriteria > 0 &&
+    maxScore > 0 &&
     answerCount > 1;
 
   const invalidateCsvRead = useCallback(() => {
@@ -115,7 +128,7 @@ export default function SetupPage() {
     setPaste(DEMO_PASTE);
     setPrediction(SESSION.prediction ?? "");
     setCsvName(null);
-    setCsvRows(0);
+    setCsvAnswers([]);
     setCsvError(null);
     clearCsvFileSelection();
   }
@@ -130,7 +143,7 @@ export default function SetupPage() {
     setPaste("");
     setPrediction("");
     setCsvName(null);
-    setCsvRows(0);
+    setCsvAnswers([]);
     setCsvError(null);
     clearCsvFileSelection();
   }
@@ -140,7 +153,7 @@ export default function SetupPage() {
     if (!file) return;
     setCsvError(null);
     setCsvName(null);
-    setCsvRows(0);
+    setCsvAnswers([]);
     if (!/\.csv$/i.test(file.name)) {
       clearCsvFileSelection();
       setCsvError("That file isn't a .csv. Export your sheet as CSV and try again.");
@@ -156,11 +169,16 @@ export default function SetupPage() {
 
       try {
         const text = String(reader.result ?? "");
-        const rows = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        const parsed = answersFromCsv(text);
         if (!isCurrentRead()) return;
         activeCsvReaderRef.current = null;
         setCsvName(file.name);
-        setCsvRows(Math.max(0, rows.length - 1));
+        setCsvAnswers(parsed);
+        if (parsed.length === 0) {
+          setCsvError(
+            "No answers were found. The file needs two columns: a student identifier and the answer text.",
+          );
+        }
       } catch {
         if (!isCurrentRead()) return;
         invalidateCsvRead();
@@ -203,7 +221,26 @@ export default function SetupPage() {
 
   function run() {
     if (!ready) return;
-    setProcessed(false);
+    const answers = mode === "csv" ? csvAnswers : answersFromPaste(paste);
+    if (answers.length < 2) return;
+
+    startRun({
+      input: {
+        question: question.trim(),
+        scheme: scheme.trim(),
+        // A criterion with no description cannot be awarded against, and an
+        // unnamed one on the export would read as an unexplained deduction.
+        criteria: criteria
+          .filter((c) => c.label.trim().length > 0)
+          .map((c) => ({ ...c, label: c.label.trim() })),
+        subject: subject.trim(),
+        level: level.trim(),
+        answers,
+      },
+      prediction,
+      courseCode: SESSION.courseCode,
+      courseTitle: SESSION.courseTitle,
+    });
     router.push("/processing");
   }
 

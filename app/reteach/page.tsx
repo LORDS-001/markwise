@@ -8,10 +8,9 @@ import { Page } from "@/components/shell";
 import { Card, EmptyState, buttonClass, cn } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
 import { clusterToneClasses } from "@/lib/cluster-tone";
-import { TOTAL_ANSWERS } from "@/lib/mock";
 
 export default function ReteachIndexPage() {
-  const { clusters, sortMode, answers, processed } = useSession();
+  const { clusters, sortMode, answers, processed, totalAnswers } = useSession();
 
   const ranked = useMemo(
     () =>
@@ -63,7 +62,7 @@ export default function ReteachIndexPage() {
           <ul className="divide-y divide-border">
             {ranked.map((c, index) => {
               const toneClasses = clusterToneClasses(c.tone);
-              const pct = (c.memberIds.length / TOTAL_ANSWERS) * 100;
+              const pct = (c.memberIds.length / totalAnswers) * 100;
               const clusterAnswers = answers.filter((answer) => c.memberIds.includes(answer.id));
               const averageLoss =
                 clusterAnswers.length > 0

@@ -33,7 +33,6 @@ import {
   cn,
   toneColor,
 } from "@/components/ui";
-import { TOTAL_ANSWERS } from "@/lib/mock";
 
 type Mode = null | "rename" | "merge" | "split" | "reject";
 type PanelMode = Exclude<Mode, null>;
@@ -56,6 +55,7 @@ export default function ClusterDetailPage() {
     mergeCluster,
     rejectCluster,
     splitOut,
+    totalAnswers,
   } = useSession();
 
   const [mode, setMode] = useState<Mode>(null);
@@ -109,7 +109,7 @@ export default function ClusterDetailPage() {
     );
   }
 
-  const pct = (members.length / TOTAL_ANSWERS) * 100;
+  const pct = (members.length / totalAnswers) * 100;
   const averageLoss = members.length
     ? members.reduce(
         (total, member) => total + member.maxScore - member.provisionalScore,
@@ -199,7 +199,7 @@ export default function ClusterDetailPage() {
         <Stat
           label="Spread"
           value={`${pct.toFixed(0)}%`}
-          sub={`${members.length} of ${TOTAL_ANSWERS} answers`}
+          sub={`${members.length} of ${totalAnswers} answers`}
           tone="brand"
         />
         <Stat

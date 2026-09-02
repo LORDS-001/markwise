@@ -7,7 +7,6 @@ import { Disclosure } from "@/components/disclosure";
 import { Page } from "@/components/shell";
 import { Badge, Card, EmptyState, buttonClass, cn, toneColor } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
-import { TOTAL_ANSWERS } from "@/lib/mock";
 
 const STOP = new Set([
   "the", "a", "an", "of", "to", "in", "is", "are", "and", "or", "for", "on",
@@ -29,7 +28,7 @@ function tokens(s: string) {
 type Verdict = "matched" | "partial" | "missed";
 
 export default function RevealPage() {
-  const { prediction, clusters, answers, processed } = useSession();
+  const { prediction, clusters, answers, processed, totalAnswers } = useSession();
 
   const ranked = useMemo(
     () =>
@@ -104,7 +103,7 @@ export default function RevealPage() {
     );
   }
 
-  const share = (top.memberIds.length / TOTAL_ANSWERS) * 100;
+  const share = (top.memberIds.length / totalAnswers) * 100;
 
   const copy: Record<Verdict, { badge: string; head: string; body: string; tone: string }> = {
     matched: {
@@ -190,7 +189,7 @@ export default function RevealPage() {
                   {share.toFixed(0)}%
                 </span>
                 <span className="text-[13.5px] text-ink-2">
-                  of sample answers — {top.memberIds.length} of {TOTAL_ANSWERS}
+                  of sample answers — {top.memberIds.length} of {totalAnswers}
                 </span>
               </div>
             </div>
@@ -268,7 +267,7 @@ export default function RevealPage() {
                   </span>
                   <span className="tnum text-[13px] text-ink-2 shrink-0">
                     {c.memberIds.length} sample answers ·{" "}
-                    {((c.memberIds.length / TOTAL_ANSWERS) * 100).toFixed(0)}%
+                    {((c.memberIds.length / totalAnswers) * 100).toFixed(0)}%
                   </span>
                   <ArrowRight size={15} strokeWidth={2} className="text-ink-3 shrink-0" aria-hidden />
                 </Link>

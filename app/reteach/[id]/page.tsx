@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -13,6 +13,8 @@ import {
   Copy,
   Download,
   FileDown,
+  Loader2,
+  Sparkles,
   Users,
 } from "lucide-react";
 import { Page } from "@/components/shell";
@@ -27,19 +29,57 @@ import {
 } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
 import { clusterToneClasses } from "@/lib/cluster-tone";
-import { RETEACH_PACKS, TOTAL_ANSWERS } from "@/lib/mock";
 
 export default function ReteachPackPage() {
   const params = useParams<{ id: string }>();
-  const { clusters, answers, processed } = useSession();
+  const {
+    clusters,
+    answers,
+    processed,
+    totalAnswers,
+    reteachPacks,
+    setReteachPack,
+    context,
+    sessionId,
+  } = useSession();
   const [copied, setCopied] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   const cluster = clusters.find((c) => c.id === params.id);
   const members = useMemo(
     () => answers.filter((a) => a.clusterId === params.id),
     [answers, params.id],
   );
-  const pack = RETEACH_PACKS[params.id];
+  const pack = reteachPacks[params.id];
+
+  // Generated per cluster on request rather than during the run, so a lecturer
+  // who only wants the diagnosis never waits for lessons they will not read.
+  const generate = useCallback(async () => {
+    if (!cluster || generating) return;
+    setGenerating(true);
+    setGenerateError(null);
+    try {
+      const { generateReteachAction } = await import("@/app/actions");
+      const result = await generateReteachAction({
+        context,
+        cluster,
+        members,
+        sessionId,
+      });
+      if (result.ok) {
+        setReteachPack(cluster.id, result.pack);
+      } else {
+        setGenerateError(result.error);
+      }
+    } catch {
+      setGenerateError(
+        "The pack could not be generated. Check your connection and try again.",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  }, [cluster, members, context, sessionId, generating, setReteachPack]);
 
   if (!processed) {
     return (
@@ -92,12 +132,36 @@ export default function ReteachPackPage() {
       >
         <Card>
           <EmptyState
-            title="No sample pack for this cluster yet"
-            body="This cluster was created by a split or merge, so a sample pack is not available for it yet."
+            icon={<BookOpen size={26} strokeWidth={1.6} />}
+            title="No pack for this cluster yet"
+            body={
+              generateError ??
+              "Generate a five-minute micro-lesson written against this specific belief, plus two diagnostic questions to confirm the fix landed."
+            }
             action={
-              <Link href="/reteach" className={buttonClass("secondary", "md")}>
-                Choose another cluster
-              </Link>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button onClick={generate} disabled={generating}>
+                  {generating ? (
+                    <>
+                      <Loader2
+                        size={16}
+                        strokeWidth={2}
+                        className="animate-spin"
+                        aria-hidden
+                      />
+                      Writing the lesson…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={16} strokeWidth={2} aria-hidden />
+                      Generate reteach pack
+                    </>
+                  )}
+                </Button>
+                <Link href="/reteach" className={buttonClass("secondary", "md")}>
+                  Choose another cluster
+                </Link>
+              </div>
             }
           />
         </Card>
@@ -164,7 +228,7 @@ export default function ReteachPackPage() {
                 {members.length}
               </span>
               <div className="min-w-0 text-[13px] text-ink-2">
-                students, {((members.length / TOTAL_ANSWERS) * 100).toFixed(0)}% of the class.
+                students, {((members.length / totalAnswers) * 100).toFixed(0)}% of the class.
                 Pull them aside, or send the pack to everyone and let it land where it needs to.
               </div>
             </div>

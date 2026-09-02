@@ -25,13 +25,7 @@ import {
   toneColor,
 } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
-import {
-  CONFIDENCE_THRESHOLD,
-  CRITERIA,
-  SESSION,
-  TOTAL_ANSWERS,
-  criterionLabel,
-} from "@/lib/mock";
+import { CONFIDENCE_THRESHOLD } from "@/lib/mock";
 import type { StudentAnswer } from "@/lib/types";
 
 type SortKey = "confidence" | "score" | "cluster";
@@ -54,6 +48,7 @@ export default function ScoresPage() {
     reviewedCount,
     needsAttention,
     exportReady,
+    totalAnswers,
   } = useSession();
 
   const [sort, setSort] = useState<SortKey>("confidence");
@@ -108,7 +103,7 @@ export default function ScoresPage() {
     (answers.filter((answer) => answer.provisionalScore / answer.maxScore >= 0.4).length /
       Math.max(1, answers.length)) *
     100;
-  const remainingCount = TOTAL_ANSWERS - reviewedCount;
+  const remainingCount = totalAnswers - reviewedCount;
   const hasEligibleUnreviewed = answers.some(
     (answer) =>
       answer.status === "unreviewed" && answer.confidence >= CONFIDENCE_THRESHOLD,
@@ -176,7 +171,7 @@ export default function ScoresPage() {
           </dl>
           <div className="sm:w-[min(32%,280px)]">
             <Progress
-              value={(reviewedCount / TOTAL_ANSWERS) * 100}
+              value={(reviewedCount / totalAnswers) * 100}
               label="Score review progress"
               tone={exportReady ? "ok" : "brand"}
             />
@@ -511,8 +506,9 @@ function ScoreInput({
 }
 
 function CriteriaMeter({ a }: { a: StudentAnswer }) {
+  const { context, criterionLabel } = useSession();
   const met = a.criteriaMet.length;
-  const total = CRITERIA.length;
+  const total = context.criteria.length;
   const title =
     `Met: ${a.criteriaMet.map(criterionLabel).join(", ") || "none"}\n` +
     `Missed: ${a.criteriaMissed.map(criterionLabel).join(", ") || "none"}`;
@@ -621,6 +617,11 @@ function StatusCell({
 }
 
 function ExpandedPanel({ a }: { a: StudentAnswer }) {
+  const {
+    context: { criteria },
+    courseCode,
+  } = useSession();
+
   return (
     <div className="grid gap-4 border-t border-border bg-surface px-4 pb-5 pt-1 sm:px-5 md:grid-cols-2">
       <div className="pt-4">
@@ -641,7 +642,7 @@ function ExpandedPanel({ a }: { a: StudentAnswer }) {
           Marking scheme, criterion by criterion
         </div>
         <ul className="flex flex-col gap-1.5">
-          {CRITERIA.map((criterion) => {
+          {criteria.map((criterion) => {
             const met = a.criteriaMet.includes(criterion.id);
             return (
               <li
@@ -676,7 +677,8 @@ function ExpandedPanel({ a }: { a: StudentAnswer }) {
           {a.scoreRationale}
         </p>
         <p className="mt-2 text-[12px] text-ink-3">
-          Scheme: {SESSION.courseCode} · {SESSION.maxScore} marks available
+          Scheme: {courseCode ? `${courseCode} · ` : ""}
+          {a.maxScore} marks available
         </p>
       </div>
     </div>

@@ -18,7 +18,6 @@ import {
 import { useSession } from "@/components/session-provider";
 import { canRenderBubbleMap, placeBubbles } from "@/lib/cluster-layout";
 import { clusterToneClasses } from "@/lib/cluster-tone";
-import { TOTAL_ANSWERS } from "@/lib/mock";
 import type { SortMode } from "@/lib/types";
 
 const MAP_WIDTH = 1000;
@@ -26,7 +25,7 @@ const MAP_HEIGHT = 420;
 
 export default function MapPage() {
   const router = useRouter();
-  const { clusters, sortMode, setSortMode, answers } = useSession();
+  const { clusters, sortMode, setSortMode, answers, totalAnswers } = useSession();
   const [hover, setHover] = useState<string | null>(null);
 
   const correct = answers.filter((a) => a.isCorrect).length;
@@ -59,7 +58,7 @@ export default function MapPage() {
 
   const headline = top
     ? sortMode === "spread"
-      ? `The largest affects ${((top.memberIds.length / TOTAL_ANSWERS) * 100).toFixed(0)}% of the sample class.`
+      ? `The largest affects ${((top.memberIds.length / totalAnswers) * 100).toFixed(0)}% of the sample class.`
       : `The most damaging threatens ${top.downstream.length} later topics.`
     : "No misconceptions were found in the sample class.";
 
@@ -96,7 +95,7 @@ export default function MapPage() {
                 <div className="font-display text-[24px] font-semibold tnum leading-none">
                   {correct}
                   <span className="text-[15px] text-ink-3 font-normal ml-1.5">
-                    of {TOTAL_ANSWERS}
+                    of {totalAnswers}
                   </span>
                 </div>
                 <p className="text-[13px] text-ink-2 mt-1">
@@ -185,7 +184,7 @@ export default function MapPage() {
           <ul className="divide-y divide-border">
             {ranked.map((c, i) => {
               const toneClasses = clusterToneClasses(c.tone);
-              const pct = (c.memberIds.length / TOTAL_ANSWERS) * 100;
+              const pct = (c.memberIds.length / totalAnswers) * 100;
               const damage = c.severity * c.memberIds.length;
               const clusterAnswers = answers.filter((answer) =>
                 c.memberIds.includes(answer.id),
@@ -302,7 +301,7 @@ export default function MapPage() {
             >
               {ranked.map((c, i) => {
                 const placement = placements[i];
-                const pct = (c.memberIds.length / TOTAL_ANSWERS) * 100;
+                const pct = (c.memberIds.length / totalAnswers) * 100;
                 const active = hover === c.id;
                 const percentageSize = Math.max(15, Math.min(30, placement.radius * 0.42));
                 return (

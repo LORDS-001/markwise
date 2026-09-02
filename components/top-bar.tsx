@@ -12,7 +12,6 @@ import {
 } from "@/components/app-navigation";
 import { useSession } from "@/components/session-provider";
 import { Badge, cn } from "@/components/ui";
-import { SESSION, TOTAL_ANSWERS } from "@/lib/mock";
 
 export function TopBar({
   onOpenNavigation,
@@ -22,7 +21,7 @@ export function TopBar({
   navigationTriggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   const pathname = usePathname();
-  const { needsAttention, reviewedCount } = useSession();
+  const { needsAttention, reviewedCount, totalAnswers, courseCode } = useSession();
   const parent = resolveStep(pathname);
   const current = STEPS.find((step) => step.href === parent) ?? STEPS[0];
   const isChild = isChildRoute(pathname);
@@ -41,7 +40,7 @@ export function TopBar({
 
       <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
         <ol className="flex min-w-0 items-center gap-1.5 text-[13px]">
-          <li className="hidden shrink-0 text-ink-3 sm:block">{SESSION.courseCode}</li>
+          <li className="hidden shrink-0 text-ink-3 sm:block">{courseCode}</li>
           <li className="hidden shrink-0 text-ink-3 sm:block" aria-hidden>
             <ChevronRight size={13} />
           </li>
@@ -75,7 +74,7 @@ export function TopBar({
               {needsAttention} need attention
             </Badge>
           </Link>
-        ) : reviewedCount === TOTAL_ANSWERS ? (
+        ) : reviewedCount === totalAnswers ? (
           <Badge tone="ok" className="hidden sm:inline-flex">
             <Check size={12} strokeWidth={2.4} aria-hidden />
             All reviewed
