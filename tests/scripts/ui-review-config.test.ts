@@ -89,5 +89,8 @@ describe("tracked UI review runner contract", () => {
     ).not.toBe(
       keyboard.focusSignature({ tag: "A", name: "Map", href: "/map", rect: { left: 10, top: 120 } }),
     );
+    const printable = keyboard.printableKeyPayload("a");
+    expect(printable.keyEvent).not.toHaveProperty("text");
+    expect(printable.charEvent).toHaveProperty("text", "a");
   });
 });

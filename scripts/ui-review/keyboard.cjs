@@ -135,15 +135,20 @@ async function press(cdp, context, keyName, modifiers = 0) {
   return after;
 }
 
-async function typeText(cdp, context, value) {
-  for (const character of value) {
-    const key = character;
+function printableKeyPayload(character) {
+  const key = character;
     const code = /^[a-z]$/i.test(character) ? `Key${character.toUpperCase()}` : /^\d$/.test(character) ? `Digit${character}` : character === " " ? "Space" : "Unidentified";
     const virtualKey = character.length === 1 ? character.toUpperCase().charCodeAt(0) : 0;
-    const base = { key, code, windowsVirtualKeyCode: virtualKey, text: character };
-    await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", ...base });
-    await cdp.send("Input.dispatchKeyEvent", { type: "char", ...base });
-    await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", ...base });
+  const keyEvent = { key, code, windowsVirtualKeyCode: virtualKey };
+  return { keyEvent, charEvent: { ...keyEvent, text: character } };
+}
+
+async function typeText(cdp, context, value) {
+  for (const character of value) {
+    const { keyEvent, charEvent } = printableKeyPayload(character);
+    await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", ...keyEvent });
+    await cdp.send("Input.dispatchKeyEvent", { type: "char", ...charEvent });
+    await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", ...keyEvent });
     context.keys.push({ key: character, textInput: true });
   }
   await delay(40);
@@ -611,5 +616,6 @@ module.exports = {
   KEY_DEFINITIONS,
   SPLIT_MEMBER_TAB_OPTIONS,
   focusSignature,
+  printableKeyPayload,
   runKeyboard,
 };
