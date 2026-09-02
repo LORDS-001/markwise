@@ -232,6 +232,16 @@ function isRadioSnapshot(snapshot) {
   return snapshot.role === "radio" || (snapshot.tag === "INPUT" && snapshot.type === "radio");
 }
 
+function historyEntryForPath(entries, pathname) {
+  return [...entries].reverse().find((entry) => {
+    try {
+      return new URL(entry.url).pathname === pathname;
+    } catch {
+      return false;
+    }
+  });
+}
+
 async function runKeyboard(options = {}) {
   const debugPort = Number(options.debugPort || process.argv[2] || 9222);
   const outputName = options.outputName || process.argv[3] || "chrome-keyboard.json";
@@ -448,6 +458,23 @@ async function runKeyboard(options = {}) {
       await waitPath(cdp, "/clusters/cl-impedance");
       await assertEval(cdp, context, "cluster merge navigates to selected target", "location.pathname === '/clusters/cl-impedance'");
       await press(cdp, context, MERGE_RETURN_KEY.key, MERGE_RETURN_KEY.modifiers);
+      await delay(250);
+      if ((await evaluate(cdp, "location.pathname")) !== "/clusters/cl-phase") {
+        const history = await cdp.send("Page.getNavigationHistory");
+        const sourceEntry = historyEntryForPath(history.entries, "/clusters/cl-phase");
+        invariant(sourceEntry, "Merged source route is absent from browser history");
+        await cdp.send("Page.navigateToHistoryEntry", { entryId: sourceEntry.id });
+        context.historyTraversal = {
+          attemptedKey: "Alt+ArrowLeft",
+          rendererHandledShortcut: false,
+          cdpHistoryEntryId: sourceEntry.id,
+        };
+        assertObserved(
+          context,
+          "headless browser history exposes merged-source fallback",
+          context.historyTraversal,
+        );
+      }
       await waitPath(cdp, "/clusters/cl-phase");
       await waitFor(cdp, "/This cluster no longer exists/.test(document.querySelector('h1')?.textContent || '')");
       await assertEval(cdp, context, "merged cluster fallback", "document.body.innerText.includes('It was merged or rejected') && !!document.querySelector('a[href=\"/map\"]')");
@@ -582,6 +609,7 @@ async function runKeyboard(options = {}) {
       limitations: [
         "The production demo configuration exposes no account email form. The runner records the keyboard-reachable Demo preview state and does not fabricate account-link capability.",
         "The no-JavaScript skip check proves native fragment navigation; the separate hydrated check proves the focus assist moves focus to the server-rendered main target.",
+        "Headless Chrome's renderer-targeted Input API did not execute the browser-chrome Alt+Left shortcut. The Cluster group records the real attempted system key, then uses CDP browser history to expose and assert the merged-source fallback created by keyboard actions.",
       ],
     };
     const reportPath = writeJson(outputName, report);
@@ -628,6 +656,7 @@ module.exports = {
   MERGE_RETURN_KEY,
   SPLIT_MEMBER_TAB_OPTIONS,
   focusSignature,
+  historyEntryForPath,
   isRadioSnapshot,
   printableKeyPayload,
   runKeyboard,

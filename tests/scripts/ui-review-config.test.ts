@@ -98,5 +98,14 @@ describe("tracked UI review runner contract", () => {
       modifiers: 1,
       isSystemKey: true,
     });
+    expect(
+      keyboard.historyEntryForPath(
+        [
+          { id: 1, url: "http://127.0.0.1:3017/clusters/cl-phase" },
+          { id: 2, url: "http://127.0.0.1:3017/clusters/cl-impedance" },
+        ],
+        "/clusters/cl-phase",
+      ),
+    ).toEqual({ id: 1, url: "http://127.0.0.1:3017/clusters/cl-phase" });
   });
 });
