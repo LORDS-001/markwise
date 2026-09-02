@@ -79,5 +79,6 @@ describe("tracked UI review runner contract", () => {
       "Scores workflow",
       "Export workflow",
     ]);
+    expect(keyboard.KEY_DEFINITIONS.Enter.text).toBe("\r");
   });
 });

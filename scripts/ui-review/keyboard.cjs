@@ -26,7 +26,7 @@ const GROUP_NAMES = [
 
 const KEY_DEFINITIONS = {
   Tab: { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 },
-  Enter: { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 },
+  Enter: { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" },
   Space: { key: " ", code: "Space", windowsVirtualKeyCode: 32, text: " " },
   Escape: { key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
   ArrowLeft: { key: "ArrowLeft", code: "ArrowLeft", windowsVirtualKeyCode: 37 },
@@ -578,4 +578,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { GROUP_NAMES, runKeyboard };
+module.exports = { GROUP_NAMES, KEY_DEFINITIONS, runKeyboard };
