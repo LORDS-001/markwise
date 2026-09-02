@@ -74,6 +74,10 @@ export default function SetupPage() {
     scheme.trim().length > 0 &&
     answerCount > 1;
 
+  function clearCsvFileSelection() {
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
   function loadDemo() {
     setQuestion(SESSION.question);
     setScheme(
@@ -88,6 +92,7 @@ export default function SetupPage() {
     setCsvName(null);
     setCsvRows(0);
     setCsvError(null);
+    clearCsvFileSelection();
   }
 
   function clearAll() {
@@ -101,6 +106,7 @@ export default function SetupPage() {
     setCsvName(null);
     setCsvRows(0);
     setCsvError(null);
+    clearCsvFileSelection();
   }
 
   function onFile(file: File | undefined) {
@@ -109,6 +115,7 @@ export default function SetupPage() {
     setCsvName(null);
     setCsvRows(0);
     if (!/\.csv$/i.test(file.name)) {
+      clearCsvFileSelection();
       setCsvError("That file isn't a .csv. Export your sheet as CSV and try again.");
       return;
     }
@@ -120,11 +127,14 @@ export default function SetupPage() {
         setCsvName(file.name);
         setCsvRows(Math.max(0, rows.length - 1));
       } catch {
+        clearCsvFileSelection();
         setCsvError("That file couldn't be read. Try re-exporting it as CSV.");
       }
     };
-    reader.onerror = () =>
+    reader.onerror = () => {
+      clearCsvFileSelection();
       setCsvError("That file couldn't be read. Try re-exporting it as CSV.");
+    };
     reader.readAsText(file);
   }
 
@@ -469,16 +479,13 @@ export default function SetupPage() {
                   id="answers-csv"
                   type="file"
                   accept=".csv,text/csv"
-                  required={mode === "csv"}
+                  required={mode === "csv" && csvRows === 0}
+                  aria-required={mode === "csv"}
                   className="sr-only"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = "";
-                    onFile(file);
-                  }}
+                  onChange={(e) => onFile(e.target.files?.[0])}
                 />
                 {csvName ? (
-                  <div className="flex items-center gap-2 text-[13.5px]">
+                  <div className="flex items-center gap-2 text-[13.5px]" role="status">
                     <FileSpreadsheet size={16} strokeWidth={1.9} className="text-brand" aria-hidden />
                     <span className="font-medium truncate">{csvName}</span>
                     <Badge tone="ok">{csvRows} rows</Badge>

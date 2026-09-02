@@ -90,6 +90,17 @@ it(
     );
 
     const toolbar = screen.getByRole("toolbar", { name: "Score review controls" });
+    const search = within(toolbar).getByRole("searchbox", { name: "Search responses" });
+    const firstScore = within(table).getAllByRole("spinbutton")[0];
+    for (const control of [search, firstScore]) {
+      expect(control).toHaveClass(
+        "border-control-border",
+        "hover:border-brand",
+        "focus:border-brand",
+      );
+    }
+    expect(search).not.toHaveClass("border-border", "hover:border-border-strong");
+    expect(firstScore).not.toHaveClass("border-border");
     expect(primaryActions(toolbar)).toHaveLength(1);
     expect(primaryActions(toolbar)[0]).toHaveAccessibleName("Accept high-confidence");
   },

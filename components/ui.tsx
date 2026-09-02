@@ -267,7 +267,7 @@ export function Segmented<T extends string>({
             className={cn(
               "px-3.5 h-7 text-[12.5px] font-semibold rounded-full transition-colors",
               active
-                ? "bg-surface text-ink border border-border"
+                ? "bg-surface text-ink border border-brand"
                 : "text-ink-2 hover:text-ink border border-transparent",
             )}
           >
@@ -319,7 +319,7 @@ export function Field({
 
 const inputBase =
   "w-full bg-surface border border-control-border rounded-[var(--r-input)] px-3.5 py-2.5 text-[14px] text-ink " +
-  "placeholder:text-ink-3 transition-colors hover:border-border-strong focus:border-brand focus:outline-none " +
+  "placeholder:text-ink-3 transition-colors hover:border-brand focus:border-brand focus:outline-none " +
   "focus:ring-2 focus:ring-[var(--brand-line)]";
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {

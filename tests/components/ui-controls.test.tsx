@@ -2,7 +2,7 @@ import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it } from "vitest";
-import { Progress, Segmented } from "@/components/ui";
+import { Input, Progress, Segmented, Textarea } from "@/components/ui";
 
 function SegmentedHarness() {
   const [value, setValue] = useState<"alpha" | "beta" | "gamma">("alpha");
@@ -30,13 +30,17 @@ it("uses the roving radio keyboard model and wraps directional navigation", asyn
 
   expect(alpha).toBeChecked();
   expect(alpha).toHaveAttribute("tabindex", "0");
+  expect(alpha).toHaveClass("border-brand");
   expect(beta).toHaveAttribute("tabindex", "-1");
+  expect(beta).toHaveClass("border-transparent");
   expect(gamma).toHaveAttribute("tabindex", "-1");
 
   alpha.focus();
   await user.keyboard("{ArrowRight}");
   expect(beta).toHaveFocus();
   expect(beta).toBeChecked();
+  expect(beta).toHaveClass("border-brand");
+  expect(alpha).toHaveClass("border-transparent");
 
   await user.keyboard("{ArrowDown}");
   expect(gamma).toHaveFocus();
@@ -67,6 +71,27 @@ it("uses the roving radio keyboard model and wraps directional navigation", asyn
   expect(beta).toBeChecked();
   await user.click(alpha);
   expect(alpha).toBeChecked();
+});
+
+it("keeps shared text controls on compliant boundaries through interactive states", () => {
+  render(
+    <>
+      <Input aria-label="Example input" />
+      <Textarea aria-label="Example textarea" />
+    </>,
+  );
+
+  for (const control of [
+    screen.getByRole("textbox", { name: "Example input" }),
+    screen.getByRole("textbox", { name: "Example textarea" }),
+  ]) {
+    expect(control).toHaveClass(
+      "border-control-border",
+      "hover:border-brand",
+      "focus:border-brand",
+    );
+    expect(control).not.toHaveClass("hover:border-border-strong");
+  }
 });
 
 it("gives the progressbar its required consumer-provided name", () => {

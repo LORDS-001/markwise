@@ -95,6 +95,7 @@ it("exposes every visible required Setup field while keeping prediction optional
   const csvInput = container.querySelector<HTMLInputElement>("#answers-csv");
   expect(csvInput).toHaveAccessibleName("CSV file (required)");
   expect(csvInput).toBeRequired();
+  expect(csvInput).toHaveAttribute("required");
   expect(container.querySelector("#paste")).not.toBeRequired();
 
   await user.click(screen.getByRole("tab", { name: /Photos/ }));
@@ -163,6 +164,53 @@ it("clears a rejected file selection so the same path can be chosen again", asyn
 
   await user.upload(fileInput!, rejected);
   expect(screen.getByRole("alert")).toHaveAccessibleName("CSV upload failed");
+});
+
+it("keeps an accepted CSV natively valid across mode changes until Setup is cleared", async () => {
+  const user = userEvent.setup();
+  const { container } = renderSetup();
+  await user.click(screen.getByRole("tab", { name: "CSV upload" }));
+  const fileInput = container.querySelector<HTMLInputElement>("#answers-csv");
+  const preview = screen.getByRole("button", { name: "Preview sample analysis" });
+  const accepted = new File(
+    ["student,answer\nS1,First response\nS2,Second response"],
+    "accepted-answers.csv",
+    { type: "text/csv" },
+  );
+
+  await user.upload(fileInput!, accepted);
+
+  const acceptedStatus = await screen.findByRole("status");
+  expect(acceptedStatus).toHaveTextContent("accepted-answers.csv");
+  expect(acceptedStatus).toHaveTextContent("2 rows");
+  expect(fileInput?.files).toHaveLength(1);
+  expect(fileInput?.files?.item(0)?.name).toBe("accepted-answers.csv");
+  expect(fileInput).not.toHaveAttribute("required");
+  expect(fileInput).toHaveAttribute("aria-required", "true");
+  expect(fileInput?.validity.valueMissing).toBe(false);
+  expect(fileInput?.checkValidity()).toBe(true);
+  expect(preview).toBeEnabled();
+
+  await user.click(screen.getByRole("tab", { name: "Paste" }));
+  await user.click(screen.getByRole("tab", { name: "CSV upload" }));
+
+  expect(fileInput?.files?.item(0)?.name).toBe("accepted-answers.csv");
+  expect(fileInput).not.toHaveAttribute("required");
+  expect(fileInput).toHaveAttribute("aria-required", "true");
+  expect(fileInput?.validity.valueMissing).toBe(false);
+  expect(fileInput?.checkValidity()).toBe(true);
+  expect(preview).toBeEnabled();
+
+  await user.click(screen.getByRole("button", { name: "Clear" }));
+
+  expect(fileInput).toHaveValue("");
+  expect(fileInput).toBeRequired();
+  expect(fileInput).toHaveAttribute("required");
+  expect(fileInput).toHaveAttribute("aria-required", "true");
+  expect(fileInput?.validity.valueMissing).toBe(true);
+  expect(fileInput?.checkValidity()).toBe(false);
+  expect(screen.queryByText("accepted-answers.csv")).not.toBeInTheDocument();
+  expect(preview).toBeDisabled();
 });
 
 it("explains an invalid CSV without introducing a competing primary action and recovers", async () => {

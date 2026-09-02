@@ -169,7 +169,7 @@ export default function ScoresPage() {
                   onChange={(event) => setQuery(event.target.value)}
                   aria-label="Search responses"
                   placeholder="Search responses"
-                  className="h-8 w-full rounded-[10px] border border-border bg-surface px-3 text-[13px] text-ink placeholder:text-ink-3 hover:border-border-strong focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--brand-line)] sm:w-52"
+                  className="h-8 w-full rounded-[10px] border border-control-border bg-surface px-3 text-[13px] text-ink placeholder:text-ink-3 hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--brand-line)] sm:w-52"
                 />
                 <div className="flex items-center gap-2">
                   <span className="label-caps text-ink-3">Status filter</span>
@@ -472,7 +472,7 @@ function ScoreInput({
         value={a.provisionalScore}
         onChange={(event) => setScore(a.id, Number(event.target.value))}
         aria-label={"Score for " + a.initials}
-        className="h-8 w-[52px] rounded-[9px] border border-border bg-surface text-center text-[14px] font-semibold tnum hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--brand-line)]"
+        className="h-8 w-[52px] rounded-[9px] border border-control-border bg-surface text-center text-[14px] font-semibold tnum hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--brand-line)]"
       />
       <span className="text-[12.5px] text-ink-3 tnum">/{a.maxScore}</span>
     </div>
