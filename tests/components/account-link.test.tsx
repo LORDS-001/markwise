@@ -118,6 +118,26 @@ it("validates anonymous email input and disables linking while the request is pe
   );
 }, 15_000);
 
+it("keeps an account-link error explanatory, optional, and free of a competing primary action", async () => {
+  const user = userEvent.setup();
+  getBrowserClient.mockReturnValue(
+    createClient({ updatePromise: Promise.resolve({ error: { message: "Email already linked" } }) }),
+  );
+  const { container } = renderAccount();
+
+  await user.type(
+    await screen.findByRole("textbox", { name: "Email address" }),
+    "lecturer@example.edu",
+  );
+  await user.click(screen.getByRole("button", { name: "Connect email" }));
+
+  const region = screen.getByRole("region", { name: "Account connection" });
+  expect(await screen.findByRole("alert")).toHaveTextContent("Email already linked");
+  expect(region).toHaveTextContent("Optional — export works without it.");
+  expect(container.querySelectorAll('[data-variant="primary"]')).toHaveLength(0);
+  expect(screen.getByRole("button", { name: "Connect email" })).toBeEnabled();
+});
+
 it("names the pending region and preserves its exact export-availability copy", async () => {
   const user = userEvent.setup();
   getBrowserClient.mockReturnValue(createClient());
