@@ -83,5 +83,6 @@ describe("tracked UI review runner contract", () => {
     expect(keyboard.HYDRATION_READY_EXPRESSION).toBe(
       "document.readyState === 'complete' && !!document.querySelector('main#main')",
     );
+    expect(keyboard.SPLIT_MEMBER_TAB_OPTIONS).toEqual({ shift: true });
   });
 });

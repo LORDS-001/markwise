@@ -25,6 +25,7 @@ const GROUP_NAMES = [
 ];
 const HYDRATION_READY_EXPRESSION =
   "document.readyState === 'complete' && !!document.querySelector('main#main')";
+const SPLIT_MEMBER_TAB_OPTIONS = { shift: true };
 
 const KEY_DEFINITIONS = {
   Tab: { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 },
@@ -367,7 +368,13 @@ async function runKeyboard(options = {}) {
       for (let index = 1; index <= 10; index += 1) {
         await tabTo(cdp, context, named(/^Split$/), `Split action ${index}`);
         await activate(cdp, context);
-        await tabTo(cdp, context, (item) => item.tag === "INPUT" && /Select/.test(item.name), `split member ${index}`);
+        await tabTo(
+          cdp,
+          context,
+          (item) => item.tag === "INPUT" && /Select/.test(item.name),
+          `split member ${index}`,
+          SPLIT_MEMBER_TAB_OPTIONS,
+        );
         await activate(cdp, context, "Space");
         await tabTo(cdp, context, named(/^New cluster name$/), `split name ${index}`);
         await typeText(cdp, context, `Fallback ${index}`);
@@ -395,7 +402,13 @@ async function runKeyboard(options = {}) {
       await assertEval(cdp, context, "cluster rename persists", "/Phase relationship model/.test(document.querySelector('h1')?.textContent)");
       await tabTo(cdp, context, named(/^Split$/), "Cluster split action");
       await activate(cdp, context);
-      await tabTo(cdp, context, (item) => item.tag === "INPUT" && /Select/.test(item.name), "Cluster split member");
+      await tabTo(
+        cdp,
+        context,
+        (item) => item.tag === "INPUT" && /Select/.test(item.name),
+        "Cluster split member",
+        SPLIT_MEMBER_TAB_OPTIONS,
+      );
       await activate(cdp, context, "Space");
       await tabTo(cdp, context, named(/^New cluster name$/), "Cluster split name");
       await typeText(cdp, context, "Phase subset");
@@ -584,5 +597,6 @@ module.exports = {
   GROUP_NAMES,
   HYDRATION_READY_EXPRESSION,
   KEY_DEFINITIONS,
+  SPLIT_MEMBER_TAB_OPTIONS,
   runKeyboard,
 };
