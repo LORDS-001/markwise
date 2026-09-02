@@ -84,5 +84,10 @@ describe("tracked UI review runner contract", () => {
       "document.readyState === 'complete' && !!document.querySelector('main#main')",
     );
     expect(keyboard.SPLIT_MEMBER_TAB_OPTIONS).toEqual({ shift: true });
+    expect(
+      keyboard.focusSignature({ tag: "A", name: "Map", href: "/map", rect: { left: 10, top: 20 } }),
+    ).not.toBe(
+      keyboard.focusSignature({ tag: "A", name: "Map", href: "/map", rect: { left: 10, top: 120 } }),
+    );
   });
 });

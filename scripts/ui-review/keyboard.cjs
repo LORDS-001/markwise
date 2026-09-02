@@ -154,6 +154,18 @@ async function replaceText(cdp, context, value) {
   await typeText(cdp, context, value);
 }
 
+function focusSignature(snapshot) {
+  return [
+    snapshot.tag,
+    snapshot.role,
+    snapshot.id,
+    snapshot.name,
+    snapshot.href,
+    snapshot.rect?.left,
+    snapshot.rect?.top,
+  ].join("|");
+}
+
 async function tabTo(cdp, context, predicate, label, options = {}) {
   const shift = options.shift ? 8 : 0;
   const maximum = options.maximum || 100;
@@ -164,7 +176,7 @@ async function tabTo(cdp, context, predicate, label, options = {}) {
       recordFocus(context, current, `matched ${label}`);
       return current;
     }
-    const signature = `${current.tag}|${current.role}|${current.id}|${current.name}|${current.href}`;
+    const signature = focusSignature(current);
     if (seen.has(signature) && index > 1) throw new Error(`Focus wrapped before ${label}; current ${JSON.stringify(current)}`);
     seen.add(signature);
     const next = await press(cdp, context, "Tab", shift);
@@ -598,5 +610,6 @@ module.exports = {
   HYDRATION_READY_EXPRESSION,
   KEY_DEFINITIONS,
   SPLIT_MEMBER_TAB_OPTIONS,
+  focusSignature,
   runKeyboard,
 };
