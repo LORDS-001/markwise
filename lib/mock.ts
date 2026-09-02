@@ -1,3 +1,4 @@
+import { DISTANCE_THRESHOLD } from "./pipeline/cluster";
 import type {
   Cluster,
   Criterion,
@@ -52,7 +53,7 @@ export const STAGES: Stage[] = [
   {
     id: "cluster",
     label: "Clustering by cosine distance",
-    detail: "Agglomerative, average linkage, threshold 0.32 — tuned on the pilot set",
+    detail: `Agglomerative, average linkage, threshold ${DISTANCE_THRESHOLD} — tuned on the pilot set`,
     weight: 12,
   },
   {

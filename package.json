@@ -13,7 +13,9 @@
     "test": "vitest",
     "test:run": "vitest run",
     "typecheck": "tsc --noEmit --incremental false",
-    "pipeline": "tsx --env-file-if-exists=.env.local scripts/pipeline/run.ts"
+    "pipeline": "tsx --env-file-if-exists=.env.local scripts/pipeline/run.ts",
+    "pipeline:tune": "tsx --env-file-if-exists=.env.local scripts/pipeline/tune.ts",
+    "pipeline:diagnose": "tsx --env-file-if-exists=.env.local scripts/pipeline/diagnose.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

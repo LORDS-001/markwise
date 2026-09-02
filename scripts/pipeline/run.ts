@@ -11,6 +11,7 @@
  *   npm run pipeline -- --csv answers.csv   # a CSV of your own
  *   npm run pipeline -- --threshold 0.28    # sweep the distance threshold
  *   npm run pipeline -- --json out.json     # dump the full result
+ *   npm run pipeline -- --limit 12          # first N answers, to save quota
  *
  * Requires GEMINI_API_KEY in .env.local.
  */
@@ -18,7 +19,7 @@
 import { writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { CRITERIA, SESSION, ANSWERS } from "@/lib/mock";
-import { isPipelineConfigured } from "@/lib/pipeline/gemini";
+import { TEXT_MODEL, isPipelineConfigured } from "@/lib/pipeline/gemini";
 import { answersFromCsv } from "@/lib/pipeline/parse-answers";
 import { runPipeline } from "@/lib/pipeline/run";
 import type { PipelineInput, RawAnswer, StageId } from "@/lib/pipeline/types";
@@ -44,16 +45,32 @@ function rule(char = "─") {
 
 async function loadAnswers(): Promise<RawAnswer[]> {
   const csvPath = arg("csv");
+  let answers: RawAnswer[];
+
   if (!csvPath) {
     // The seeded pilot class (PRD §8) — 40 real answers, pseudonymised.
-    return ANSWERS.map((a) => ({ studentRef: a.studentId, text: a.answer }));
+    answers = ANSWERS.map((a) => ({ studentRef: a.studentId, text: a.answer }));
+  } else {
+    const text = await readFile(csvPath, "utf8");
+    answers = answersFromCsv(text);
+    if (answers.length === 0) {
+      throw new Error(`No answers found in ${csvPath}`);
+    }
   }
-  const text = await readFile(csvPath, "utf8");
-  const answers = answersFromCsv(text);
-  if (answers.length === 0) {
-    throw new Error(`No answers found in ${csvPath}`);
+
+  // Every Nth answer. A batch is usually stored grouped by the mistake behind
+  // it, so the first N answers all share one belief and would cluster into one
+  // group no matter what the threshold is. Striding spans the groups, which is
+  // what actually tests whether the threshold discriminates.
+  const stride = Number(arg("stride"));
+  if (Number.isFinite(stride) && stride > 1) {
+    answers = answers.filter((_, i) => i % stride === 0);
   }
-  return answers;
+
+  // Free-tier request quota is charged per day, per model, so checking whether
+  // signatures read as beliefs should not have to cost a whole day's budget.
+  const limit = Number(arg("limit"));
+  return Number.isFinite(limit) && limit > 0 ? answers.slice(0, limit) : answers;
 }
 
 async function main() {
@@ -82,6 +99,7 @@ async function main() {
   rule();
   console.log(`Question   ${SESSION.question.slice(0, 58)}…`);
   console.log(`Answers    ${answers.length}`);
+  console.log(`Model      ${TEXT_MODEL}`);
   console.log(`Criteria   ${CRITERIA.length} (${input.criteria.reduce((s, c) => s + c.marks, 0)} marks)`);
   if (thresholdArg) console.log(`Threshold  ${thresholdArg} ${DIM}(overridden)${RESET}`);
   rule();

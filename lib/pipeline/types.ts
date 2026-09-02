@@ -32,6 +32,8 @@ export interface Extraction {
   criteriaMet: string[];
   criteriaMissed: string[];
   scoreRationale: string;
+  /** Set when the call failed and this is the undiagnosed fallback. */
+  failed?: boolean;
 }
 
 /** Step 4 output — one canonical misconception per group. */

@@ -99,6 +99,7 @@ export function normaliseExtraction(
 async function extractOne(
   input: PipelineInput,
   answer: RawAnswer,
+  onError: (message: string) => void,
 ): Promise<Extraction> {
   const maxScore = input.criteria.reduce((sum, c) => sum + c.marks, 0);
 
@@ -110,7 +111,8 @@ async function extractOne(
       temperature: 0.1,
     });
     return normaliseExtraction(raw, answer, input.criteria);
-  } catch {
+  } catch (error) {
+    onError(error instanceof Error ? error.message : String(error));
     // One answer failing must not lose the other thirty-nine. It comes back
     // undiagnosed at zero confidence, which routes it straight to the
     // mandatory-review queue rather than silently scoring it.
@@ -126,6 +128,7 @@ async function extractOne(
       criteriaMissed: input.criteria.map((c) => c.id),
       scoreRationale:
         "This answer could not be read automatically. Score it yourself.",
+      failed: true,
     };
   }
 }
@@ -161,11 +164,14 @@ export async function runPipeline(
   onProgress({ stage: "extract", progress: 0 });
 
   let done = 0;
+  const failures: string[] = [];
   const extractions = await mapWithConcurrency(
     input.answers,
     CONCURRENCY,
     async (answer) => {
-      const result = await extractOne(input, answer);
+      const result = await extractOne(input, answer, (message) =>
+        failures.push(message),
+      );
       done += 1;
       onProgress({
         stage: "extract",
@@ -177,6 +183,19 @@ export async function runPipeline(
   );
 
   onProgress({ stage: "extract", progress: 1 });
+
+  /*
+   * A few answers failing is survivable — they land in the mandatory-review
+   * queue and a lecturer marks them by hand. Most of them failing is not: the
+   * map would be drawn from whatever scraped through, and nothing on screen
+   * would say so. A diagnosis built from a third of the class, presented as if
+   * it were the class, is worse than no diagnosis, so this stops instead.
+   */
+  if (failures.length > input.answers.length / 3) {
+    throw new Error(
+      `${failures.length} of ${input.answers.length} answers could not be read, so the result would not describe your class. First error: ${failures[0]}`,
+    );
+  }
 
   // Correct answers are pooled separately and never clustered (PRD §6 step 1).
   const diagnosable = extractions

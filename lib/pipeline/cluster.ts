@@ -109,13 +109,25 @@ export function agglomerativeCluster(
 }
 
 /**
- * The distance threshold, tuned on the 40-answer pilot set (PRD §8).
+ * The distance threshold, tuned on the pilot set with `npm run pipeline:tune`
+ * (PRD §8).
  *
- * Raising it merges distinct beliefs into one vague cluster; lowering it
- * shatters a real shared belief into singletons that the "Other" bucket then
- * swallows. Re-tune here, against real answers, never against synthetic ones.
+ * Measured against gemini-embedding-001 at 768 dimensions. The sweep is stark:
+ * precision holds above 0.9 up to about 0.10, collapses between 0.12 and 0.14,
+ * and by 0.26 every signature has merged into a single cluster at precision
+ * 0.28 — one vague group covering four unrelated beliefs.
+ *
+ * 0.10 sits at the top of the high-precision plateau. It errs toward splitting
+ * a belief in two rather than merging two into one, which is the right way to
+ * be wrong: the lecturer can merge two clusters in a click, while a single
+ * cluster that quietly spans four beliefs is the "clusters look arbitrary on
+ * stage" failure PRD §11 calls fatal, and it hides the problem instead of
+ * showing it.
+ *
+ * This value is specific to the embedding model. Changing EMBEDDING_MODEL or
+ * EMBEDDING_DIMENSIONS invalidates it — re-run the sweep, do not scale it.
  */
-export const DISTANCE_THRESHOLD = 0.32;
+export const DISTANCE_THRESHOLD = 0.1;
 
 /**
  * Groups smaller than this are not a class-level pattern. They are collected

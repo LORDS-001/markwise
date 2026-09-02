@@ -11,15 +11,73 @@
 
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta";
 
-export const TEXT_MODEL = "gemini-2.5-flash";
-export const EMBEDDING_MODEL = "text-embedding-004";
+/**
+ * Flash rather than Pro: a 40-answer batch is 40+ calls, and PRD §12 budgets
+ * the whole run at under two minutes.
+ *
+ * Overridable because the free tier's daily request quota is charged **per
+ * model**, so which model you can actually finish a batch on depends on the
+ * account, and that should not need a code change to fix.
+ */
+export const TEXT_MODEL =
+  process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
+export const EMBEDDING_MODEL =
+  process.env.GEMINI_EMBEDDING_MODEL?.trim() || "gemini-embedding-001";
 
-/** Matches the vector(768) column in migration 0001. */
+/**
+ * Matches the vector(768) column in migration 0001.
+ *
+ * gemini-embedding-001 returns 3072 by default; asking for 768 keeps the
+ * schema as it is. Vectors at reduced dimensionality come back un-normalised,
+ * which does not matter here because cosineDistance divides by both norms.
+ */
 export const EMBEDDING_DIMENSIONS = 768;
 
-const MAX_ATTEMPTS = 4;
+const MAX_ATTEMPTS = 5;
 const BASE_BACKOFF_MS = 600;
 const REQUEST_TIMEOUT_MS = 60_000;
+
+/**
+ * Requests allowed per rolling minute.
+ *
+ * The free tier allows roughly 20/min, and a 40-answer batch is 40 extraction
+ * calls plus a few per cluster — so without a limiter the run burns its quota
+ * in the first ten seconds and the remaining thirty answers come back
+ * undiagnosed. That failure is quiet and disastrous: the lecturer gets a map
+ * built from three answers and no indication the rest were never read.
+ *
+ * Raise it with GEMINI_RPM on a paid tier, where the whole run fits inside the
+ * two-minute budget in PRD §12.
+ */
+function requestsPerMinute(): number {
+  const configured = Number(process.env.GEMINI_RPM);
+  return Number.isFinite(configured) && configured > 0 ? configured : 15;
+}
+
+/** Start times of in-flight and recent requests, oldest first. */
+const recentRequests: number[] = [];
+
+/** Blocks until starting another request keeps us inside the rolling window. */
+async function waitForSlot(): Promise<void> {
+  for (;;) {
+    const now = Date.now();
+    const limit = requestsPerMinute();
+
+    while (recentRequests.length > 0 && now - recentRequests[0] >= 60_000) {
+      recentRequests.shift();
+    }
+
+    if (recentRequests.length < limit) {
+      recentRequests.push(now);
+      return;
+    }
+
+    // Wait until the oldest request leaves the window, plus a little slack so
+    // a clock difference with the server does not put us back over.
+    const waitMs = 60_000 - (now - recentRequests[0]) + 50;
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+}
 
 export function geminiApiKey(): string | null {
   // Hard stop rather than a silent null: reaching here in a browser means an
@@ -48,6 +106,18 @@ export class GeminiError extends Error {
   }
 }
 
+/**
+ * Reads the retryDelay the API returns alongside a quota error, e.g.
+ * `"retryDelay": "37s"`. Capped so a pathological value cannot hang a run.
+ */
+function retryDelayFrom(body: string): number | null {
+  const match = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(body);
+  if (!match) return null;
+  const seconds = Number(match[1]);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return Math.min(seconds * 1000 + 250, 65_000);
+}
+
 function retryable(status: number): boolean {
   // 429 rate limit, 500/503 transient. 4xx otherwise means the request is
   // wrong and retrying it just spends quota to fail again.
@@ -63,8 +133,11 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   }
 
   let lastError: GeminiError | null = null;
+  let serverRetryMs: number | null = null;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    await waitForSlot();
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -82,6 +155,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
       if (response.ok) return (await response.json()) as T;
 
       const text = await response.text().catch(() => "");
+      serverRetryMs = retryDelayFrom(text);
       lastError = new GeminiError(
         `Gemini ${response.status}: ${text.slice(0, 400)}`,
         response.status,
@@ -101,9 +175,14 @@ async function post<T>(path: string, body: unknown): Promise<T> {
       clearTimeout(timer);
     }
 
-    // Exponential backoff with jitter, so 40 concurrent answers hitting a rate
-    // limit do not all retry on the same tick and trip it again.
-    const delay = BASE_BACKOFF_MS * 2 ** (attempt - 1) * (0.5 + Math.random());
+    // Prefer the server's own retryDelay: on a quota error it knows when the
+    // window reopens, and guessing shorter just spends another attempt to be
+    // refused again. Otherwise exponential backoff with jitter, so 40 answers
+    // hitting the limit together do not all retry on the same tick.
+    const delay =
+      serverRetryMs ??
+      BASE_BACKOFF_MS * 2 ** (attempt - 1) * (0.5 + Math.random());
+    serverRetryMs = null;
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
@@ -186,6 +265,7 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
           model: `models/${EMBEDDING_MODEL}`,
           content: { parts: [{ text }] },
           taskType: "SEMANTIC_SIMILARITY",
+          outputDimensionality: EMBEDDING_DIMENSIONS,
         })),
       },
     );

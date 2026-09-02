@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import MapPage from "@/app/map/page";
+import { DISTANCE_THRESHOLD } from "@/lib/pipeline/cluster";
 
 const state = vi.hoisted(() => {
   const clusters = Array.from({ length: 13 }, (_, index) => ({
@@ -77,7 +78,7 @@ it("keeps sample mechanics inside the prioritisation disclosure and explains the
   const disclosure = summary.closest("details");
   expect(disclosure).not.toBeNull();
 
-  for (const mechanic of ["Threshold 0.32", "Average linkage", "Cosine distance"]) {
+  for (const mechanic of [`Threshold ${DISTANCE_THRESHOLD}`, "Average linkage", "Cosine distance"]) {
     expect(within(disclosure!).getByText(mechanic)).not.toBeVisible();
   }
   expect(
@@ -91,7 +92,7 @@ it("keeps sample mechanics inside the prioritisation disclosure and explains the
       "This page ranks seeded sample clusters for the preview; it does not process the lecturer entries from setup.",
     ),
   ).toBeVisible();
-  for (const mechanic of ["Threshold 0.32", "Average linkage", "Cosine distance"]) {
+  for (const mechanic of [`Threshold ${DISTANCE_THRESHOLD}`, "Average linkage", "Cosine distance"]) {
     expect(within(disclosure!).getByText(mechanic)).toBeVisible();
   }
 });

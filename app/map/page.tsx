@@ -18,6 +18,7 @@ import {
 import { useSession } from "@/components/session-provider";
 import { canRenderBubbleMap, placeBubbles } from "@/lib/cluster-layout";
 import { clusterToneClasses } from "@/lib/cluster-tone";
+import { DISTANCE_THRESHOLD } from "@/lib/pipeline/cluster";
 import type { SortMode } from "@/lib/types";
 
 const MAP_WIDTH = 1000;
@@ -151,7 +152,7 @@ export default function MapPage() {
                 </p>
               )}
               <div className="flex flex-wrap gap-2">
-                <Badge tone="neutral">Threshold 0.32</Badge>
+                <Badge tone="neutral">Threshold {DISTANCE_THRESHOLD}</Badge>
                 <Badge tone="neutral">Average linkage</Badge>
                 <Badge tone="neutral">Cosine distance</Badge>
               </div>
