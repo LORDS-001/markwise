@@ -135,6 +135,28 @@ it("orders the ready flow and keeps exactly one primary through validation and c
   expect(container.querySelectorAll('[data-variant="primary"]')).toHaveLength(1);
 }, 15_000);
 
+it("keeps keyboard focus on the reviewer confirmation replacement in both directions", async () => {
+  const user = userEvent.setup();
+  renderReadyExport();
+  await waitForReadyExport();
+
+  const reviewer = screen.getByRole("textbox", { name: "Confirmed by" });
+  await user.click(reviewer);
+  await user.tab();
+
+  const confirm = screen.getByRole("button", { name: "Confirm reviewer" });
+  expect(confirm).toHaveFocus();
+  await user.keyboard("{Enter}");
+
+  const reopen = screen.getByRole("button", { name: "Reopen for edits" });
+  expect(reopen).toHaveFocus();
+  expect(document.body).not.toHaveFocus();
+  await user.keyboard("{Enter}");
+
+  expect(screen.getByRole("button", { name: "Confirm reviewer" })).toHaveFocus();
+  expect(document.body).not.toHaveFocus();
+});
+
 it("uses control and brand boundaries for native format options", async () => {
   renderReadyExport();
   await waitForReadyExport();

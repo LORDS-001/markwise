@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Check,
@@ -51,6 +51,23 @@ export default function ExportPage() {
   const [format, setFormat] = useState<Format>("xlsx");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirmationControlsRef = useRef<HTMLDivElement>(null);
+  const confirmationFocusIntentRef = useRef<"confirm" | "reopen" | null>(null);
+
+  useLayoutEffect(() => {
+    const focusIntent = confirmationFocusIntentRef.current;
+    if (!focusIntent) return;
+
+    confirmationFocusIntentRef.current = null;
+    confirmationControlsRef.current
+      ?.querySelector<HTMLElement>(`[data-confirmation-focus="${focusIntent}"]`)
+      ?.focus();
+  }, [confirmed]);
+
+  function updateConfirmation(nextConfirmed: boolean) {
+    confirmationFocusIntentRef.current = nextConfirmed ? "reopen" : "confirm";
+    setConfirmed(nextConfirmed);
+  }
 
   const rows = useMemo(() => buildRows(answers, clusters), [answers, clusters]);
   const stats = useMemo(() => classStats(rows), [rows]);
@@ -187,7 +204,7 @@ export default function ExportPage() {
           hint="Your name is written into the provenance line in both files"
           action={confirmed ? <Badge tone="ok">Confirmed</Badge> : null}
         />
-        <div className="flex flex-col gap-3 px-5 py-4 sm:px-6">
+        <div ref={confirmationControlsRef} className="flex flex-col gap-3 px-5 py-4 sm:px-6">
           <label htmlFor="lecturer" className="text-[13px] font-bold">
             Confirmed by
           </label>
@@ -207,16 +224,22 @@ export default function ExportPage() {
                 <ShieldCheck size={16} strokeWidth={2} aria-hidden />
                 All {TOTAL_ANSWERS} rows reviewed and confirmed
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setConfirmed(false)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => updateConfirmation(false)}
+                data-confirmation-focus="reopen"
+              >
                 Reopen for edits
               </Button>
             </div>
           ) : (
             <Button
               size="lg"
-              onClick={() => setConfirmed(true)}
+              onClick={() => updateConfirmation(true)}
               disabled={!confirmedBy.trim()}
               className="self-start"
+              data-confirmation-focus="confirm"
             >
               <Check size={17} strokeWidth={2.2} aria-hidden />
               Confirm reviewer
