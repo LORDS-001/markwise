@@ -62,6 +62,7 @@ const CONTRAST_PAIRS = [
     background,
     minimum: 3,
   })),
+  { foreground: "on-ok", background: "ok", minimum: 4.5 },
   ...Array.from({ length: 7 }, (_, tone) => ({
     foreground: `on-c${tone}`,
     background: `c${tone}`,

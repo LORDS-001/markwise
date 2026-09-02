@@ -344,6 +344,28 @@ it(
     expect(expanded).toHaveTextContent("Reactance term included");
     expect(expanded).toHaveTextContent("Marking scheme, criterion by criterion");
     expect(within(expanded).getByText(/^Rationale$/)).toBeVisible();
+
+    const successIndicator = expanded.querySelector(".lucide-check")?.parentElement;
+    expect(successIndicator).toHaveClass("border-ok", "bg-ok", "text-on-ok");
+    expect(successIndicator).not.toHaveClass("text-white");
+
+    for (const [label, state] of [
+      ["Reactance term included", "Not met"],
+      ["Impedance combined in quadrature", "Not met"],
+      ["Current obtained from V/Z", "Met"],
+      ["Phase relationship addressed", "Not met"],
+      ["Units stated throughout", "Met"],
+    ]) {
+      const criterion = within(expanded).getByText(label).closest("li");
+      expect(criterion, `${label} criterion`).not.toBeNull();
+      expect(
+        within(criterion!).getAllByText(/^(Met|Not met):$/, { selector: ".sr-only" }),
+      ).toHaveLength(1);
+      expect(
+        within(criterion!).getByText(`${state}:`, { selector: ".sr-only" }),
+      ).toBeInTheDocument();
+    }
+    expect(successIndicator).toHaveAttribute("aria-hidden", "true");
   },
   TEST_TIMEOUT,
 );

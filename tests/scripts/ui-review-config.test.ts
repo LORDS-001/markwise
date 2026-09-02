@@ -30,6 +30,7 @@ describe("tracked UI review runner contract", () => {
       expect.arrayContaining([
         expect.objectContaining({ foreground: "ink-3", minimum: 4.5 }),
         expect.objectContaining({ foreground: "control-border", minimum: 3 }),
+        { foreground: "on-ok", background: "ok", minimum: 4.5 },
         ...Array.from({ length: 7 }, (_, tone) => ({
           foreground: `on-c${tone}`,
           background: `c${tone}`,
@@ -37,6 +38,12 @@ describe("tracked UI review runner contract", () => {
         })),
       ]),
     );
+    expect(
+      matrix.CONTRAST_PAIRS.filter(
+        ({ foreground }: { foreground: string }) =>
+          foreground === "on-ok" || /^on-c[0-6]$/.test(foreground),
+      ),
+    ).toHaveLength(8);
     expect(matrix.REDUCED_MOTION_ROUTE).toBe("/");
     expect(matrix.DESKTOP_ASIDE_SELECTOR).toBe('aside[class~="lg:block"]');
   });

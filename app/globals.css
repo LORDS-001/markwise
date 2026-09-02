@@ -61,6 +61,7 @@
   --crit-soft: #fcebee;
   --crit-line: #efc5cc;
   --ok: #1d744e;
+  --on-ok: #ffffff;
   --ok-soft: #e5f3ed;
   --ok-line: #b3d8c6;
 
@@ -120,6 +121,7 @@
   --crit-soft: #371923;
   --crit-line: #642b3a;
   --ok: #69d2a3;
+  --on-ok: #061018;
   --ok-soft: #112f27;
   --ok-line: #285845;
   --c1: #35b8cb;
@@ -170,6 +172,7 @@
   --color-crit-soft: var(--crit-soft);
   --color-crit-line: var(--crit-line);
   --color-ok: var(--ok);
+  --color-on-ok: var(--on-ok);
   --color-ok-soft: var(--ok-soft);
   --color-ok-line: var(--ok-line);
 

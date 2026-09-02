@@ -78,6 +78,7 @@ describe.each(["light", "dark"] as const)("%s theme contrast", (theme) => {
     for (const [foreground, background] of [
       ["on-primary", "primary"],
       ["on-brand", "brand"],
+      ["on-ok", "ok"],
       ["brand", "brand-soft"],
       ["warn", "warn-soft"],
       ["crit", "crit-soft"],

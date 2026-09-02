@@ -614,13 +614,16 @@ function ExpandedPanel({ a }: { a: StudentAnswer }) {
                 <span
                   className={cn(
                     "grid h-4 w-4 shrink-0 place-items-center rounded-[5px] border",
-                    met ? "border-ok bg-ok text-white" : "border-border-strong",
+                    met ? "border-ok bg-ok text-on-ok" : "border-border-strong",
                   )}
                   aria-hidden
                 >
                   {met ? <Check size={11} strokeWidth={3.2} /> : null}
                 </span>
-                <span className="min-w-0 flex-1 truncate">{criterion.label}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="sr-only">{met ? "Met: " : "Not met: "}</span>
+                  {criterion.label}
+                </span>
                 <span className="shrink-0 text-[12px] tnum">{criterion.marks}</span>
               </li>
             );
