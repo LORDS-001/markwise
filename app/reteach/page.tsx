@@ -5,12 +5,12 @@ import { useMemo } from "react";
 import { ArrowRight, BookOpen, Users } from "lucide-react";
 import { Disclosure } from "@/components/disclosure";
 import { Page } from "@/components/shell";
-import { Card, EmptyState, buttonClass, toneColor } from "@/components/ui";
+import { Card, EmptyState, buttonClass, cn, toneColor } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
 import { TOTAL_ANSWERS } from "@/lib/mock";
 
 export default function ReteachIndexPage() {
-  const { clusters, sortMode, answers } = useSession();
+  const { clusters, sortMode, answers, processed } = useSession();
 
   const ranked = useMemo(
     () =>
@@ -30,15 +30,29 @@ export default function ReteachIndexPage() {
       title="Choose a misconception to reteach"
       lead="Open a sample teaching pack for one of the prioritised patterns."
     >
-      {ranked.length === 0 ? (
+      {!processed ? (
+        <Card>
+          <EmptyState
+            icon={<BookOpen size={26} strokeWidth={1.6} />}
+            title="The sample teaching packs aren't ready yet"
+            body="Prepare the sample analysis before choosing a seeded teaching pack to preview."
+            action={
+              <Link href="/processing" className={buttonClass("primary", "md")}>
+                Preview sample analysis
+                <ArrowRight size={16} strokeWidth={2} aria-hidden />
+              </Link>
+            }
+          />
+        </Card>
+      ) : ranked.length === 0 ? (
         <Card>
           <EmptyState
             icon={<BookOpen size={26} strokeWidth={1.6} />}
             title="No clusters to teach against yet"
-            body="Review an active misconception cluster before opening its sample teaching pack."
+            body="The seeded preview has no active misconception clusters. Return to setup to adjust the question or marking guidance."
             action={
-              <Link href="/processing" className={buttonClass("primary", "md")}>
-                Run the pipeline
+              <Link href="/" className={buttonClass("primary", "md")}>
+                Return to setup
               </Link>
             }
           />
@@ -63,7 +77,16 @@ export default function ReteachIndexPage() {
                     className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-5 sm:px-6 py-4 hover:bg-surface-2 transition-colors"
                   >
                     <span
-                      className="grid w-7 h-7 rounded-full shrink-0 place-items-center text-[12px] font-semibold text-white tnum"
+                      className={cn(
+                        "grid w-7 h-7 rounded-full shrink-0 place-items-center text-[12px] font-semibold tnum",
+                        c.tone === 1
+                          ? "text-on-c1"
+                          : c.tone === 2
+                            ? "text-on-c2"
+                            : c.tone === 3
+                              ? "text-on-c3"
+                              : "text-white",
+                      )}
                       style={{ background: toneColor(c.tone) }}
                       aria-hidden
                     >

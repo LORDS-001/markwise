@@ -27,6 +27,13 @@ import {
 import { useSession } from "@/components/session-provider";
 import { RETEACH_PACKS, TOTAL_ANSWERS } from "@/lib/mock";
 
+function clusterForegroundClass(tone: number) {
+  if (tone === 1) return "text-on-c1";
+  if (tone === 2) return "text-on-c2";
+  if (tone === 3) return "text-on-c3";
+  return "text-white";
+}
+
 export default function ReteachPackPage() {
   const params = useParams<{ id: string }>();
   const { clusters, answers } = useSession();
@@ -135,7 +142,7 @@ export default function ReteachPackPage() {
             <CardHead title="Who this is for" hint="Attach the roster when you send it" />
             <div className="px-5 py-4 flex items-center gap-4">
               <span
-                className="grid place-items-center w-12 h-12 rounded-full shrink-0 text-white font-display text-[18px] font-semibold"
+                className={`grid place-items-center w-12 h-12 rounded-full shrink-0 font-display text-[18px] font-semibold ${clusterForegroundClass(cluster.tone)}`}
                 style={{ background: toneColor(cluster.tone) }}
                 aria-hidden
               >
@@ -168,7 +175,7 @@ export default function ReteachPackPage() {
       }
     >
       <ActionArea note="Copy or download this sample lesson and its affected-student roster.">
-        <Button variant="secondary" size="md" onClick={copyPack}>
+        <Button size="md" onClick={copyPack}>
           {copied ? (
             <Check size={16} strokeWidth={2.2} aria-hidden />
           ) : (
@@ -235,7 +242,7 @@ export default function ReteachPackPage() {
                   <div className="flex flex-col gap-4">
                     <div className="flex gap-3">
                       <span
-                        className="grid place-items-center w-7 h-7 rounded-full shrink-0 text-[13px] font-semibold text-white tnum"
+                        className={`grid place-items-center w-7 h-7 rounded-full shrink-0 text-[13px] font-semibold tnum ${clusterForegroundClass(cluster.tone)}`}
                         style={{ background: toneColor(cluster.tone) }}
                         aria-hidden
                       >

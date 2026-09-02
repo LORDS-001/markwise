@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import MapPage from "@/app/map/page";
 
@@ -54,4 +55,31 @@ it("falls back to the complete ranked list when the bubble map is too dense", ()
   render(<MapPage />);
   expect(screen.getByText("Map hidden at this cluster count")).toBeVisible();
   expect(screen.getAllByRole("link", { name: /Misconception/i })).toHaveLength(13);
+});
+
+it("keeps sample mechanics inside the prioritisation disclosure and explains their scope", async () => {
+  const user = userEvent.setup();
+  render(<MapPage />);
+
+  const summary = screen.getByText("How prioritisation works");
+  const disclosure = summary.closest("details");
+  expect(disclosure).not.toBeNull();
+
+  for (const mechanic of ["Threshold 0.32", "Average linkage", "Cosine distance"]) {
+    expect(within(disclosure!).getByText(mechanic)).not.toBeVisible();
+  }
+  expect(
+    screen.queryByText("Clustering runs in the app, not in an external service."),
+  ).not.toBeInTheDocument();
+
+  await user.click(summary);
+
+  expect(
+    within(disclosure!).getByText(
+      "This page ranks seeded sample clusters for the preview; it does not process the lecturer entries from setup.",
+    ),
+  ).toBeVisible();
+  for (const mechanic of ["Threshold 0.32", "Average linkage", "Cosine distance"]) {
+    expect(within(disclosure!).getByText(mechanic)).toBeVisible();
+  }
 });

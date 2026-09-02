@@ -70,6 +70,28 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+it("keeps the locked route accurate and offers one primary recovery action", () => {
+  const { container } = render(
+    <SessionProvider>
+      <ExportPage />
+    </SessionProvider>,
+  );
+
+  expect(screen.getByRole("heading", { level: 1, name: "Export is locked" })).toBeVisible();
+  expect(
+    screen.getByText(
+      /Nothing leaves this session while a score is still unreviewed/i,
+    ),
+  ).toBeVisible();
+  expect(screen.getByText("Student ID and initials")).toBeVisible();
+  expect(screen.queryByText("Student ID and name")).not.toBeInTheDocument();
+  expect(screen.getByRole("progressbar", { name: "Score review progress" })).toBeVisible();
+
+  const recovery = screen.getByRole("link", { name: "Go to score review" });
+  expect(recovery).toHaveAttribute("href", "/scores");
+  expect(container.querySelectorAll('[data-variant="primary"], a.bg-primary')).toHaveLength(1);
+});
+
 it("orders the ready flow and keeps exactly one primary through validation and confirmation", async () => {
   const user = userEvent.setup();
   const { container } = renderReadyExport();

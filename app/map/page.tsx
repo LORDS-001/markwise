@@ -23,6 +23,13 @@ import type { SortMode } from "@/lib/types";
 const MAP_WIDTH = 1000;
 const MAP_HEIGHT = 420;
 
+function clusterForegroundClass(tone: number) {
+  if (tone === 1) return "text-on-c1";
+  if (tone === 2) return "text-on-c2";
+  if (tone === 3) return "text-on-c3";
+  return "text-white";
+}
+
 export default function MapPage() {
   const router = useRouter();
   const { clusters, sortMode, setSortMode, answers } = useSession();
@@ -133,18 +140,29 @@ export default function MapPage() {
                 : "Currently ranked by severity × spread"
             }
           >
-            {sortMode === "spread" ? (
+            <div className="flex flex-col gap-3">
               <p>
-                Size alone can mislead. A smaller belief that blocks several later topics can be
-                more urgent than a bigger slip that stops here. Damage ranking combines severity
-                with spread.
+                This page ranks seeded sample clusters for the preview; it does not process the
+                lecturer entries from setup.
               </p>
-            ) : (
-              <p>
-                Damage is severity multiplied by spread. The named downstream topics explain
-                what each belief may block, so the ranking is never presented as a bare number.
-              </p>
-            )}
+              {sortMode === "spread" ? (
+                <p>
+                  Size alone can mislead. A smaller belief that blocks several later topics can be
+                  more urgent than a bigger slip that stops here. Damage ranking combines severity
+                  with spread.
+                </p>
+              ) : (
+                <p>
+                  Damage is severity multiplied by spread. The named downstream topics explain
+                  what each belief may block, so the ranking is never presented as a bare number.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Badge tone="neutral">Threshold 0.32</Badge>
+                <Badge tone="neutral">Average linkage</Badge>
+                <Badge tone="neutral">Cosine distance</Badge>
+              </div>
+            </div>
           </Disclosure>
         </>
       }
@@ -200,7 +218,10 @@ export default function MapPage() {
                   >
                     <span className="flex items-center gap-3 min-w-0 flex-1">
                       <span
-                        className="grid place-items-center w-7 h-7 rounded-full shrink-0 text-[12px] font-semibold tnum text-white"
+                        className={cn(
+                          "grid place-items-center w-7 h-7 rounded-full shrink-0 text-[12px] font-semibold tnum",
+                          clusterForegroundClass(c.tone),
+                        )}
                         style={{ background: toneColor(c.tone) }}
                         aria-hidden
                       >
@@ -367,15 +388,6 @@ export default function MapPage() {
           </div>
         </Card>
       ) : null}
-
-      <div className="flex flex-wrap items-center gap-2 pb-2">
-        <Badge tone="neutral">Threshold 0.32</Badge>
-        <Badge tone="neutral">Average linkage</Badge>
-        <Badge tone="neutral">Cosine distance</Badge>
-        <span className="text-[13px] text-ink-3">
-          Clustering runs in the app, not in an external service.
-        </span>
-      </div>
     </Page>
   );
 }

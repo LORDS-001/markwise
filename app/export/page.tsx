@@ -118,7 +118,11 @@ export default function ExportPage() {
                   : "The rest are high-confidence — accepting them in bulk takes one click."}
               </p>
               <div className="mt-4 max-w-sm">
-                <Progress value={(reviewedCount / TOTAL_ANSWERS) * 100} tone="warn" />
+                <Progress
+                  value={(reviewedCount / TOTAL_ANSWERS) * 100}
+                  tone="warn"
+                  label="Score review progress"
+                />
               </div>
             </div>
             <Link href="/scores" className={buttonClass("primary", "lg", "shrink-0")}>
@@ -132,7 +136,7 @@ export default function ExportPage() {
           <CardHead title="What the export will contain" hint="Once the gate opens" />
           <ul className="px-5 py-4 grid gap-2.5 sm:grid-cols-2 text-[13.5px] text-ink-2">
             {[
-              "Student ID and name",
+              "Student ID and initials",
               "Score, max, and percentage",
               "The misconception cluster they fell into",
               "The criteria they missed, named",
