@@ -114,5 +114,6 @@ describe("tracked UI review runner contract", () => {
     expect(keyboard.SCORES_EVIDENCE_EXPRESSION).toContain('td[colspan="8"]');
     expect(keyboard.replacementPlan("")).toEqual(["KeyA", "Backspace"]);
     expect(keyboard.EXPORT_READY_TAB_OPTIONS).toEqual({ shift: true });
+    expect(keyboard.REVIEWER_VALIDATION_VALUE).toBe("");
   });
 });

@@ -27,6 +27,7 @@ const HYDRATION_READY_EXPRESSION =
   "document.readyState === 'complete' && !!document.querySelector('main#main')";
 const SPLIT_MEMBER_TAB_OPTIONS = { shift: true };
 const EXPORT_READY_TAB_OPTIONS = { shift: true };
+const REVIEWER_VALIDATION_VALUE = "";
 const MERGE_RETURN_KEY = { key: "ArrowLeft", modifiers: 1, isSystemKey: true };
 const REJECT_DESTINATION = "/map";
 const SCORES_EVIDENCE_EXPRESSION = `document.activeElement.getAttribute('aria-expanded') === 'true' && (() => {
@@ -589,6 +590,7 @@ async function runKeyboard(options = {}) {
 
     await group("Export workflow", async (context) => {
       await tabTo(cdp, context, named(/^Confirmed by$/), "reviewer input");
+      await replaceText(cdp, context, REVIEWER_VALIDATION_VALUE);
       await assertEval(cdp, context, "blank reviewer keeps confirmation disabled", "!![...document.querySelectorAll('button')].find((button) => /Confirm reviewer/.test(button.textContent) && button.disabled)");
       await replaceText(cdp, context, "Prof. Keyboard Reviewer");
       await tabTo(cdp, context, named(/^Confirm reviewer$/), "confirm reviewer");
@@ -686,6 +688,7 @@ module.exports = {
   KEY_DEFINITIONS,
   MERGE_RETURN_KEY,
   REJECT_DESTINATION,
+  REVIEWER_VALIDATION_VALUE,
   SCORES_EVIDENCE_EXPRESSION,
   SPLIT_MEMBER_TAB_OPTIONS,
   focusSignature,
