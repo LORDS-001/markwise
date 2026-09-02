@@ -2,7 +2,7 @@
 
 import type { Cluster, ReteachPack, ReviewStatus, StudentAnswer } from "@/lib/types";
 import type { PipelineInput } from "@/lib/pipeline/types";
-import { isPipelineConfigured } from "@/lib/pipeline/gemini";
+import { isPipelineConfigured, pipelineConfigMessage } from "@/lib/pipeline/config";
 import { generateReteachPack, otherBucketPack } from "@/lib/pipeline/reteach";
 import { getServerClient } from "@/lib/supabase/server";
 
@@ -61,8 +61,7 @@ export async function generateReteachAction(params: {
     return {
       ok: false,
       code: "not_configured",
-      error:
-        "Reteach packs need GEMINI_API_KEY. The seeded demo class ships with its packs already written.",
+      error: `${pipelineConfigMessage()} Its reteach packs are already written.`,
     };
   }
 

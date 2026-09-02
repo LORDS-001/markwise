@@ -9,17 +9,23 @@
  */
 
 import { ANSWERS, CRITERIA, SESSION } from "@/lib/mock";
-import { generateJson, isPipelineConfigured } from "@/lib/pipeline/gemini";
+import { claudeJson } from "@/lib/pipeline/claude";
 import {
-  EXTRACTION_SCHEMA,
-  extractionPrompt,
+  isPipelineConfigured,
+  missingPipelineKeys,
+  workspaceHint,
+} from "@/lib/pipeline/config";
+import {
+  extractionAnswer,
+  extractionContext,
   extractionSystemPrompt,
 } from "@/lib/pipeline/prompts";
+import { ExtractionSchema } from "@/lib/pipeline/schemas";
 import type { PipelineInput } from "@/lib/pipeline/types";
 
 async function main() {
   if (!isPipelineConfigured()) {
-    console.error("GEMINI_API_KEY is not set.");
+    console.error(`Missing ${missingPipelineKeys().join(" and ")}.`);
     process.exit(1);
   }
 
@@ -36,11 +42,13 @@ async function main() {
 
   console.log("Calling extraction for one answer, errors unswallowed…\n");
   try {
-    const result = await generateJson({
-      system: extractionSystemPrompt(),
-      prompt: extractionPrompt(input, answer),
-      schema: EXTRACTION_SCHEMA as unknown as Record<string, unknown>,
-      temperature: 0.1,
+    const result = await claudeJson({
+      stable: `${extractionSystemPrompt()}
+
+${extractionContext(input)}`,
+      variable: extractionAnswer(answer),
+      schema: ExtractionSchema,
+      effort: "low",
     });
     console.log("SUCCESS:\n", JSON.stringify(result, null, 2));
   } catch (error) {

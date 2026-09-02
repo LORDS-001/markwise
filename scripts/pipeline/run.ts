@@ -13,13 +13,16 @@
  *   npm run pipeline -- --json out.json     # dump the full result
  *   npm run pipeline -- --limit 12          # first N answers, to save quota
  *
- * Requires GEMINI_API_KEY in .env.local.
+ * Requires ANTHROPIC_API_KEY and GEMINI_API_KEY in .env.local — Claude runs
+ * the generative stages, Gemini embeds the signatures.
  */
 
 import { writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { CRITERIA, SESSION, ANSWERS } from "@/lib/mock";
-import { TEXT_MODEL, isPipelineConfigured } from "@/lib/pipeline/gemini";
+import { CLAUDE_MODEL } from "@/lib/pipeline/claude";
+import { EMBEDDING_MODEL } from "@/lib/pipeline/gemini";
+import { isPipelineConfigured, missingPipelineKeys } from "@/lib/pipeline/config";
 import { answersFromCsv } from "@/lib/pipeline/parse-answers";
 import { runPipeline } from "@/lib/pipeline/run";
 import type { PipelineInput, RawAnswer, StageId } from "@/lib/pipeline/types";
@@ -76,8 +79,9 @@ async function loadAnswers(): Promise<RawAnswer[]> {
 async function main() {
   if (!isPipelineConfigured()) {
     console.error(
-      `${RED}GEMINI_API_KEY is not set.${RESET}\n` +
-        `Add it to .env.local, then re-run. This script makes real API calls.`,
+      `${RED}Missing ${missingPipelineKeys().join(" and ")}.${RESET}\n` +
+        `Add to .env.local, then re-run. This script makes real API calls.\n` +
+        `Claude runs the generative stages; Gemini embeds the signatures.`,
     );
     process.exit(1);
   }
@@ -99,7 +103,7 @@ async function main() {
   rule();
   console.log(`Question   ${SESSION.question.slice(0, 58)}…`);
   console.log(`Answers    ${answers.length}`);
-  console.log(`Model      ${TEXT_MODEL}`);
+  console.log(`Model      ${CLAUDE_MODEL} ${DIM}(embeddings: ${EMBEDDING_MODEL})${RESET}`);
   console.log(`Criteria   ${CRITERIA.length} (${input.criteria.reduce((s, c) => s + c.marks, 0)} marks)`);
   if (thresholdArg) console.log(`Threshold  ${thresholdArg} ${DIM}(overridden)${RESET}`);
   rule();

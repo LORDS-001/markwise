@@ -1,16 +1,8 @@
 import type { Cluster, ReteachPack, StudentAnswer } from "@/lib/types";
-import { generateJson } from "./gemini";
-import { RETEACH_SCHEMA, reteachPrompt } from "./prompts";
+import { claudeJson } from "./claude";
+import { ReteachSchema } from "./schemas";
+import { reteachPrompt } from "./prompts";
 import type { PipelineInput } from "./types";
-
-interface RawReteach {
-  lesson: { heading: string; body: string }[];
-  diagnostics: {
-    prompt: string;
-    holder_answers: string;
-    corrected_answers: string;
-  }[];
-}
 
 /**
  * The pack shown when a cluster has no shared belief to teach against.
@@ -57,10 +49,16 @@ export async function generateReteachPack(
     .filter((e) => e.trim().length > 0)
     .slice(0, 6);
 
-  const raw = await generateJson<RawReteach>({
-    prompt: reteachPrompt(input, cluster.label, cluster.why, evidence),
-    schema: RETEACH_SCHEMA as unknown as Record<string, unknown>,
-    temperature: 0.4,
+  const raw = await claudeJson({
+    stable:
+      "You write short, specific reteach lessons that argue against one named misconception.",
+    variable: reteachPrompt(input, cluster.label, cluster.why, evidence),
+    schema: ReteachSchema,
+    // The diagnostics have to genuinely discriminate between a student who
+    // still holds the belief and one who has corrected it, which is a harder
+    // ask than the other stages and worth the extra reasoning.
+    effort: "high",
+    maxTokens: 8192,
   });
 
   return {

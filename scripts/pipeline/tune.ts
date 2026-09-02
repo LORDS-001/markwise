@@ -19,7 +19,8 @@
 import { readFile } from "node:fs/promises";
 import { ANSWERS } from "@/lib/mock";
 import { agglomerativeCluster } from "@/lib/pipeline/cluster";
-import { EMBEDDING_MODEL, embedTexts, isPipelineConfigured } from "@/lib/pipeline/gemini";
+import { EMBEDDING_MODEL, embedTexts } from "@/lib/pipeline/gemini";
+import { isPipelineConfigured } from "@/lib/pipeline/config";
 
 const ESC = "\x1b";
 const BOLD = `${ESC}[1m`;

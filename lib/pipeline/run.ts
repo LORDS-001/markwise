@@ -1,16 +1,13 @@
 import type { Cluster, StudentAnswer } from "@/lib/types";
+import { embedTexts } from "./gemini";
+import { claudeJson } from "./claude";
+import { CONCURRENCY, mapWithConcurrency } from "./concurrency";
+import { DamageSchema, ExtractionSchema, LabelSchema } from "./schemas";
+import type { ExtractionResponse } from "./schemas";
 import {
-  CONCURRENCY,
-  embedTexts,
-  generateJson,
-  mapWithConcurrency,
-} from "./gemini";
-import {
-  DAMAGE_SCHEMA,
-  EXTRACTION_SCHEMA,
-  LABEL_SCHEMA,
   damagePrompt,
-  extractionPrompt,
+  extractionAnswer,
+  extractionContext,
   extractionSystemPrompt,
   labelPrompt,
 } from "./prompts";
@@ -32,17 +29,6 @@ import type {
 /*  Step 1 — error signature extraction                                */
 /* ------------------------------------------------------------------ */
 
-interface RawExtraction {
-  is_correct: boolean;
-  error_signature: string;
-  confidence: number;
-  evidence_span: string;
-  provisional_score: number;
-  criteria_met: string[];
-  criteria_missed: string[];
-  score_rationale: string;
-}
-
 /**
  * Normalises one model response into a trustworthy Extraction.
  *
@@ -52,7 +38,7 @@ interface RawExtraction {
  * thing a lecturer would catch and lose confidence over.
  */
 export function normaliseExtraction(
-  raw: RawExtraction,
+  raw: ExtractionResponse,
   answer: RawAnswer,
   criteria: { id: string; marks: number }[],
 ): Extraction {
@@ -99,16 +85,17 @@ export function normaliseExtraction(
 async function extractOne(
   input: PipelineInput,
   answer: RawAnswer,
+  stable: string,
   onError: (message: string) => void,
 ): Promise<Extraction> {
   const maxScore = input.criteria.reduce((sum, c) => sum + c.marks, 0);
 
   try {
-    const raw = await generateJson<RawExtraction>({
-      system: extractionSystemPrompt(),
-      prompt: extractionPrompt(input, answer),
-      schema: EXTRACTION_SCHEMA as unknown as Record<string, unknown>,
-      temperature: 0.1,
+    const raw = await claudeJson({
+      stable,
+      variable: extractionAnswer(answer),
+      schema: ExtractionSchema,
+      effort: "low",
     });
     return normaliseExtraction(raw, answer, input.criteria);
   } catch (error) {
@@ -137,15 +124,6 @@ async function extractOne(
 /*  Orchestration                                                      */
 /* ------------------------------------------------------------------ */
 
-interface RawLabel {
-  label: string;
-  why: string;
-}
-interface RawDamage {
-  downstream: string[];
-  severity: number;
-}
-
 const OTHER_CLUSTER_ID = "cl-other";
 
 /**
@@ -163,13 +141,19 @@ export async function runPipeline(
   /* --- Step 1: extraction ---------------------------------------- */
   onProgress({ stage: "extract", progress: 0 });
 
+  // Identical for every answer in the batch, so it is sent once as a cached
+  // prefix rather than re-billed forty times.
+  const extractionStable = `${extractionSystemPrompt()}
+
+${extractionContext(input)}`;
+
   let done = 0;
   const failures: string[] = [];
   const extractions = await mapWithConcurrency(
     input.answers,
     CONCURRENCY,
     async (answer) => {
-      const result = await extractOne(input, answer, (message) =>
+      const result = await extractOne(input, answer, extractionStable, (message) =>
         failures.push(message),
       );
       done += 1;
@@ -247,12 +231,13 @@ export async function runPipeline(
       const signatures = group.map(
         (i) => diagnosable[i].extraction.errorSignature!,
       );
-      let result: RawLabel;
+      let result: { label: string; why: string };
       try {
-        result = await generateJson<RawLabel>({
-          prompt: labelPrompt(input, signatures),
-          schema: LABEL_SCHEMA as unknown as Record<string, unknown>,
-          temperature: 0.3,
+        result = await claudeJson({
+          stable: "You name the single misconception a group of student errors share.",
+          variable: labelPrompt(input, signatures),
+          schema: LabelSchema,
+          effort: "medium",
         });
       } catch {
         // Fall back to the most common member signature, so a failed call
@@ -275,12 +260,13 @@ export async function runPipeline(
 
   let assessed = 0;
   const damages = await mapWithConcurrency(labels, CONCURRENCY, async (label) => {
-    let result: RawDamage;
+    let result: { downstream: string[]; severity: number };
     try {
-      result = await generateJson<RawDamage>({
-        prompt: damagePrompt(input, label.label),
-        schema: DAMAGE_SCHEMA as unknown as Record<string, unknown>,
-        temperature: 0.3,
+      result = await claudeJson({
+        stable: "You judge which later topics a misconception will break, and how badly.",
+        variable: damagePrompt(input, label.label),
+        schema: DamageSchema,
+        effort: "medium",
       });
     } catch {
       // Severity 1 with no named topics reads honestly as "not assessed"

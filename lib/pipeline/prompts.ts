@@ -72,10 +72,12 @@ export function extractionSystemPrompt(): string {
   return EXTRACTION_SYSTEM;
 }
 
-export function extractionPrompt(
-  input: PipelineInput,
-  answer: RawAnswer,
-): string {
+/**
+ * The half of the extraction prompt that is identical for every answer in a
+ * batch: the question, the scheme, the criteria. Sent as the cached prefix, so
+ * forty answers pay for it once.
+ */
+export function extractionContext(input: PipelineInput): string {
   const total = input.criteria.reduce((sum, c) => sum + c.marks, 0);
 
   return `SUBJECT: ${input.subject}
@@ -90,9 +92,12 @@ ${input.scheme}
 CRITERIA (award against these ids exactly):
 ${criteriaBlock(input.criteria)}
 
-TOTAL MARKS AVAILABLE: ${total}
+TOTAL MARKS AVAILABLE: ${total}`;
+}
 
-STUDENT ANSWER (id ${answer.studentRef}):
+/** The half that changes: one student's answer. Never cached. */
+export function extractionAnswer(answer: RawAnswer): string {
+  return `STUDENT ANSWER (id ${answer.studentRef}):
 ---
 ${answer.text}
 ---
@@ -100,36 +105,6 @@ ${answer.text}
 Diagnose this answer and award its criteria.`;
 }
 
-export const EXTRACTION_SCHEMA = {
-  type: "object",
-  properties: {
-    is_correct: { type: "boolean" },
-    error_signature: {
-      type: "string",
-      description:
-        "The false belief, starting with the word believes. Empty when correct or undiagnosable.",
-    },
-    confidence: { type: "number" },
-    evidence_span: {
-      type: "string",
-      description: "Verbatim substring of the answer. Empty when none applies.",
-    },
-    provisional_score: { type: "integer" },
-    criteria_met: { type: "array", items: { type: "string" } },
-    criteria_missed: { type: "array", items: { type: "string" } },
-    score_rationale: { type: "string" },
-  },
-  required: [
-    "is_correct",
-    "error_signature",
-    "confidence",
-    "evidence_span",
-    "provisional_score",
-    "criteria_met",
-    "criteria_missed",
-    "score_rationale",
-  ],
-} as const;
 
 /* ------------------------------------------------------------------ */
 /*  Step 4 — cluster labelling                                         */
@@ -164,14 +139,6 @@ lecturer will teach against, so it must be sympathetic and specific, not a
 restatement of the error.`;
 }
 
-export const LABEL_SCHEMA = {
-  type: "object",
-  properties: {
-    label: { type: "string" },
-    why: { type: "string" },
-  },
-  required: ["label", "why"],
-} as const;
 
 /* ------------------------------------------------------------------ */
 /*  Step 5 — prerequisite damage ranking                               */
@@ -198,14 +165,6 @@ Rules:
   and make the damage sort meaningless.`;
 }
 
-export const DAMAGE_SCHEMA = {
-  type: "object",
-  properties: {
-    downstream: { type: "array", items: { type: "string" } },
-    severity: { type: "integer" },
-  },
-  required: ["downstream", "severity"],
-} as const;
 
 /* ------------------------------------------------------------------ */
 /*  Step 6 — reteach pack                                              */
@@ -246,32 +205,3 @@ For each diagnostic, state what a student who still holds the misconception
 would answer, and what a corrected student would answer.`;
 }
 
-export const RETEACH_SCHEMA = {
-  type: "object",
-  properties: {
-    lesson: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          heading: { type: "string" },
-          body: { type: "string" },
-        },
-        required: ["heading", "body"],
-      },
-    },
-    diagnostics: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          prompt: { type: "string" },
-          holder_answers: { type: "string" },
-          corrected_answers: { type: "string" },
-        },
-        required: ["prompt", "holder_answers", "corrected_answers"],
-      },
-    },
-  },
-  required: ["lesson", "diagnostics"],
-} as const;

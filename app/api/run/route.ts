@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerClient } from "@/lib/supabase/server";
-import { isPipelineConfigured } from "@/lib/pipeline/gemini";
+import { isPipelineConfigured, pipelineConfigMessage } from "@/lib/pipeline/config";
 import { runPipeline } from "@/lib/pipeline/run";
 import { persistRun } from "@/lib/db/persist";
 import type { PipelineInput, StageProgress } from "@/lib/pipeline/types";
@@ -81,8 +81,7 @@ export async function POST(request: NextRequest) {
   if (!isPipelineConfigured()) {
     return NextResponse.json(
       {
-        error:
-          "The marking pipeline is not configured on this deployment. Set GEMINI_API_KEY to run it on your own answers.",
+        error: pipelineConfigMessage(),
         code: "not_configured",
       },
       { status: 503 },

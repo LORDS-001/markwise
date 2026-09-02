@@ -1,9 +1,12 @@
 /**
- * Gemini REST client — PRD §9.
+ * Gemini embedding client — PRD §6 step 2.
  *
- * Deliberately plain `fetch` rather than an SDK: the surface used here is
- * three endpoints, and a zero-dependency client keeps the pipeline auditable
- * and immune to SDK churn during the build window.
+ * Embeddings only. The four generative stages run on Claude (claude.ts);
+ * Gemini stays because Anthropic publishes no embedding model and clustering
+ * needs vectors, so the split is forced rather than chosen.
+ *
+ * Deliberately plain `fetch` rather than an SDK: the surface used here is one
+ * endpoint, and a zero-dependency client keeps it auditable.
  *
  * The key is read from GEMINI_API_KEY — server-side only, never NEXT_PUBLIC,
  * so it cannot reach the browser bundle.
@@ -11,16 +14,6 @@
 
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta";
 
-/**
- * Flash rather than Pro: a 40-answer batch is 40+ calls, and PRD §12 budgets
- * the whole run at under two minutes.
- *
- * Overridable because the free tier's daily request quota is charged **per
- * model**, so which model you can actually finish a batch on depends on the
- * account, and that should not need a code change to fix.
- */
-export const TEXT_MODEL =
-  process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
 export const EMBEDDING_MODEL =
   process.env.GEMINI_EMBEDDING_MODEL?.trim() || "gemini-embedding-001";
 
@@ -90,10 +83,6 @@ export function geminiApiKey(): string | null {
   }
   const key = process.env.GEMINI_API_KEY?.trim();
   return key && key.length > 0 ? key : null;
-}
-
-export function isPipelineConfigured(): boolean {
-  return geminiApiKey() !== null;
 }
 
 export class GeminiError extends Error {
@@ -189,56 +178,6 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   throw lastError ?? new GeminiError("Gemini request failed");
 }
 
-interface GenerateResponse {
-  candidates?: {
-    content?: { parts?: { text?: string }[] };
-    finishReason?: string;
-  }[];
-}
-
-/**
- * One JSON generation, constrained by a response schema so the model cannot
- * return prose where an object is expected.
- */
-export async function generateJson<T>(options: {
-  prompt: string;
-  schema: Record<string, unknown>;
-  system?: string;
-  temperature?: number;
-}): Promise<T> {
-  const body: Record<string, unknown> = {
-    contents: [{ role: "user", parts: [{ text: options.prompt }] }],
-    generationConfig: {
-      temperature: options.temperature ?? 0.2,
-      responseMimeType: "application/json",
-      responseSchema: options.schema,
-    },
-  };
-  if (options.system) {
-    body.systemInstruction = { parts: [{ text: options.system }] };
-  }
-
-  const data = await post<GenerateResponse>(
-    `models/${TEXT_MODEL}:generateContent`,
-    body,
-  );
-
-  const candidate = data.candidates?.[0];
-  const text = candidate?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-
-  if (text.trim().length === 0) {
-    throw new GeminiError(
-      `Gemini returned no content (finishReason: ${candidate?.finishReason ?? "unknown"})`,
-    );
-  }
-
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    throw new GeminiError(`Gemini returned unparseable JSON: ${text.slice(0, 300)}`);
-  }
-}
-
 interface BatchEmbedResponse {
   embeddings?: { values?: number[] }[];
 }
@@ -285,32 +224,3 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 
   return out;
 }
-
-/**
- * Runs `worker` over `items` with bounded concurrency, preserving input order.
- *
- * Forty answers fired at once trips the rate limit; forty fired in sequence
- * blows the two-minute budget in PRD §12. Six at a time holds both.
- */
-export async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  worker: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let cursor = 0;
-
-  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    for (;;) {
-      const index = cursor;
-      cursor += 1;
-      if (index >= items.length) return;
-      results[index] = await worker(items[index], index);
-    }
-  });
-
-  await Promise.all(runners);
-  return results;
-}
-
-export const CONCURRENCY = 6;
