@@ -21,14 +21,14 @@ Leave the production server running. In another PowerShell window, regenerate th
 
 ```powershell
 $chrome = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
-Start-Process -FilePath $chrome -WindowStyle Hidden -ArgumentList '--headless=new','--remote-debugging-port=9222',"--user-data-dir=$PWD\.next\ui-review\profiles\chrome-matrix",'about:blank'
+Start-Process -FilePath $chrome -WindowStyle Hidden -ArgumentList '--headless=new','--disable-extensions','--remote-debugging-port=9222',"--user-data-dir=$PWD\.next\ui-review\profiles\chrome-matrix",'about:blank'
 node scripts/ui-review/matrix.cjs chrome 9222 chrome-matrix.json
 ```
 
 The matrix runner sends `Browser.close`, so launch a new Chrome process for the keyboard workflow:
 
 ```powershell
-Start-Process -FilePath $chrome -WindowStyle Hidden -ArgumentList '--headless=new','--remote-debugging-port=9224',"--user-data-dir=$PWD\.next\ui-review\profiles\chrome-keyboard",'about:blank'
+Start-Process -FilePath $chrome -WindowStyle Hidden -ArgumentList '--headless=new','--disable-extensions','--remote-debugging-port=9224',"--user-data-dir=$PWD\.next\ui-review\profiles\chrome-keyboard",'about:blank'
 node scripts/ui-review/keyboard.cjs 9224 chrome-keyboard.json
 ```
 
@@ -36,11 +36,11 @@ Run the check-only matrix in Edge:
 
 ```powershell
 $edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
-Start-Process -FilePath $edge -WindowStyle Hidden -ArgumentList '--headless=new','--remote-debugging-port=9223',"--user-data-dir=$PWD\.next\ui-review\profiles\edge-matrix",'about:blank'
+Start-Process -FilePath $edge -WindowStyle Hidden -ArgumentList '--headless=new','--disable-extensions','--disable-component-extensions-with-background-pages','--remote-debugging-port=9223',"--user-data-dir=$PWD\.next\ui-review\profiles\edge-matrix",'about:blank'
 node scripts/ui-review/matrix.cjs edge 9223 edge-matrix.json
 ```
 
-The runners themselves are cross-platform. On macOS or Linux, launch the installed Chrome/Edge binary with the same `--headless=new`, `--remote-debugging-port`, and `--user-data-dir` arguments, then pass the selected port to the same Node commands.
+The runners themselves are cross-platform. On macOS or Linux, launch the installed Chrome/Edge binary with the same `--headless=new`, extension-isolation, `--remote-debugging-port`, and `--user-data-dir` arguments, then pass the selected port to the same Node commands. Extension isolation matters on managed Edge installations because wallet extensions can inject unrelated console/runtime errors into otherwise clean application pages.
 
 Set `UI_REVIEW_ORIGIN` to review a different already-running origin. Set `UI_REVIEW_OUTPUT` to change the ignored output directory. Both default to the Task 8 production values shown above.
 
