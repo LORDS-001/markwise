@@ -198,4 +198,27 @@ describe("tracked UI review runner contract", () => {
       },
     ]);
   });
+
+  it("returns to Map after repeated splits without crossing document-root focus", async () => {
+    const calls: unknown[][] = [];
+    const reached = { name: "Misconception map" };
+    const result = await keyboard.tabToMapAfterSplits(
+      "cdp",
+      "context",
+      (...args: unknown[]) => {
+        calls.push(args);
+        return Promise.resolve(reached);
+      },
+    );
+
+    expect(result).toBe(reached);
+    expect(calls).toHaveLength(1);
+    const [cdp, context, predicate, label, options] = calls[0];
+    expect(cdp).toBe("cdp");
+    expect(context).toBe("context");
+    expect((predicate as (snapshot: { name: string }) => boolean)(reached)).toBe(true);
+    expect(label).toBe("Map navigation after splits");
+    expect(options).toEqual({ shift: true });
+    expect(keyboard.tabTraversalModifiers(options)).toBe(8);
+  });
 });

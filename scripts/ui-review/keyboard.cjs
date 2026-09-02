@@ -246,6 +246,16 @@ async function tabToProcessingCompletion(cdp, context, tabToImpl = tabTo) {
   );
 }
 
+async function tabToMapAfterSplits(cdp, context, tabToImpl = tabTo) {
+  return tabToImpl(
+    cdp,
+    context,
+    named(/^Misconception map/),
+    "Map navigation after splits",
+    { shift: true },
+  );
+}
+
 async function assertEval(cdp, context, label, expression) {
   const result = await evaluate(cdp, expression);
   invariant(Boolean(result), `${label} failed; value ${JSON.stringify(result)}`);
@@ -486,7 +496,7 @@ async function runKeyboard(options = {}) {
         await waitFor(cdp, "document.activeElement?.tagName === 'BUTTON' && document.activeElement.textContent.trim() === 'Split'");
         await tabTo(cdp, context, named(/^Split$/), `restored Split action ${index}`);
       }
-      await tabTo(cdp, context, named(/^Misconception map/), "Map navigation after splits");
+      await tabToMapAfterSplits(cdp, context);
       await activate(cdp, context);
       await waitPath(cdp, "/map");
       await assertEval(cdp, context, "actual 13-cluster fallback is keyboard reachable", "document.body.innerText.includes('Map hidden at this cluster count') && document.querySelectorAll('a[href^=\"/clusters/\"]').length >= 13");
@@ -750,6 +760,7 @@ module.exports = {
   recordFocus,
   replacementPlan,
   tabToProcessingCompletion,
+  tabToMapAfterSplits,
   tabTraversalModifiers,
   visibleStatusCountExpression,
   runKeyboard,
