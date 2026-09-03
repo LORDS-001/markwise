@@ -58,6 +58,14 @@ interface SessionState {
   reviewedCount: number;
   needsAttention: number;
   exportReady: boolean;
+  /**
+   * Rows still standing between the lecturer and an export: unreviewed, or
+   * flagged. PRD §6 step 7 gates on both — a flagged row is one the lecturer
+   * has looked at and objected to, so treating it as settled would let the
+   * exact scores they distrusted reach the registry.
+   */
+  blockedCount: number;
+  flaggedCount: number;
 
   /** True while the screens are showing the seeded demo class. */
   isDemo: boolean;
@@ -522,6 +530,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [answers],
   );
 
+  const flaggedCount = useMemo(
+    () => answers.filter((a) => a.status === "flagged").length,
+    [answers],
+  );
+
+  const blockedCount = useMemo(
+    () =>
+      answers.filter((a) => a.status === "unreviewed" || a.status === "flagged")
+        .length,
+    [answers],
+  );
+
   const value = useMemo<SessionState>(
     () => ({
       answers,
@@ -535,7 +555,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       needsAttention,
       // Counted against this run's own size, not a constant — a batch of 12
       // answers must be able to reach a reviewed state just as a batch of 40 can.
-      exportReady: answers.length > 0 && reviewedCount === answers.length,
+      exportReady: answers.length > 0 && blockedCount === 0,
+      blockedCount,
+      flaggedCount,
       isDemo,
       sessionId,
       context,
@@ -572,6 +594,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       confirmedBy,
       reviewedCount,
       needsAttention,
+      blockedCount,
+      flaggedCount,
       isDemo,
       sessionId,
       context,

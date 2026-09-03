@@ -41,6 +41,8 @@ export default function ExportPage() {
     reviewedCount,
     needsAttention,
     exportReady,
+    blockedCount,
+    flaggedCount,
     confirmed,
     setConfirmed,
     confirmedBy,
@@ -86,7 +88,10 @@ export default function ExportPage() {
     }
   }
 
-  const rows = useMemo(() => buildRows(answers, clusters), [answers, clusters]);
+  const rows = useMemo(
+    () => buildRows(answers, clusters, context.criteria),
+    [answers, clusters, context.criteria],
+  );
   const stats = useMemo(() => classStats(rows), [rows]);
 
   const topMisconceptions = useMemo(
@@ -136,7 +141,7 @@ export default function ExportPage() {
       <Page
         eyebrow="Step 7 of 7"
         title="Export is locked"
-        lead="Nothing leaves this session while a score is still unreviewed. That gate is the whole basis of the claim that a person, not the model, assigned these marks."
+        lead="Nothing leaves this session while a score is still unreviewed or flagged. That gate is the whole basis of the claim that a person, not the model, assigned these marks."
       >
         <Card className="border-warn-line bg-warn-soft">
           <div className="px-5 sm:px-8 py-7 flex flex-col sm:flex-row sm:items-center gap-5 justify-between">
@@ -146,16 +151,18 @@ export default function ExportPage() {
                 <span className="label-caps text-warn">Blocked</span>
               </div>
               <h2 className="font-display text-[22px] font-semibold">
-                {totalAnswers - reviewedCount} of {totalAnswers} rows still need you
+                {blockedCount} of {totalAnswers} rows still need you
               </h2>
               <p className="text-[14px] text-ink-2 mt-1.5 max-w-[60ch]">
-                {needsAttention > 0
-                  ? `${needsAttention} of them scored below the confidence threshold and are flagged for a mandatory look.`
-                  : "The rest are high-confidence — accepting them in bulk takes one click."}
+                {flaggedCount > 0
+                  ? `${flaggedCount} ${flaggedCount === 1 ? "row is" : "rows are"} flagged — you raised those yourself, so resolve or accept ${flaggedCount === 1 ? "it" : "them"} before exporting.`
+                  : needsAttention > 0
+                    ? `${needsAttention} of them scored below the confidence threshold and are flagged for a mandatory look.`
+                    : "The rest are high-confidence — accepting them in bulk takes one click."}
               </p>
               <div className="mt-4 max-w-sm">
                 <Progress
-                  value={(reviewedCount / totalAnswers) * 100}
+                  value={((totalAnswers - blockedCount) / totalAnswers) * 100}
                   tone="warn"
                   label="Score review progress"
                 />

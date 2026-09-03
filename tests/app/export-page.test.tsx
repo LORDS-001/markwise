@@ -6,7 +6,7 @@ import ExportPage from "@/app/export/page";
 import { AuthProvider } from "@/components/auth-provider";
 import { SessionProvider, useSession } from "@/components/session-provider";
 import { buildRows, classStats } from "@/lib/export";
-import { ANSWERS, CLUSTERS, SESSION } from "@/lib/mock";
+import { ANSWERS, CLUSTERS, CRITERIA, SESSION } from "@/lib/mock";
 
 const downloadMocks = vi.hoisted(() => ({
   downloadXlsx: vi.fn(),
@@ -271,9 +271,12 @@ it("uses native radio keyboard behavior and dispatches both formats with reviewe
     "true",
   );
 
+  // Criteria are passed the way the page passes them, so missed criteria
+  // resolve to their names rather than raw ids.
   const reviewedRows = buildRows(
     ANSWERS.map((answer) => ({ ...answer, status: "accepted" })),
     CLUSTERS,
+    CRITERIA,
   );
   const reviewedStats = classStats(reviewedRows);
   expect(downloadMocks.downloadXlsx).toHaveBeenCalledWith(reviewedRows, reviewedStats, {
