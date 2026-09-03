@@ -118,13 +118,35 @@ export async function persistRun(options: {
     throw new Error(`Could not save the answers: ${answerError?.message}`);
   }
 
-  // student_ref is unique within a batch in practice, but duplicates must not
-  // silently collapse two students into one row, so the mapping is positional
-  // with student_ref only as a cross-check.
+  /*
+   * Matched on student_ref, not on array position.
+   *
+   * PostgreSQL does not promise that INSERT ... RETURNING hands rows back in
+   * the order they were supplied, and when it does not, positional mapping
+   * gives each answer another student's row id — so every later write keyed on
+   * that id, every score and every status, lands on the wrong student with
+   * nothing on screen to show it.
+   *
+   * Duplicate refs in one batch are consumed in arrival order, which is
+   * correct for them too: two rows with the same ref are interchangeable.
+   */
+  const rowsByRef = new Map<string, string[]>();
+  for (const row of answerRows) {
+    const ref = String(row.student_ref ?? "");
+    const queue = rowsByRef.get(ref);
+    if (queue) queue.push(row.id as string);
+    else rowsByRef.set(ref, [row.id as string]);
+  }
+
   const newAnswerId = new Map<string, string>();
   result.answers.forEach((answer, index) => {
-    const row = answerRows[index];
-    if (row) newAnswerId.set(answer.id, row.id as string);
+    const queue = rowsByRef.get(answer.studentId);
+    const matched = queue?.shift();
+    // Position is the last resort, for the case where the database returned a
+    // ref we never sent. Losing the id entirely would be worse.
+    const fallback = answerRows[index]?.id as string | undefined;
+    const id = matched ?? fallback;
+    if (id) newAnswerId.set(answer.id, id);
   });
 
   const answers: StudentAnswer[] = result.answers.map((a) => ({
