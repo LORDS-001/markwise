@@ -38,7 +38,6 @@ export default function ExportPage() {
   const {
     answers,
     clusters,
-    reviewedCount,
     needsAttention,
     exportReady,
     blockedCount,

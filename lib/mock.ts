@@ -316,6 +316,15 @@ const T_CORRECT: Template[] = [
 /*  Clusters                                                           */
 /* ------------------------------------------------------------------ */
 
+/*
+ * x and y are real projections of this class's own error signatures onto the
+ * plane, produced by `npm run pipeline:demo-positions` — not decorative
+ * coordinates. Baked in so the seeded demo shows the embedding-space map
+ * (PRD §7.4) with no API key set, which is what keeps the live URL working
+ * if an environment variable goes missing.
+ *
+ * Re-run that script if the seeded signatures change.
+ */
 const CLUSTER_SPEC: Omit<Cluster, "memberIds">[] = [
   {
     id: "cl-impedance",
@@ -329,6 +338,8 @@ const CLUSTER_SPEC: Omit<Cluster, "memberIds">[] = [
       "Apparent vs. real power",
     ],
     isOther: false,
+    x: 0.9233,
+    y: 0.8912,
   },
   {
     id: "cl-arithmetic",
@@ -343,6 +354,8 @@ const CLUSTER_SPEC: Omit<Cluster, "memberIds">[] = [
       "Transmission line modelling",
     ],
     isOther: false,
+    x: 1.0,
+    y: 0.1088,
   },
   {
     id: "cl-phase",
@@ -352,6 +365,8 @@ const CLUSTER_SPEC: Omit<Cluster, "memberIds">[] = [
     severity: 4,
     downstream: ["Power factor correction", "Phasor diagrams"],
     isOther: false,
+    x: 0.0,
+    y: 0.4532,
   },
   {
     id: "cl-other",

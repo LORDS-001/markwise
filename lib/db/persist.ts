@@ -73,6 +73,8 @@ export async function persistRun(options: {
         tone: c.tone,
         is_other: c.isOther,
         rank: index,
+        plane_x: c.x ?? null,
+        plane_y: c.y ?? null,
       })),
     )
     .select("id, rank");
@@ -190,6 +192,8 @@ interface ClusterRow {
   tone: number;
   is_other: boolean;
   rank: number;
+  plane_x: number | null;
+  plane_y: number | null;
 }
 
 /** Reads a saved run back into the shape the screens consume. */
@@ -214,7 +218,9 @@ export async function loadRun(
   const [{ data: clusterRows }, { data: answerRows }] = await Promise.all([
     supabase
       .from("clusters")
-      .select("id, label, why, severity, downstream, tone, is_other, rank")
+      .select(
+        "id, label, why, severity, downstream, tone, is_other, rank, plane_x, plane_y",
+      )
       .eq("session_id", sessionId)
       .order("rank", { ascending: true }),
     supabase
@@ -257,6 +263,8 @@ export async function loadRun(
       severity: row.severity ?? 1,
       downstream: row.downstream ?? [],
       isOther: row.is_other,
+      x: row.plane_x ?? undefined,
+      y: row.plane_y ?? undefined,
     }),
   );
 

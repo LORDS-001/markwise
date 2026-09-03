@@ -20,6 +20,7 @@ import {
   agglomerativeCluster,
 } from "./cluster";
 import { initialsFor } from "./parse-answers";
+import { centroid, projectToPlane } from "./project";
 import type {
   Extraction,
   PipelineInput,
@@ -349,8 +350,16 @@ export async function runPipeline(
   const membersOf = (clusterId: string) =>
     answers.filter((a) => a.clusterId === clusterId).map((a) => a.id);
 
+  // Where each cluster sits relative to the others, so the map can place
+  // related misconceptions near each other rather than on an arbitrary grid.
+  const centroids = realGroups.map((group) =>
+    centroid(group.map((memberIndex) => vectors[memberIndex])),
+  );
+  const positions = projectToPlane(centroids.filter((c) => c.length > 0));
+
   const clusters: Cluster[] = realGroups.map((_, groupIndex) => {
     const id = `cl-${groupIndex + 1}`;
+    const position = positions[groupIndex];
     return {
       id,
       // Tones 1-6 are the categorical ramp; 0 is reserved for the Other bucket.
@@ -361,6 +370,8 @@ export async function runPipeline(
       severity: damages[groupIndex].severity,
       downstream: damages[groupIndex].downstream,
       isOther: false,
+      x: position?.x,
+      y: position?.y,
     };
   });
 

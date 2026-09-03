@@ -47,6 +47,10 @@ export default function MapPage() {
         ranked.map((cluster) => ({
           id: cluster.id,
           weight: cluster.memberIds.length,
+          // Present on a real run, so related misconceptions sit near each
+          // other; absent on the seeded class, which falls back to the grid.
+          x: cluster.x,
+          y: cluster.y,
         })),
         MAP_WIDTH,
         MAP_HEIGHT,

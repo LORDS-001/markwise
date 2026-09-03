@@ -36,6 +36,13 @@ export interface Cluster {
   severity: number;
   downstream: string[];
   isOther: boolean;
+  /**
+   * Where this cluster sits relative to the others in embedding space,
+   * projected onto the unit square — PRD §7.4, so related misconceptions
+   * render near each other. Absent when there was nothing to project from.
+   */
+  x?: number;
+  y?: number;
 }
 
 export interface ReteachPack {
