@@ -395,6 +395,25 @@ function jitter(i: number, span: number, offset = 0) {
   return ((i * 37 + offset * 13) % span) / span;
 }
 
+/**
+ * A stable, token-shaped id for the seeded class.
+ *
+ * Real tokens come from the database and are 128 bits of CSPRNG, because they
+ * are the only credential on a student's diagnostic. These are deterministic
+ * on purpose: the demo has to work with no database at all, and a link that
+ * changed on every reload could not be printed in a script or opened twice.
+ * The class behind them is pseudonymous, so there is nothing here to protect.
+ */
+function demoToken(index: number): string {
+  let hash = 0x9e3779b9 ^ (index * 0x85ebca6b);
+  let out = "";
+  for (let i = 0; i < 4; i += 1) {
+    hash = Math.imul(hash ^ (hash >>> 15), 0x2545f491) >>> 0;
+    out += hash.toString(16).padStart(8, "0");
+  }
+  return out;
+}
+
 function buildClass(): { answers: StudentAnswer[]; clusters: Cluster[] } {
   const groups: { clusterId: string | null; templates: Template[]; count: number }[] = [
     { clusterId: "cl-impedance", templates: T_IMPEDANCE, count: 15 },
@@ -439,6 +458,7 @@ function buildClass(): { answers: StudentAnswer[]; clusters: Cluster[] } {
         criteriaMissed: t.missed,
         scoreRationale: t.rationale,
         status: "unreviewed",
+        diagnosticToken: demoToken(i),
       });
 
       if (group.clusterId) {

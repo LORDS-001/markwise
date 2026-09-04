@@ -12,6 +12,7 @@ import {
   Network,
   Settings,
   Table2,
+  TrendingUp,
   User,
   Waves,
 } from "lucide-react";
@@ -31,6 +32,7 @@ export const STEPS = [
   { href: "/reveal", label: "Reveal", icon: Eye, blurb: "Your guess vs. actual" },
   { href: "/map", label: "Misconception map", icon: Network, blurb: "Clusters by spread" },
   { href: "/reteach", label: "Reteach packs", icon: BookOpen, blurb: "Lesson & diagnostic" },
+  { href: "/outcome", label: "Outcome", icon: TrendingUp, blurb: "Did it land?" },
   { href: "/scores", label: "Score review", icon: Table2, blurb: "Provisional marks" },
   { href: "/export", label: "Export", icon: Download, blurb: "xlsx & docx" },
 ] as const;

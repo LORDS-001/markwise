@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { AppNavigation } from "@/components/app-navigation";
 import { OverlayPanel } from "@/components/overlay-panel";
@@ -8,7 +9,21 @@ import { PageHeader } from "@/components/page-structure";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { TopBar } from "@/components/top-bar";
 
+/**
+ * Routes that are not part of the lecturer's session and must not be wrapped
+ * in its navigation.
+ *
+ * A student opening their diagnostic has no account and no business seeing the
+ * session's progress, its other screens, or that any of it exists — PRD v2
+ * §5 step 7. Rendering the shell around their page would put the whole
+ * lecturer interface one click away.
+ */
+function isStandaloneRoute(pathname: string): boolean {
+  return pathname.startsWith("/d/");
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const navigationTriggerRef = useRef<HTMLButtonElement>(null);
@@ -19,6 +34,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     settingsReturnRef.current = returnTarget;
     setSettingsOpen(true);
   }
+
+  if (isStandaloneRoute(pathname)) return <>{children}</>;
 
   return (
     <div className="min-h-dvh bg-ground lg:p-4">

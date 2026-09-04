@@ -23,6 +23,12 @@ export interface StudentAnswer {
   criteriaMissed: string[];
   scoreRationale: string;
   status: ReviewStatus;
+  /**
+   * Addresses this student's diagnostic and nothing else — PRD v2 §5 step 7.
+   * The only credential on that page, so it must be unguessable, not merely
+   * unique. Absent until a run is saved.
+   */
+  diagnosticToken?: string;
 }
 
 export interface Cluster {
@@ -75,6 +81,39 @@ export interface Stage {
   detail: string;
   /** Share of total wall-clock, used for the progress simulation. */
   weight: number;
+}
+
+/** Whether a diagnostic answer still shows the misconception — PRD v2 §8. */
+export type DiagnosticVerdict = "holds" | "corrected" | "unclear";
+
+/** One student's answer to one diagnostic question. */
+export interface DiagnosticResponse {
+  answerId: string;
+  questionIndex: number;
+  responseText: string;
+  /** Null until graded. Ungraded is not the same as unclear. */
+  verdict: DiagnosticVerdict | null;
+  rationale: string;
+}
+
+/**
+ * The before/after figure — PRD v2 §12's primary metric.
+ *
+ * `unclear` and `pending` are carried separately rather than folded into
+ * either side. A loop that quietly counted them as corrected would report
+ * improvement it did not measure.
+ */
+export interface LearningChange {
+  clusterId: string;
+  clusterLabel: string;
+  /** Students the run found holding this misconception. */
+  before: number;
+  /** Of those, how many have completed the diagnostic. */
+  completed: number;
+  stillHolds: number;
+  corrected: number;
+  unclear: number;
+  pending: number;
 }
 
 export type SortMode = "spread" | "damage";

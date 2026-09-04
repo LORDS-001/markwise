@@ -1,9 +1,16 @@
 "use server";
 
-import type { Cluster, ReteachPack, ReviewStatus, StudentAnswer } from "@/lib/types";
+import type {
+  Cluster,
+  DiagnosticVerdict,
+  ReteachPack,
+  ReviewStatus,
+  StudentAnswer,
+} from "@/lib/types";
 import type { PipelineInput } from "@/lib/pipeline/types";
 import { isPipelineConfigured } from "@/lib/pipeline/gemini";
 import { generateReteachPack, otherBucketPack } from "@/lib/pipeline/reteach";
+import { gradeDiagnostic } from "@/lib/pipeline/grade-diagnostic";
 import { getServerClient } from "@/lib/supabase/server";
 
 /**
@@ -255,4 +262,124 @@ export async function confirmBatchAction(params: {
     .eq("id", params.sessionId);
 
   return { ok: !error };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Steps 7 and 8 — the personalised diagnostic and its measurement    */
+/* ------------------------------------------------------------------ */
+
+export interface DiagnosticQuestion {
+  prompt: string;
+  holderAnswers: string;
+  correctedAnswers: string;
+}
+
+export type SubmitDiagnosticResult =
+  | { ok: true; verdicts: { verdict: DiagnosticVerdict; rationale: string }[] }
+  | { ok: false; error: string; graded: false };
+
+/**
+ * Records a student's answers and grades them against the misconception.
+ *
+ * The lesson and questions come from the client because the seeded demo class
+ * has no database behind it, and the demo has to work with no environment at
+ * all. For a saved run the token is also written to Supabase through a
+ * SECURITY DEFINER function, which is what keeps one student's submission from
+ * ever touching another's row (PRD v2 §5 step 7).
+ */
+export async function submitDiagnosticAction(params: {
+  token: string;
+  misconception: string;
+  questions: DiagnosticQuestion[];
+  responses: string[];
+}): Promise<SubmitDiagnosticResult> {
+  const { token, misconception, questions, responses } = params;
+
+  if (!token.trim()) {
+    return { ok: false, graded: false, error: "This link is missing its code." };
+  }
+
+  // Recorded before grading. A student who answered has answered, whether or
+  // not the grader was available — losing their work to a quota error would
+  // be unrecoverable, since they cannot be asked to sit it twice.
+  try {
+    const supabase = await client();
+    if (supabase) {
+      await Promise.all(
+        responses.map((text, index) =>
+          supabase.rpc("submit_diagnostic_response", {
+            token,
+            question_index: index,
+            response_text: text,
+          }),
+        ),
+      );
+    }
+  } catch {
+    // The client keeps the responses either way.
+  }
+
+  if (!isPipelineConfigured()) {
+    return {
+      ok: false,
+      graded: false,
+      error:
+        "Your answers were recorded. They could not be marked automatically yet.",
+    };
+  }
+
+  try {
+    const graded = await gradeDiagnostic({ misconception, questions, responses });
+    return { ok: true, verdicts: graded };
+  } catch (error) {
+    return {
+      ok: false,
+      graded: false,
+      error:
+        error instanceof Error
+          ? `Your answers were recorded, but marking failed: ${error.message}`
+          : "Your answers were recorded, but marking failed.",
+    };
+  }
+}
+
+/** Reads one student's diagnostic from a saved run, and nothing else. */
+export async function diagnosticForTokenAction(token: string): Promise<{
+  clusterLabel: string;
+  clusterWhy: string;
+  lesson: { heading: string; body: string }[];
+  diagnostics: DiagnosticQuestion[];
+  alreadyDone: boolean;
+} | null> {
+  const supabase = await client();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase.rpc("diagnostic_for_token", { token });
+  if (error || !data || data.length === 0) return null;
+
+  const row = data[0] as {
+    cluster_label: string;
+    cluster_why: string | null;
+    lesson: { heading: string; body: string }[] | null;
+    diagnostics: {
+      prompt: string;
+      holderAnswers?: string;
+      corrected_answers?: string;
+      correctedAnswers?: string;
+      holder_answers?: string;
+    }[] | null;
+    already_done: boolean;
+  };
+
+  return {
+    clusterLabel: row.cluster_label,
+    clusterWhy: row.cluster_why ?? "",
+    lesson: row.lesson ?? [],
+    diagnostics: (row.diagnostics ?? []).map((d) => ({
+      prompt: d.prompt,
+      holderAnswers: d.holderAnswers ?? d.holder_answers ?? "",
+      correctedAnswers: d.correctedAnswers ?? d.corrected_answers ?? "",
+    })),
+    alreadyDone: row.already_done,
+  };
 }

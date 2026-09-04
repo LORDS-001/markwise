@@ -228,11 +228,14 @@ ACTUAL STUDENT WORK SHOWING IT:
 ${evidence.map((e, i) => `${i + 1}. "${e}"`).join("\n")}
 
 Write a five-minute micro-lesson a lecturer can deliver at the start of the next
-class, as 3 or 4 sections. The sections must, in order:
+class, as exactly 5 sections. The sections must, in order:
 1. Name the false belief out loud, so students recognise it as theirs.
 2. Show why it is intuitive — grant that it is a reasonable thing to think.
-3. Show exactly where it breaks, using this question's own numbers.
-4. State the correct principle in one memorable line.
+3. Give an ANALOGY from outside this subject that makes the correct idea
+   obvious. It must break where the belief breaks, not merely decorate.
+4. Work through a WORKED EXAMPLE using this question's own numbers, line by
+   line, showing the step where the belief leads the student astray.
+5. State the correct principle in one memorable line.
 
 Each section: a short heading, and a body of 2-4 sentences the lecturer could
 read aloud. No bullet points inside the body. No preamble about the lesson.
@@ -275,3 +278,63 @@ export const RETEACH_SCHEMA = {
   },
   required: ["lesson", "diagnostics"],
 } as const;
+
+/* ------------------------------------------------------------------ */
+/*  Step 8 — grading the diagnostic                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Judges a student's free-text answers against the misconception itself.
+ *
+ * Both questions go in one call. Forty students marking two questions each is
+ * eighty calls if graded singly, and the pair share all their context anyway.
+ *
+ * The rubric is not "is this right" — it is "does this answer still show the
+ * belief". Those come apart: a student can reach a wrong number while
+ * reasoning correctly about the belief, and a student can guess the right
+ * number while still holding it. The before/after figure in PRD v2 §12
+ * measures the belief, so that is what gets judged.
+ */
+export function diagnosticGradingPrompt(
+  misconception: string,
+  questions: {
+    prompt: string;
+    holderAnswers: string;
+    correctedAnswers: string;
+  }[],
+  responses: string[],
+): string {
+  const blocks = questions
+    .map((q, i) => {
+      return `QUESTION ${i + 1}: ${q.prompt}
+
+A student who STILL HOLDS the misconception answers along these lines:
+${q.holderAnswers}
+
+A student who has CORRECTED it answers along these lines:
+${q.correctedAnswers}
+
+THIS STUDENT ANSWERED:
+"""
+${responses[i] ?? "(no answer given)"}
+"""`;
+    })
+    .join("\n\n---\n\n");
+
+  return `MISCONCEPTION BEING TESTED: ${misconception}
+
+${blocks}
+
+For each question, decide whether this student's answer still shows the
+misconception.
+
+- "holds" — the answer reflects the false belief, whatever else is right about it.
+- "corrected" — the answer reflects the corrected understanding, even if the
+  arithmetic or the wording is poor. You are marking the belief, not the sum.
+- "unclear" — the answer is blank, off-topic, or too thin to tell. Use this
+  honestly and often. A guess recorded as "corrected" becomes improvement the
+  lecturer never actually achieved, in the one number this whole exercise
+  produces.
+
+Give a one-sentence reason for each, quoting the phrase that decided it.`;
+}
