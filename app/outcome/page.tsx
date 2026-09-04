@@ -24,8 +24,9 @@ import type { DiagnosticResponse } from "@/lib/types";
  * than no figure at all.
  */
 export default function OutcomePage() {
-  const { clusters, answers, processed } = useSession();
-  const [responses, setResponses] = useState<DiagnosticResponse[]>([]);
+  const { clusters, answers, processed, sessionId } = useSession();
+  const [local, setLocal] = useState<DiagnosticResponse[]>([]);
+  const [remote, setRemote] = useState<DiagnosticResponse[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
 
   /*
@@ -39,9 +40,54 @@ export default function OutcomePage() {
    */
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setResponses(readDiagnosticResponses());
-    return subscribeToDiagnostics(() => setResponses(readDiagnosticResponses()));
+    setLocal(readDiagnosticResponses());
+    return subscribeToDiagnostics(() => setLocal(readDiagnosticResponses()));
   }, []);
+
+  /*
+   * A student answers on their own device, so their response reaches the
+   * database and never this browser's storage. Reading only local storage
+   * would show a lecturer nothing at all for a real class — the one case the
+   * loop exists for.
+   */
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+
+    void import("@/app/actions")
+      .then((actions) => actions.diagnosticResponsesForSessionAction(sessionId))
+      .then((rows) => {
+        if (!cancelled) setRemote(rows);
+      })
+      .catch(() => {
+        // The local copy still stands; nothing here is worth interrupting for.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
+  /*
+   * The saved copy wins where both exist. A response can be recorded in the
+   * database before its verdict is, so the same submission can appear graded
+   * here and ungraded there — but the database is the copy that outlives the
+   * browser, and the one every other device agrees on.
+   */
+  const responses = useMemo(() => {
+    const key = (r: DiagnosticResponse) => `${r.answerId}#${r.questionIndex}`;
+    const merged = new Map(local.map((r) => [key(r), r]));
+    for (const row of remote) {
+      const existing = merged.get(key(row));
+      // Keep a local verdict only when the saved row has none yet.
+      merged.set(key(row), {
+        ...row,
+        verdict: row.verdict ?? existing?.verdict ?? null,
+        rationale: row.rationale || (existing?.rationale ?? ""),
+      });
+    }
+    return [...merged.values()];
+  }, [local, remote]);
 
   const changes = useMemo(
     () => learningChange(clusters, answers, responses),

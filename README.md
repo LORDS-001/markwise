@@ -1,37 +1,69 @@
 # Markwise
 
-Mark the scripts. See what the class got wrong.
+See what your class misunderstood. Fix it. Measure the change.
 
-A marking assistant for lecturers. Upload a batch of answers to one question;
-Markwise extracts the false belief behind each mistake, clusters those beliefs,
-and ranks the misconceptions actually spreading through the class. Provisional
-scores fall out of the same pass as a byproduct.
+A learning-intelligence tool for lecturers. Upload a batch of answers to one
+question; Markwise extracts the false belief behind each mistake, clusters
+those beliefs, ranks the misconceptions actually spreading through the class,
+writes a targeted reteach lesson, sends each affected student a diagnostic
+built against their own misconception, and then reports whether the belief
+survived.
+
+The loop is the product: **before → intervention → after**. Provisional scores
+fall out of the same pass as a byproduct, and stay secondary to the diagnosis.
 
 ## Status
 
-All eight screens, the model pipeline, and Supabase persistence are wired.
+All ten lecturer screens, the student diagnostic, the model pipeline, and
+Supabase persistence are wired.
 
 With no `GEMINI_API_KEY` the app runs on the seeded demo class alone, so the
 deployed demo cannot be taken down by a missing variable. With a key, Run the
 pipeline marks a real batch: extraction, embedding, agglomerative clustering,
 labelling, and prerequisite damage ranking, with live stage progress.
 
-Reteach packs are generated per cluster on request. Handwritten-script OCR is
-still not supported — typed and CSV input are the guaranteed path.
+Reteach packs are generated per cluster on request, and each affected student
+gets an unguessable link to a diagnostic built from that pack. The outcome
+screen reports how many still hold the belief afterwards.
+
+That figure is deliberately conservative: students who did not answer count as
+pending rather than corrected, an answer too thin to judge counts as unclear,
+and the share still holding the belief is measured against answers that were
+actually decided. Dividing by absentees would show a misconception collapsing
+because people did not turn up.
+
+Handwritten-script OCR is still not supported — typed and CSV input are the
+guaranteed path.
 
 ## Screens
 
 | Route              | Screen                                            |
 | ------------------ | ------------------------------------------------- |
 | `/`                | Setup — question, scheme, answers, prediction      |
-| `/processing`      | Staged run with real stage names                   |
+| `/processing`      | Live run with real stage names                     |
 | `/reveal`          | Prediction beside the actual top cluster           |
-| `/map`             | Bubble map, sortable by spread or damage           |
+| `/map`             | Bubble map, positioned by embedding proximity      |
 | `/clusters/[id]`   | Evidence, roster, rename / merge / split / reject  |
 | `/reteach`         | Cluster picker                                     |
 | `/reteach/[id]`    | Micro-lesson and two-question diagnostic           |
+| `/outcome`         | Before and after — did the reteach land?           |
 | `/scores`          | Dense review table, inline edit, export gate       |
 | `/export`          | Format, preview, confirm, download                 |
+| `/d/[token]`       | A student's own diagnostic. Not part of the shell  |
+
+## The student's page
+
+`/d/<token>` is the only route a student ever sees, and it shows one thing:
+their own misconception, the lesson written against it, and the two questions
+that test it. No navigation, no session, nobody else's work.
+
+The rule is enforced in Postgres, not in the interface. A student has no
+account and therefore no `auth.uid()`, so row level security cannot express
+"your own row" for them; two `SECURITY DEFINER` functions do it instead, each
+scoped to one token. There is no code path from a token to another student.
+
+Answers are recorded before they are graded. A student cannot be asked to sit
+the diagnostic twice, so a grader outage must not cost them the attempt.
 
 ## Stack
 
@@ -77,7 +109,9 @@ To connect it:
 
 1. Create a project at supabase.com, then copy `.env.example` to `.env.local`
    and fill in the URL and anon key from Project settings → API.
-2. Run the migrations in `supabase/migrations/` in order, in the SQL editor.
+2. Run every migration in `supabase/migrations/` in order, in the SQL editor.
+   `0004` and `0005` add the student diagnostic and its grading, including the
+   two token-scoped functions that keep one student's page off another's data.
 3. Enable anonymous sign-ins: Authentication → Sign In / Up → Anonymous.
 
 Once the app is live, schedule `public.prune_abandoned_anonymous_users()` —

@@ -2,6 +2,7 @@
 
 import type {
   Cluster,
+  DiagnosticResponse,
   DiagnosticVerdict,
   ReteachPack,
   ReviewStatus,
@@ -330,6 +331,28 @@ export async function submitDiagnosticAction(params: {
 
   try {
     const graded = await gradeDiagnostic({ misconception, questions, responses });
+
+    // Written back so the lecturer's outcome screen sees a grade rather than
+    // a page of unclear verdicts. Best effort: the student already has their
+    // result, and the response itself is safely recorded either way.
+    try {
+      const supabase = await client();
+      if (supabase) {
+        await Promise.all(
+          graded.map((entry, index) =>
+            supabase.rpc("grade_diagnostic_response", {
+              token,
+              question_index: index,
+              verdict: entry.verdict,
+              rationale: entry.rationale,
+            }),
+          ),
+        );
+      }
+    } catch {
+      // The local copy still carries the verdict for this browser.
+    }
+
     return { ok: true, verdicts: graded };
   } catch (error) {
     return {
@@ -382,4 +405,35 @@ export async function diagnosticForTokenAction(token: string): Promise<{
     })),
     alreadyDone: row.already_done,
   };
+}
+
+/**
+ * Every diagnostic response for one session, for the outcome screen.
+ *
+ * Read through the ordinary row level security policy rather than a
+ * SECURITY DEFINER function: this one is called by the lecturer, who has an
+ * account, so the policy already expresses "sessions I own" exactly.
+ */
+export async function diagnosticResponsesForSessionAction(
+  sessionId: string,
+): Promise<DiagnosticResponse[]> {
+  if (!isPersistedId(sessionId)) return [];
+
+  const supabase = await client();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("diagnostic_responses")
+    .select("answer_id, question_index, response_text, verdict, rationale, answers!inner(session_id)")
+    .eq("answers.session_id", sessionId);
+
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    answerId: row.answer_id as string,
+    questionIndex: row.question_index as number,
+    responseText: (row.response_text as string) ?? "",
+    verdict: (row.verdict as DiagnosticResponse["verdict"]) ?? null,
+    rationale: (row.rationale as string) ?? "",
+  }));
 }
