@@ -7,7 +7,7 @@
  * would cost 40 model calls per candidate value.
  *
  *   npm run pipeline:tune                     # authored signatures, as a floor
- *   npm run pipeline:tune -- --json run.json  # a real run dumped by `pipeline`
+ *   npm run pipeline:tune -- --json run.json --labels human-labels.json
  *
  * Scored against the known grouping with pairwise precision/recall: of every
  * pair of answers the threshold puts together, how many genuinely share a
@@ -20,6 +20,7 @@ import { readFile } from "node:fs/promises";
 import { ANSWERS } from "@/lib/mock";
 import { agglomerativeCluster } from "@/lib/pipeline/cluster";
 import { EMBEDDING_MODEL, embedTexts, isPipelineConfigured } from "@/lib/pipeline/gemini";
+import { samplesFromExport, type TuningSample } from "@/lib/pipeline/tuning";
 
 const ESC = "\x1b";
 const BOLD = `${ESC}[1m`;
@@ -32,30 +33,28 @@ function arg(name: string): string | null {
   return index !== -1 ? (process.argv[index + 1] ?? null) : null;
 }
 
-interface Sample {
-  signature: string;
-  /** The group this answer truly belongs to, used only for scoring. */
-  truth: string;
-}
+type Sample = TuningSample;
 
 async function loadSamples(): Promise<{ samples: Sample[]; source: string }> {
   const jsonPath = arg("json");
 
   if (jsonPath) {
-    const raw = JSON.parse(await readFile(jsonPath, "utf8")) as {
-      answers: {
-        errorSignature: string | null;
-        clusterId: string | null;
-        isCorrect: boolean;
-      }[];
+    const labelsPath = arg("labels");
+    if (!labelsPath) {
+      throw new Error(
+        "Exported runs require --labels with independently assigned human groups.",
+      );
+    }
+    const raw = JSON.parse(await readFile(jsonPath, "utf8")) as unknown;
+    const labels = JSON.parse(await readFile(labelsPath, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    const samples = samplesFromExport(raw, labels);
+    return {
+      samples,
+      source: `${jsonPath} (signatures) + ${labelsPath} (human truth)`,
     };
-    const samples = raw.answers
-      .filter((a) => !a.isCorrect && a.errorSignature)
-      .map((a) => ({
-        signature: a.errorSignature!,
-        truth: a.clusterId ?? "unknown",
-      }));
-    return { samples, source: `${jsonPath} (model-written signatures)` };
   }
 
   const samples = ANSWERS.filter((a) => !a.isCorrect && a.errorSignature).map(

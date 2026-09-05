@@ -14,12 +14,12 @@ fall out of the same pass as a byproduct, and stay secondary to the diagnosis.
 
 ## Status
 
-All ten lecturer screens, the student diagnostic, the model pipeline, and
-Supabase persistence are wired.
+The lecturer workflow, saved-session history, student diagnostic, model
+pipeline, and Supabase persistence are implemented.
 
 With no `GEMINI_API_KEY` the app runs on the seeded demo class alone, so the
-deployed demo cannot be taken down by a missing variable. With a key, Run the
-pipeline marks a real batch: extraction, embedding, agglomerative clustering,
+deployed demo remains available without credentials. With Gemini and secure
+Supabase persistence configured, Run the pipeline marks a real batch: extraction, embedding, agglomerative clustering,
 labelling, and prerequisite damage ranking, with live stage progress.
 
 Reteach packs are generated per cluster on request, and each affected student
@@ -49,6 +49,7 @@ guaranteed path.
 | `/outcome`         | Before and after — did the reteach land?           |
 | `/scores`          | Dense review table, inline edit, export gate       |
 | `/export`          | Format, preview, confirm, download                 |
+| `/sessions`        | Recover a saved batch from the current account    |
 | `/d/[token]`       | A student's own diagnostic. Not part of the shell  |
 
 ## The student's page
@@ -57,13 +58,16 @@ guaranteed path.
 their own misconception, the lesson written against it, and the two questions
 that test it. No navigation, no session, nobody else's work.
 
-The rule is enforced in Postgres, not in the interface. A student has no
-account and therefore no `auth.uid()`, so row level security cannot express
-"your own row" for them; two `SECURITY DEFINER` functions do it instead, each
-scoped to one token. There is no code path from a token to another student.
+Student lookup is scoped to an unguessable token and returns question prompts,
+the lesson, and that student's recorded result. Expected answers stay on the
+server. Only the server's service-role client can record an attempt or write
+a verdict; the public database roles cannot grade themselves.
 
-Answers are recorded before they are graded. A student cannot be asked to sit
-the diagnostic twice, so a grader outage must not cost them the attempt.
+Both responses and the trusted rubric are saved in one transaction before
+grading. A grader outage leaves the attempt available for a marking retry,
+using the original text rather than asking the student to submit again.
+Saved outcomes are read from the database. The credential-free sample uses
+browser storage and does not call Gemini or claim automatic grading.
 
 ## Stack
 
@@ -108,10 +112,13 @@ class alone, so a missing env var can never take the deployed demo down.
 To connect it:
 
 1. Create a project at supabase.com, then copy `.env.example` to `.env.local`
-   and fill in the URL and anon key from Project settings → API.
+   and fill in the URL and anon key from Project settings → API. Add
+   `SUPABASE_SERVICE_ROLE_KEY` for server-authoritative grading and AI budgets.
+   Keep this key server-side; never use a `NEXT_PUBLIC_` prefix for it.
 2. Run every migration in `supabase/migrations/` in order, in the SQL editor.
-   `0004` and `0005` add the student diagnostic and its grading, including the
-   two token-scoped functions that keep one student's page off another's data.
+   Existing installations through `0005` need `0006`, `0007`, and `0008`:
+   these secure diagnostics, make run saves atomic, and enforce AI budgets.
+   For a new empty project, `supabase/setup.sql` contains the full sequence.
 3. Enable anonymous sign-ins: Authentication → Sign In / Up → Anonymous.
 
 Once the app is live, schedule `public.prune_abandoned_anonymous_users()` —
@@ -123,6 +130,35 @@ It only removes anonymous users with no sessions attached.
 Add `GEMINI_API_KEY` to `.env.local` (aistudio.google.com/apikey). Without it
 the app stays on the demo class and the run endpoint returns 503 rather than
 failing halfway.
+
+Live web operations also require the Supabase URL, anon key, service-role key,
+all migrations, and a verified account session. Anonymous Supabase accounts
+qualify, so this does not add a signup form. Missing security configuration
+disables paid web calls while leaving the sample class available.
+
+The run endpoint accepts 2–100 answers, at most 10,000 characters per answer,
+whole positive criterion marks, and at most 1 MiB for the request. It bounds processing time and reports
+degraded clustering explicitly. Student identifiers are replaced with
+correlation labels in model prompts; answer text itself is sent to Gemini.
+
+Daily limits are enforced atomically in Postgres, across server processes:
+3 runs and 12 reteach generations per account, and 2 grading attempts per
+student token. Service-wide limits are 60 runs, 240 reteach generations, and
+600 diagnostic grading attempts per UTC day. Change the constants in a new
+migration when intentionally changing these budgets. `GEMINI_RPM` separately
+paces provider requests within each process. The run has a 270-second deadline,
+with batch admission checked against configured RPM before consuming AI quota.
+The default 15 RPM admits the 40-answer class; batches of 50 or more require
+splitting or a higher RPM supported by your provider quota. Label and damage
+assessment share one model call per cluster. A slow provider can still exceed
+the deadline and reports a recoverable error.
+
+Setup shows a local sample preview when secure live configuration is absent.
+Configured deployments label the live action explicitly and explain what is
+sent to Gemini. If saving a completed analysis fails, **Retry save** stores the
+existing result without another model run. Pending or failed edits remain
+marked unsaved across refresh; saved-session recovery offers an explicit way
+to discard local edits and reopen the database copy.
 
 `npm run pipeline` runs the whole thing as a bare console script with no UI,
 which is how the extraction prompt and the distance threshold get tuned:
@@ -142,3 +178,21 @@ threshold — descriptions will not cluster no matter what the threshold is.
 
 The seeded class is 40 answers to one EEE 301 question. Names are replaced with
 initials and student numbers are invented.
+
+## Verification
+
+```bash
+npm run test:run
+npm run typecheck
+npm run lint
+npm run build
+```
+
+The suite includes an in-memory PostgreSQL harness for migrations, permissions,
+atomic batch saves, diagnostic attempts, and quotas. It does not connect to a
+Supabase project. The harness substitutes an array for the unused pgvector
+storage column; pgvector itself and hosted Supabase/PostgREST behavior need
+deployment checks. Function permission tests include
+[Supabase's default role grants](https://supabase.com/docs/guides/database/functions#function-privileges).
+Vitest uses one worker thread to avoid Windows fork-startup failures and
+memory contention in the UI tests.

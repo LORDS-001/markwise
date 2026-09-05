@@ -6,6 +6,15 @@ import type {
   StudentAnswer,
 } from "./types";
 
+/** Saved outcomes trust the database; browser storage belongs to demo only. */
+export function responsesForOutcome(
+  isDemo: boolean,
+  local: DiagnosticResponse[],
+  remote: DiagnosticResponse[],
+): DiagnosticResponse[] {
+  return isDemo ? local : remote;
+}
+
 /**
  * The before/after figure — PRD v2 §12's primary metric.
  *
@@ -25,8 +34,10 @@ import type {
 export function verdictForStudent(
   verdicts: (DiagnosticVerdict | null)[],
 ): DiagnosticVerdict | null {
-  const graded = verdicts.filter((v): v is DiagnosticVerdict => v !== null);
-  if (graded.length === 0) return null;
+  if (verdicts.length !== 2 || verdicts.some((verdict) => verdict === null)) {
+    return null;
+  }
+  const graded = verdicts as DiagnosticVerdict[];
   if (graded.includes("holds")) return "holds";
   if (graded.every((v) => v === "corrected")) return "corrected";
   return "unclear";

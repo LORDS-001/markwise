@@ -1,73 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { persistRun } from "@/lib/db/persist";
+import { loadRun, persistRun } from "@/lib/db/persist";
 import type { PipelineInput, PipelineResult } from "@/lib/pipeline/types";
 import type { Cluster, StudentAnswer } from "@/lib/types";
 
-/**
- * A Supabase stand-in that records what it was asked to write and replays
- * chosen rows back.
- *
- * `reverseAnswerRows` exists because PostgreSQL does not promise that
- * INSERT ... RETURNING hands rows back in the order they were supplied.
- * Persisting a run has to survive that, and a test that always replays rows in
- * order would never notice it does not.
- */
-function fakeSupabase(options: { reverseAnswerRows?: boolean } = {}) {
-  const inserted: Record<string, unknown[]> = {};
-
-  const uuid = (table: string, index: number) =>
-    `${index.toString(16).padStart(8, "0")}-0000-4000-8000-${table
-      .slice(0, 12)
-      .padEnd(12, "0")}`;
-
-  const client = {
-    from(table: string) {
-      return {
-        insert(rows: unknown) {
-          const list = Array.isArray(rows) ? rows : [rows];
-          inserted[table] = [...(inserted[table] ?? []), ...list];
-
-          const built = list.map((row, index) => {
-            const source = row as Record<string, unknown>;
-            return {
-              // Encodes the student so a test can tell whose row came back,
-              // and stays unique per row so two answers sharing a student ref
-              // still get distinct ids — as a real database would give them.
-              id:
-                table === "answers"
-                  ? `row-${String(source.student_ref)}#${index}`
-                  : uuid(table, index),
-              rank: source.rank,
-              student_ref: source.student_ref,
-            };
-          });
-
-          const data =
-            table === "answers" && options.reverseAnswerRows
-              ? [...built].reverse()
-              : built;
-
-          return {
-            select() {
-              // Multi-row inserts await the builder directly; single-row
-              // inserts call .single() on it. A real promise with the method
-              // attached satisfies both without reimplementing thenables.
-              const pending = Promise.resolve({ data, error: null });
-              return Object.assign(pending, {
-                single: async () => ({ data: data[0], error: null }),
-              });
-            },
-          };
-        },
-      };
-    },
-  };
-
-  return { client: client as unknown as SupabaseClient, inserted };
-}
-
-const INPUT: Omit<PipelineInput, "answers"> & { answers: [] } = {
+const INPUT: PipelineInput = {
   question: "A series RL circuit…",
   scheme: "Full marks require…",
   criteria: [{ id: "c-1", label: "Reactance included", marks: 2 }],
@@ -81,7 +18,7 @@ function answer(id: string, studentId: string, clusterId: string | null): Studen
     id,
     studentId,
     initials: "AB",
-    answer: `answer from ${studentId}`,
+    answer: `answer ${id}`,
     isCorrect: clusterId === null,
     clusterId,
     errorSignature: clusterId ? "believes X" : null,
@@ -96,163 +33,288 @@ function answer(id: string, studentId: string, clusterId: string | null): Studen
   };
 }
 
-function cluster(id: string, memberIds: string[]): Cluster {
+function cluster(id: string, memberIds: string[], isOther = false): Cluster {
   return {
     id,
-    tone: 1,
-    label: `Cluster ${id}`,
+    tone: isOther ? 6 : 1,
+    label: isOther ? "Other" : `Cluster ${id}`,
     why: "",
     memberIds,
     severity: 3,
     downstream: [],
-    isOther: false,
+    isOther,
   };
 }
 
 const RESULT: PipelineResult = {
   answers: [
     answer("a-01", "EEE/1", "cl-1"),
-    answer("a-02", "EEE/2", "cl-1"),
-    answer("a-03", "EEE/3", "cl-2"),
+    answer("a-02", "EEE/1", "cl-1"),
+    answer("a-03", "EEE/3", "cl-other"),
   ],
-  clusters: [cluster("cl-1", ["a-01", "a-02"]), cluster("cl-2", ["a-03"])],
+  clusters: [
+    cluster("cl-1", ["a-01", "a-02"]),
+    cluster("cl-other", ["a-03"], true),
+  ],
   reteachPacks: {},
   maxScore: 10,
 };
 
+type AtomicArgs = {
+  p_input: Record<string, unknown>;
+  p_clusters: Array<Record<string, unknown>>;
+  p_answers: Array<Record<string, unknown>>;
+  p_reteach_packs: Array<Record<string, unknown>>;
+  p_prediction: string | null;
+  p_course_code: string;
+  p_course_title: string;
+};
+
+function atomicClient(
+  respond?: (args: AtomicArgs) => { data: unknown; error: { message: string } | null },
+) {
+  const calls: Array<{ name: string; args: AtomicArgs }> = [];
+  const client = {
+    async rpc(name: string, args: AtomicArgs) {
+      calls.push({ name, args });
+      if (respond) return respond(args);
+
+      return {
+        data: {
+          session_id: "10000000-0000-4000-8000-000000000001",
+          cluster_rows: [...args.p_clusters].reverse().map((row, index) => ({
+            client_ref: row.client_ref,
+            id: `20000000-0000-4000-8000-00000000000${index}`,
+          })),
+          answer_rows: [...args.p_answers].reverse().map((row, index) => ({
+            client_ref: row.client_ref,
+            id: `30000000-0000-4000-8000-00000000000${index}`,
+            diagnostic_token: `token-${String(row.client_ref)}`,
+          })),
+        },
+        error: null,
+      };
+    },
+  };
+  return { client: client as unknown as SupabaseClient, calls };
+}
+
 describe("persistRun", () => {
-  it("re-keys answers and clusters to the row ids", async () => {
-    const { client } = fakeSupabase();
-    const { result } = await persistRun({
-      supabase: client,
-      ownerId: "owner-1",
-      input: INPUT as PipelineInput,
-      result: RESULT,
-      prediction: null,
-    });
+  it("persists the complete run in one atomic RPC", async () => {
+    const { client, calls } = atomicClient();
 
-    for (const a of result.answers) {
-      expect(a.id).toMatch(/^row-EEE\/\d#\d$/);
-      expect(a.id.startsWith(`row-${a.studentId}#`)).toBe(true);
-    }
-    for (const c of result.clusters) {
-      expect(c.id).toMatch(/^[0-9a-f]{8}-0000-4000-8000-/);
-    }
-  });
-
-  it("keeps every answer pointing at the cluster it was in", async () => {
-    const { client } = fakeSupabase();
-    const { result } = await persistRun({
-      supabase: client,
-      ownerId: "owner-1",
-      input: INPUT as PipelineInput,
-      result: RESULT,
-      prediction: null,
-    });
-
-    const idOf = (studentId: string) =>
-      result.answers.find((a) => a.studentId === studentId)!.clusterId;
-
-    // The first two shared a cluster and must still share one; the third was
-    // on its own and must not have joined them.
-    expect(idOf("EEE/1")).toBe(idOf("EEE/2"));
-    expect(idOf("EEE/3")).not.toBe(idOf("EEE/1"));
-  });
-
-  it("keeps cluster membership consistent with the answers", async () => {
-    const { client } = fakeSupabase();
-    const { result } = await persistRun({
-      supabase: client,
-      ownerId: "owner-1",
-      input: INPUT as PipelineInput,
-      result: RESULT,
-      prediction: null,
-    });
-
-    for (const c of result.clusters) {
-      for (const memberId of c.memberIds) {
-        const member = result.answers.find((a) => a.id === memberId);
-        expect(member, `member ${memberId} missing from answers`).toBeDefined();
-        expect(member!.clusterId).toBe(c.id);
-      }
-    }
-  });
-
-  it("survives the database returning inserted rows out of order", async () => {
-    // Positional mapping silently pairs each answer with another student's
-    // row: scores save against the wrong student and answers join the wrong
-    // cluster, with nothing on screen to show it happened.
-    const { client } = fakeSupabase({ reverseAnswerRows: true });
-    const { result } = await persistRun({
-      supabase: client,
-      ownerId: "owner-1",
-      input: INPUT as PipelineInput,
-      result: RESULT,
-      prediction: null,
-    });
-
-    // The decisive check: each answer must carry ITS OWN row. Positional
-    // mapping hands EEE/1 the row holding EEE/3's work, so every later write
-    // keyed on that id — every score, every status — lands on the wrong
-    // student, silently.
-    for (const a of result.answers) {
-      expect(
-        a.id.startsWith(`row-${a.studentId}#`),
-        `${a.studentId} is carrying another student's row (${a.id})`,
-      ).toBe(true);
-    }
-
-    const idOf = (studentId: string) =>
-      result.answers.find((a) => a.studentId === studentId)!.clusterId;
-    expect(idOf("EEE/1")).toBe(idOf("EEE/2"));
-    expect(idOf("EEE/3")).not.toBe(idOf("EEE/1"));
-
-    for (const c of result.clusters) {
-      for (const memberId of c.memberIds) {
-        expect(result.answers.find((a) => a.id === memberId)).toBeDefined();
-      }
-    }
-  });
-
-  it("gives two answers sharing a student ref distinct rows", async () => {
-    // A CSV can carry the same identifier twice. Matching on ref must not
-    // collapse both answers onto one row and lose a student's work.
-    const duplicated: PipelineResult = {
-      ...RESULT,
-      answers: [
-        answer("a-01", "EEE/1", "cl-1"),
-        answer("a-02", "EEE/1", "cl-1"),
-        answer("a-03", "EEE/3", "cl-2"),
-      ],
-      clusters: [cluster("cl-1", ["a-01", "a-02"]), cluster("cl-2", ["a-03"])],
-    };
-
-    const { client } = fakeSupabase();
-    const { result } = await persistRun({
-      supabase: client,
-      ownerId: "owner-1",
-      input: INPUT as PipelineInput,
-      result: duplicated,
-      prediction: null,
-    });
-
-    const ids = result.answers.map((a) => a.id);
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-
-  it("writes the answer rows with their own student refs", async () => {
-    const { client, inserted } = fakeSupabase();
     await persistRun({
       supabase: client,
+      ownerId: "caller-supplied-owner-is-not-trusted",
+      input: INPUT,
+      result: RESULT,
+      prediction: "They will omit reactance",
+      courseCode: "EEE 301",
+      courseTitle: "Circuit Theory",
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].name).toBe("persist_run_atomic");
+    expect(calls[0].args).toMatchObject({
+      p_prediction: "They will omit reactance",
+      p_course_code: "EEE 301",
+      p_course_title: "Circuit Theory",
+    });
+    expect(calls[0].args).not.toHaveProperty("owner_id");
+    expect(calls[0].args.p_answers).toHaveLength(3);
+    expect(calls[0].args.p_clusters).toHaveLength(2);
+  });
+
+  it("uses per-answer correlation ids when duplicate refs return out of order", async () => {
+    const { client } = atomicClient();
+
+    const { result } = await persistRun({
+      supabase: client,
       ownerId: "owner-1",
-      input: INPUT as PipelineInput,
+      input: INPUT,
       result: RESULT,
       prediction: null,
     });
 
-    const refs = (inserted.answers as { student_ref: string }[]).map(
-      (r) => r.student_ref,
+    expect(new Set(result.answers.map((item) => item.id)).size).toBe(3);
+    expect(result.answers.every((item) => item.diagnosticToken?.startsWith("token-"))).toBe(true);
+    for (const savedCluster of result.clusters) {
+      for (const memberId of savedCluster.memberIds) {
+        const member = result.answers.find((item) => item.id === memberId);
+        expect(member?.clusterId).toBe(savedCluster.id);
+      }
+    }
+  });
+
+  it("refuses to report a saved run when an answer token is missing", async () => {
+    const { client } = atomicClient((args) => ({
+      data: {
+        session_id: "10000000-0000-4000-8000-000000000001",
+        cluster_rows: args.p_clusters.map((row) => ({
+          client_ref: row.client_ref,
+          id: crypto.randomUUID(),
+        })),
+        answer_rows: args.p_answers.map((row, index) => ({
+          client_ref: row.client_ref,
+          id: crypto.randomUUID(),
+          diagnostic_token: index === 1 ? null : `token-${index}`,
+        })),
+      },
+      error: null,
+    }));
+
+    await expect(
+      persistRun({
+        supabase: client,
+        ownerId: "owner-1",
+        input: INPUT,
+        result: RESULT,
+        prediction: null,
+      }),
+    ).rejects.toThrow("diagnostic token");
+  });
+
+  it("surfaces an atomic save failure without falling back to partial inserts", async () => {
+    const { client, calls } = atomicClient(() => ({
+      data: null,
+      error: { message: "answer constraint failed" },
+    }));
+
+    await expect(
+      persistRun({
+        supabase: client,
+        ownerId: "owner-1",
+        input: INPUT,
+        result: RESULT,
+        prediction: null,
+      }),
+    ).rejects.toThrow("answer constraint failed");
+    expect(calls).toHaveLength(1);
+  });
+
+  it("rejects inconsistent cluster associations before calling the database", async () => {
+    const { client, calls } = atomicClient();
+    const broken: PipelineResult = {
+      ...RESULT,
+      clusters: [cluster("cl-1", ["a-03"]), cluster("cl-other", [], true)],
+    };
+    await expect(
+      persistRun({
+        supabase: client,
+        ownerId: "owner-1",
+        input: INPUT,
+        result: broken,
+        prediction: null,
+      }),
+    ).rejects.toThrow(/cluster/i);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+type QueryResult = { data: unknown; error: { message: string } | null };
+
+function loadClient(results: Record<string, QueryResult>) {
+  const client = {
+    from(table: string) {
+      const result = results[table];
+      const builder = {
+        select: () => builder,
+        eq: () => builder,
+        order: () => builder,
+        maybeSingle: async () => result,
+        then: (resolve: (value: QueryResult) => unknown) => Promise.resolve(result).then(resolve),
+      };
+      return builder;
+    },
+  };
+  return client as unknown as SupabaseClient;
+}
+
+const SESSION_ROW = {
+  id: "10000000-0000-4000-8000-000000000001",
+  question: INPUT.question,
+  marking_scheme: INPUT.scheme,
+  criteria: INPUT.criteria,
+  subject: INPUT.subject,
+  level: INPUT.level,
+  max_score: 10,
+  prediction: "reactance",
+  status: "ready",
+  courses: { code: "EEE 301", title: "Circuit Theory" },
+};
+
+const CLUSTER_ROW = {
+  id: "20000000-0000-4000-8000-000000000001",
+  label: "Reactance omitted",
+  why: "DC intuition",
+  severity: 3,
+  downstream: [],
+  tone: 1,
+  is_other: false,
+  rank: 0,
+  plane_x: null,
+  plane_y: null,
+};
+
+const ANSWER_ROW = {
+  id: "30000000-0000-4000-8000-000000000001",
+  cluster_id: CLUSTER_ROW.id,
+  student_ref: "EEE/1",
+  initials: "AB",
+  answer: "Z = R",
+  is_correct: false,
+  error_signature: "believes impedance equals resistance",
+  evidence_span: "Z = R",
+  confidence: 0.8,
+  provisional_score: 4,
+  criteria_met: [],
+  criteria_missed: ["c-1"],
+  score_rationale: "",
+  review_status: "unreviewed",
+  diagnostic_token: "student-secret",
+};
+
+describe("loadRun", () => {
+  it("restores diagnostic tokens and course identity", async () => {
+    const loaded = await loadRun(
+      loadClient({
+        sessions: { data: SESSION_ROW, error: null },
+        clusters: { data: [CLUSTER_ROW], error: null },
+        answers: { data: [ANSWER_ROW], error: null },
+        reteach_packs: { data: [], error: null },
+      }),
+      SESSION_ROW.id,
     );
-    expect(refs).toEqual(["EEE/1", "EEE/2", "EEE/3"]);
+
+    expect(loaded?.result.answers[0].diagnosticToken).toBe("student-secret");
+    expect(loaded?.course).toEqual({ code: "EEE 301", title: "Circuit Theory" });
+  });
+
+  it("rejects query errors instead of fabricating an empty run", async () => {
+    await expect(
+      loadRun(
+        loadClient({
+          sessions: { data: SESSION_ROW, error: null },
+          clusters: { data: null, error: { message: "clusters unavailable" } },
+          answers: { data: [], error: null },
+          reteach_packs: { data: [], error: null },
+        }),
+        SESSION_ROW.id,
+      ),
+    ).rejects.toThrow("clusters unavailable");
+  });
+
+  it("rejects an incomplete saved run", async () => {
+    await expect(
+      loadRun(
+        loadClient({
+          sessions: { data: SESSION_ROW, error: null },
+          clusters: { data: [], error: null },
+          answers: { data: [ANSWER_ROW], error: null },
+          reteach_packs: { data: [], error: null },
+        }),
+        SESSION_ROW.id,
+      ),
+    ).rejects.toThrow("incomplete");
   });
 });

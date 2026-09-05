@@ -194,9 +194,9 @@ it("guards a direct teaching-pack route before sample processing", async () => {
 });
 
 it("keeps a missing sample pack clear and limited to one recovery action", async () => {
-  const splitTime = 123_456_789;
-  vi.spyOn(Date, "now").mockReturnValue(splitTime);
-  route.id = `cl-split-${splitTime.toString(36)}`;
+  const splitId = "40000000-0000-4000-8000-000000000001";
+  vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(splitId);
+  route.id = `cl-split-${splitId}`;
   const { container } = render(
     <SessionProvider>
       <WithSplitCluster>

@@ -42,8 +42,8 @@ export function AccountLink() {
       >
         <Check size={15} strokeWidth={2.4} className="text-ok shrink-0 mt-0.5" aria-hidden />
         <p className="text-[12.5px] text-ink-2">
-          Signed in as <span className="font-semibold text-ink">{email}</span>. Batch results are
-          not synced in this preview.
+          Signed in as <span className="font-semibold text-ink">{email}</span>. Open Saved sessions
+          to recover saved batches. The sample class is not saved.
         </p>
       </div>
     );

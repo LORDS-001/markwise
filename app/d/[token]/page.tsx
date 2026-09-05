@@ -6,8 +6,11 @@ import { CircleCheck, CircleHelp, Loader2, Send, TriangleAlert } from "lucide-re
 import { Button, Card, CardHead, Textarea, cn } from "@/components/ui";
 import { MarkwiseLogo } from "@/components/logo";
 import { ANSWERS, CLUSTERS, RETEACH_PACKS } from "@/lib/mock";
-import { recordDiagnosticResponses } from "@/lib/diagnostic-store";
-import type { DiagnosticResponse, DiagnosticVerdict } from "@/lib/types";
+import {
+  readDiagnosticResponses,
+  recordDiagnosticResponses,
+} from "@/lib/diagnostic-store";
+import type { DiagnosticVerdict } from "@/lib/types";
 
 /**
  * One student's diagnostic — PRD v2 §5 step 7.
@@ -20,12 +23,11 @@ import type { DiagnosticResponse, DiagnosticVerdict } from "@/lib/types";
 
 interface Question {
   prompt: string;
-  holderAnswers: string;
-  correctedAnswers: string;
 }
 
 interface Diagnostic {
-  answerId: string;
+  answerId: string | null;
+  isDemo: boolean;
   clusterLabel: string;
   clusterWhy: string;
   lesson: { heading: string; body: string }[];
@@ -49,10 +51,11 @@ function demoDiagnostic(token: string): Diagnostic | null {
   const pack = RETEACH_PACKS[cluster.id];
   return {
     answerId: answer.id,
+    isDemo: true,
     clusterLabel: cluster.label,
     clusterWhy: cluster.why,
     lesson: pack?.lesson ?? [],
-    questions: pack?.diagnostics ?? [],
+    questions: (pack?.diagnostics ?? []).map(({ prompt }) => ({ prompt })),
   };
 }
 
@@ -78,10 +81,42 @@ export default function StudentDiagnosticPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    // Already resolved from the seeded class during render.
-    if (local) return;
-
     let cancelled = false;
+
+    if (local) {
+      // Storage is browser-only. Defer the state update so the seeded page can
+      // hydrate first, then restore any answers saved by this same demo link.
+      queueMicrotask(() => {
+        if (cancelled) return;
+        const saved = new Map(
+          readDiagnosticResponses()
+            .filter(
+              (row) =>
+                row.answerId === local.answerId &&
+                row.questionIndex < local.questions.length,
+            )
+            .map((row) => [row.questionIndex, row]),
+        );
+        const restored = local.questions.map(
+          (_, index) => saved.get(index)?.responseText ?? "",
+        );
+        const complete =
+          local.questions.length === 2 &&
+          saved.size === 2 &&
+          restored.every((response) => response.trim().length > 0);
+
+        setResponses(restored);
+        setDone(complete);
+        setNotice(
+          complete
+            ? "Your answers were saved on this device. This sample check is not automatically marked."
+            : null,
+        );
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
 
     async function load() {
       try {
@@ -90,14 +125,38 @@ export default function StudentDiagnosticPage() {
         if (cancelled) return;
         if (remote) {
           setDiagnostic({
-            answerId: token,
+            answerId: null,
+            isDemo: false,
             clusterLabel: remote.clusterLabel,
             clusterWhy: remote.clusterWhy,
             lesson: remote.lesson,
-            questions: remote.diagnostics,
+            questions: remote.questions,
           });
-          setResponses(remote.diagnostics.map(() => ""));
-          setDone(remote.alreadyDone);
+          const saved = new Map(
+            remote.responses.map((row) => [row.questionIndex, row]),
+          );
+          setResponses(
+            remote.questions.map((_, index) => saved.get(index)?.responseText ?? ""),
+          );
+          const restoredVerdicts = remote.questions.map((_, index) => {
+            const row = saved.get(index);
+            return row?.verdict
+              ? { verdict: row.verdict, rationale: row.rationale }
+              : null;
+          });
+          setVerdicts(
+            restoredVerdicts.every((entry) => entry !== null)
+              ? restoredVerdicts
+              : null,
+          );
+          setDone(remote.status !== "open");
+          if (remote.status === "ungraded" || remote.status === "grading") {
+            setNotice(
+              remote.status === "grading"
+                ? "Your answers are saved and marking is in progress."
+                : "Your answers are saved, but have not been marked yet.",
+            );
+          }
         }
       } catch {
         // Falls through to the not-found state below.
@@ -113,8 +172,12 @@ export default function StudentDiagnosticPage() {
   }, [token, local]);
 
   const answered = useMemo(
-    () => responses.some((r) => r.trim().length > 0),
-    [responses],
+    () =>
+      diagnostic !== null &&
+      diagnostic.questions.length === 2 &&
+      responses.length === 2 &&
+      responses.every((response) => response.trim().length > 0),
+    [diagnostic, responses],
   );
 
   const submit = useCallback(async () => {
@@ -123,27 +186,42 @@ export default function StudentDiagnosticPage() {
     setNotice(null);
 
     try {
+      if (diagnostic.isDemo) {
+        const recorded = recordDiagnosticResponses(
+          diagnostic.questions.map((_, index) => ({
+            answerId: diagnostic.answerId!,
+            questionIndex: index,
+            responseText: responses[index] ?? "",
+            verdict: null,
+            rationale: "",
+          })),
+        );
+        if (!recorded.ok) {
+          setNotice(
+            "Your answers could not be saved on this device. Check browser storage and try again.",
+          );
+          return;
+        }
+        setDone(true);
+        setNotice(
+          "Your answers were saved on this device. This sample check is not automatically marked.",
+        );
+        return;
+      }
+
       const { submitDiagnosticAction } = await import("@/app/actions");
       const result = await submitDiagnosticAction({
         token,
-        misconception: diagnostic.clusterLabel,
-        questions: diagnostic.questions,
         responses,
       });
 
-      const graded: DiagnosticResponse[] = diagnostic.questions.map((_, index) => ({
-        answerId: diagnostic.answerId,
-        questionIndex: index,
-        responseText: responses[index] ?? "",
-        verdict: result.ok ? result.verdicts[index]?.verdict ?? null : null,
-        rationale: result.ok ? (result.verdicts[index]?.rationale ?? "") : "",
-      }));
-
-      recordDiagnosticResponses(graded);
-      setDone(true);
-
-      if (result.ok) setVerdicts(result.verdicts);
-      else setNotice(result.error);
+      if (result.recorded) setDone(true);
+      if (result.ok) {
+        setVerdicts(result.verdicts);
+        setNotice(null);
+      } else {
+        setNotice(result.error);
+      }
     } catch {
       setNotice(
         "Something went wrong sending your answers. Try again in a moment.",
@@ -152,6 +230,22 @@ export default function StudentDiagnosticPage() {
       setSubmitting(false);
     }
   }, [diagnostic, responses, submitting, token]);
+
+  const retryMarking = useCallback(async () => {
+    if (!diagnostic || diagnostic.isDemo || submitting) return;
+    setSubmitting(true);
+    setNotice(null);
+    try {
+      const { retryDiagnosticGradingAction } = await import("@/app/actions");
+      const result = await retryDiagnosticGradingAction({ token });
+      if (result.ok) setVerdicts(result.verdicts);
+      else setNotice(result.error);
+    } catch {
+      setNotice("Marking could not be retried. Try again in a moment.");
+    } finally {
+      setSubmitting(false);
+    }
+  }, [diagnostic, submitting, token]);
 
   if (loading) {
     return (
@@ -308,7 +402,7 @@ export default function StudentDiagnosticPage() {
                 </Button>
                 {!answered ? (
                   <p className="text-[12.5px] text-ink-3 mt-2">
-                    Answer at least one question first.
+                    Answer both questions first.
                   </p>
                 ) : null}
               </div>
@@ -322,6 +416,19 @@ export default function StudentDiagnosticPage() {
                     Thanks — your answers were recorded.
                   </p>
                 )}
+                {!verdicts && !diagnostic.isDemo ? (
+                  <Button
+                    variant="secondary"
+                    className="mt-3"
+                    onClick={retryMarking}
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <Loader2 size={16} className="animate-spin" aria-hidden />
+                    ) : null}
+                    Retry marking
+                  </Button>
+                ) : null}
               </div>
             )}
           </Card>

@@ -12,8 +12,8 @@
 const API_ROOT = "https://generativelanguage.googleapis.com/v1beta";
 
 /**
- * Flash rather than Pro: a 40-answer batch is 40+ calls, and PRD §12 budgets
- * the whole run at under two minutes.
+ * Flash keeps per-answer extraction latency low. Web admission accounts for
+ * the configured request rate and the route's bounded runtime.
  *
  * Overridable because the free tier's daily request quota is charged **per
  * model**, so which model you can actually finish a batch on depends on the
@@ -46,38 +46,89 @@ const REQUEST_TIMEOUT_MS = 60_000;
  * undiagnosed. That failure is quiet and disastrous: the lecturer gets a map
  * built from three answers and no indication the rest were never read.
  *
- * Raise it with GEMINI_RPM on a paid tier, where the whole run fits inside the
- * two-minute budget in PRD §12.
+ * Raise it only when the provider account supports the higher rate. Route
+ * admission rejects batches this limiter cannot start within its time budget.
  */
-function requestsPerMinute(): number {
+export function geminiRequestsPerMinute(): number {
   const configured = Number(process.env.GEMINI_RPM);
-  return Number.isFinite(configured) && configured > 0 ? configured : 15;
+  return Number.isFinite(configured) && configured >= 1
+    ? Math.floor(configured)
+    : 15;
 }
 
-/** Start times of in-flight and recent requests, oldest first. */
-const recentRequests: number[] = [];
+const RATE_WINDOW_MS = 60_050;
+const COMPLETION_RESERVE_MS = 25_000;
+
+/** Request starts the limiter can admit while leaving time for final work. */
+export function geminiRequestCapacity(runBudgetMs: number): number {
+  const usableMs = runBudgetMs - COMPLETION_RESERVE_MS;
+  if (!Number.isFinite(usableMs) || usableMs < 0) return 0;
+  const windows = Math.floor(usableMs / RATE_WINDOW_MS) + 1;
+  return windows * geminiRequestsPerMinute();
+}
 
 /** Blocks until starting another request keeps us inside the rolling window. */
-async function waitForSlot(): Promise<void> {
-  for (;;) {
-    const now = Date.now();
-    const limit = requestsPerMinute();
-
-    while (recentRequests.length > 0 && now - recentRequests[0] >= 60_000) {
-      recentRequests.shift();
-    }
-
-    if (recentRequests.length < limit) {
-      recentRequests.push(now);
-      return;
-    }
-
-    // Wait until the oldest request leaves the window, plus a little slack so
-    // a clock difference with the server does not put us back over.
-    const waitMs = 60_000 - (now - recentRequests[0]) + 50;
-    await new Promise((resolve) => setTimeout(resolve, waitMs));
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw signal.reason instanceof Error
+      ? signal.reason
+      : new GeminiError("AI request was cancelled.");
   }
 }
+
+async function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  throwIfAborted(signal);
+  await new Promise<void>((resolve, reject) => {
+    const finish = () => {
+      signal?.removeEventListener("abort", abort);
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    const abort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+      reject(
+        signal?.reason instanceof Error
+          ? signal.reason
+          : new GeminiError("AI request was cancelled."),
+      );
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+  });
+}
+
+export function createRequestLimiter(options: {
+  requestsPerMinute: () => number;
+  now: () => number;
+  sleep: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
+}): (signal?: AbortSignal) => Promise<void> {
+  const recentRequests: number[] = [];
+  return async (signal?: AbortSignal) => {
+    for (;;) {
+      throwIfAborted(signal);
+      const now = options.now();
+      const limit = options.requestsPerMinute();
+
+      while (recentRequests.length > 0 && now - recentRequests[0] >= 60_000) {
+        recentRequests.shift();
+      }
+
+      if (recentRequests.length < limit) {
+        recentRequests.push(now);
+        return;
+      }
+
+      const waitMs = 60_000 - (now - recentRequests[0]) + 50;
+      await options.sleep(waitMs, signal);
+    }
+  };
+}
+
+const waitForSlot = createRequestLimiter({
+  requestsPerMinute: geminiRequestsPerMinute,
+  now: Date.now,
+  sleep: abortableDelay,
+});
 
 export function geminiApiKey(): string | null {
   // Hard stop rather than a silent null: reaching here in a browser means an
@@ -124,7 +175,7 @@ function retryable(status: number): boolean {
   return status === 429 || status >= 500;
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const key = geminiApiKey();
   if (!key) {
     throw new GeminiError(
@@ -136,9 +187,12 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   let serverRetryMs: number | null = null;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    await waitForSlot();
+    throwIfAborted(signal);
+    await waitForSlot(signal);
 
     const controller = new AbortController();
+    const cancel = () => controller.abort(signal?.reason);
+    signal?.addEventListener("abort", cancel, { once: true });
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
@@ -157,11 +211,12 @@ async function post<T>(path: string, body: unknown): Promise<T> {
       const text = await response.text().catch(() => "");
       serverRetryMs = retryDelayFrom(text);
       lastError = new GeminiError(
-        `Gemini ${response.status}: ${text.slice(0, 400)}`,
+        `Gemini request failed (status ${response.status}).`,
         response.status,
       );
       if (!retryable(response.status) || attempt === MAX_ATTEMPTS) throw lastError;
     } catch (error) {
+      if (signal?.aborted) throwIfAborted(signal);
       if (error instanceof GeminiError) {
         if (!retryable(error.status ?? 0) || attempt === MAX_ATTEMPTS) throw error;
         lastError = error;
@@ -173,6 +228,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
       }
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener("abort", cancel);
     }
 
     // Prefer the server's own retryDelay: on a quota error it knows when the
@@ -183,7 +239,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
       serverRetryMs ??
       BASE_BACKOFF_MS * 2 ** (attempt - 1) * (0.5 + Math.random());
     serverRetryMs = null;
-    await new Promise((resolve) => setTimeout(resolve, delay));
+    await abortableDelay(delay, signal);
   }
 
   throw lastError ?? new GeminiError("Gemini request failed");
@@ -205,6 +261,7 @@ export async function generateJson<T>(options: {
   schema: Record<string, unknown>;
   system?: string;
   temperature?: number;
+  signal?: AbortSignal;
 }): Promise<T> {
   const body: Record<string, unknown> = {
     contents: [{ role: "user", parts: [{ text: options.prompt }] }],
@@ -221,21 +278,20 @@ export async function generateJson<T>(options: {
   const data = await post<GenerateResponse>(
     `models/${TEXT_MODEL}:generateContent`,
     body,
+    options.signal,
   );
 
   const candidate = data.candidates?.[0];
   const text = candidate?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
 
   if (text.trim().length === 0) {
-    throw new GeminiError(
-      `Gemini returned no content (finishReason: ${candidate?.finishReason ?? "unknown"})`,
-    );
+    throw new GeminiError("Gemini returned no content.");
   }
 
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new GeminiError(`Gemini returned unparseable JSON: ${text.slice(0, 300)}`);
+    throw new GeminiError("Gemini returned unparseable JSON.");
   }
 }
 
@@ -250,7 +306,10 @@ interface BatchEmbedResponse {
  *
  * Batched, because one request per answer would be 40 round trips.
  */
-export async function embedTexts(texts: string[]): Promise<number[][]> {
+export async function embedTexts(
+  texts: string[],
+  signal?: AbortSignal,
+): Promise<number[][]> {
   if (texts.length === 0) return [];
 
   const BATCH_SIZE = 100;
@@ -268,6 +327,7 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
           outputDimensionality: EMBEDDING_DIMENSIONS,
         })),
       },
+      signal,
     );
 
     const embeddings = data.embeddings ?? [];
@@ -278,7 +338,14 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
     }
     for (const embedding of embeddings) {
       const values = embedding.values ?? [];
-      if (values.length === 0) throw new GeminiError("Embedding came back empty");
+      if (values.length !== EMBEDDING_DIMENSIONS) {
+        throw new GeminiError(
+          `Embedding dimension mismatch: expected ${EMBEDDING_DIMENSIONS}, got ${values.length}.`,
+        );
+      }
+      if (values.some((value) => !Number.isFinite(value))) {
+        throw new GeminiError("Embedding contained a non-finite value.");
+      }
       out.push(values);
     }
   }
@@ -289,8 +356,8 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 /**
  * Runs `worker` over `items` with bounded concurrency, preserving input order.
  *
- * Forty answers fired at once trips the rate limit; forty fired in sequence
- * blows the two-minute budget in PRD §12. Six at a time holds both.
+ * Forty answers fired at once trips the rate limit; six at a time keeps useful
+ * concurrency while the rolling limiter controls request starts.
  */
 export async function mapWithConcurrency<T, R>(
   items: T[],

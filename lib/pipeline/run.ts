@@ -6,13 +6,11 @@ import {
   mapWithConcurrency,
 } from "./gemini";
 import {
-  DAMAGE_SCHEMA,
   EXTRACTION_SCHEMA,
-  LABEL_SCHEMA,
-  damagePrompt,
+  CLUSTER_ASSESSMENT_SCHEMA,
+  clusterAssessmentPrompt,
   extractionPrompt,
   extractionSystemPrompt,
-  labelPrompt,
 } from "./prompts";
 import {
   DISTANCE_THRESHOLD,
@@ -60,7 +58,13 @@ export function normaliseExtraction(
   const validIds = new Set(criteria.map((c) => c.id));
   const maxScore = criteria.reduce((sum, c) => sum + c.marks, 0);
 
-  const met = (raw.criteria_met ?? []).filter((id) => validIds.has(id));
+  const met = Array.from(
+    new Set(
+      (Array.isArray(raw.criteria_met) ? raw.criteria_met : []).filter(
+        (id): id is string => typeof id === "string" && validIds.has(id),
+      ),
+    ),
+  );
   const metSet = new Set(met);
   // Anything valid that was not met is missed, whatever the model listed. This
   // guarantees met and missed partition the criteria exactly once each.
@@ -70,18 +74,31 @@ export function normaliseExtraction(
     .filter((c) => metSet.has(c.id))
     .reduce((sum, c) => sum + c.marks, 0);
 
-  const signature = (raw.error_signature ?? "").trim();
-  const isCorrect = Boolean(raw.is_correct);
+  const proposedSignature =
+    typeof raw.error_signature === "string" ? raw.error_signature.trim() : "";
+  const validSignature =
+    proposedSignature.length <= 500 && /^believes\s+\S/i.test(proposedSignature);
+  const signature = validSignature ? proposedSignature : "";
+  const fullAward = criteria.length > 0 && met.length === criteria.length;
+  const proposedCorrect = raw.is_correct === true;
+  const signatureContradiction =
+    proposedCorrect && fullAward && proposedSignature.length > 0;
+  const contradictory = proposedCorrect !== fullAward || signatureContradiction;
+  const isCorrect = proposedCorrect && fullAward && !signatureContradiction;
 
   // The span must be genuinely verbatim — the UI highlights it inside the
   // answer, so a paraphrase would highlight nothing and look broken.
-  const span = (raw.evidence_span ?? "").trim();
+  const span =
+    typeof raw.evidence_span === "string" ? raw.evidence_span.trim() : "";
   const evidenceSpan =
     span.length > 0 && answer.text.includes(span) ? span : null;
 
-  const confidence = Number.isFinite(raw.confidence)
+  let confidence = Number.isFinite(raw.confidence)
     ? Math.min(1, Math.max(0, raw.confidence))
     : 0;
+  if (contradictory || (!isCorrect && proposedSignature.length > 0 && !validSignature)) {
+    confidence = Math.min(confidence, 0.69);
+  }
 
   return {
     studentRef: answer.studentRef,
@@ -93,26 +110,31 @@ export function normaliseExtraction(
     maxScore,
     criteriaMet: met,
     criteriaMissed: missed,
-    scoreRationale: (raw.score_rationale ?? "").trim(),
+    scoreRationale:
+      typeof raw.score_rationale === "string" ? raw.score_rationale.trim() : "",
   };
 }
 
 async function extractOne(
   input: PipelineInput,
   answer: RawAnswer,
+  correlationReference: string,
   onError: (message: string) => void,
+  signal?: AbortSignal,
 ): Promise<Extraction> {
   const maxScore = input.criteria.reduce((sum, c) => sum + c.marks, 0);
 
   try {
     const raw = await generateJson<RawExtraction>({
       system: extractionSystemPrompt(),
-      prompt: extractionPrompt(input, answer),
+      prompt: extractionPrompt(input, answer, correlationReference),
       schema: EXTRACTION_SCHEMA as unknown as Record<string, unknown>,
       temperature: 0.1,
+      signal,
     });
     return normaliseExtraction(raw, answer, input.criteria);
   } catch (error) {
+    if (signal?.aborted) throw error;
     onError(error instanceof Error ? error.message : String(error));
     // One answer failing must not lose the other thirty-nine. It comes back
     // undiagnosed at zero confidence, which routes it straight to the
@@ -138,16 +160,20 @@ async function extractOne(
 /*  Orchestration                                                      */
 /* ------------------------------------------------------------------ */
 
-interface RawLabel {
+interface RawClusterAssessment {
   label: string;
   why: string;
-}
-interface RawDamage {
   downstream: string[];
   severity: number;
 }
 
 const OTHER_CLUSTER_ID = "cl-other";
+
+/** Maximum model requests when every wrong answer forms a two-person group. */
+export function estimateMaximumPipelineRequests(answerCount: number): number {
+  if (!Number.isInteger(answerCount) || answerCount <= 0) return 0;
+  return answerCount + 1 + Math.floor(answerCount / MIN_CLUSTER_SIZE);
+}
 
 /**
  * Runs the full pipeline — PRD §6 steps 1 through 5.
@@ -158,7 +184,17 @@ const OTHER_CLUSTER_ID = "cl-other";
 export async function runPipeline(
   input: PipelineInput,
   onProgress: ProgressHandler = () => {},
+  options: { signal?: AbortSignal } = {},
 ): Promise<PipelineResult> {
+  const { signal } = options;
+  const ensureActive = () => {
+    if (signal?.aborted) {
+      throw signal.reason instanceof Error
+        ? signal.reason
+        : new Error("The pipeline was cancelled.");
+    }
+  };
+  ensureActive();
   const maxScore = input.criteria.reduce((sum, c) => sum + c.marks, 0);
 
   /* --- Step 1: extraction ---------------------------------------- */
@@ -169,9 +205,14 @@ export async function runPipeline(
   const extractions = await mapWithConcurrency(
     input.answers,
     CONCURRENCY,
-    async (answer) => {
-      const result = await extractOne(input, answer, (message) =>
-        failures.push(message),
+    async (answer, index) => {
+      ensureActive();
+      const result = await extractOne(
+        input,
+        answer,
+        `submission-${index + 1}`,
+        (message) => failures.push(message),
+        signal,
       );
       done += 1;
       onProgress({
@@ -209,15 +250,27 @@ export async function runPipeline(
   /* --- Step 2: embedding ----------------------------------------- */
   onProgress({ stage: "embed", progress: 0 });
 
-  const vectors =
-    diagnosable.length > 0
-      ? await embedTexts(diagnosable.map((d) => d.extraction.errorSignature!))
-      : [];
+  let vectors: number[][] = [];
+  let embeddingWarning: string | undefined;
+  if (diagnosable.length > 0) {
+    ensureActive();
+    try {
+      vectors = await embedTexts(
+        diagnosable.map((d) => d.extraction.errorSignature!),
+        signal,
+      );
+    } catch {
+      if (signal?.aborted) ensureActive();
+      embeddingWarning =
+        "Embedding was unavailable. Answers remain unclustered in the review queue; no semantic groups were inferred.";
+    }
+  }
 
   onProgress({
     stage: "embed",
     progress: 1,
-    detail: `${vectors.length} signatures embedded`,
+    detail: embeddingWarning ?? `${vectors.length} signatures embedded`,
+    warning: embeddingWarning,
   });
 
   /* --- Step 3: clustering ---------------------------------------- */
@@ -237,30 +290,50 @@ export async function runPipeline(
     detail: `${realGroups.length} groups found`,
   });
 
-  /* --- Step 4: labelling ----------------------------------------- */
+  /* --- Steps 4 and 5: label and assess each cluster -------------- */
   onProgress({ stage: "label", progress: 0 });
 
   let labelled = 0;
-  const labels = await mapWithConcurrency(
+  const assessments = await mapWithConcurrency(
     realGroups,
     CONCURRENCY,
     async (group) => {
       const signatures = group.map(
         (i) => diagnosable[i].extraction.errorSignature!,
       );
-      let result: RawLabel;
+      let result: RawClusterAssessment;
       try {
-        result = await generateJson<RawLabel>({
-          prompt: labelPrompt(input, signatures),
-          schema: LABEL_SCHEMA as unknown as Record<string, unknown>,
+        ensureActive();
+        const raw = await generateJson<RawClusterAssessment>({
+          prompt: clusterAssessmentPrompt(input, signatures),
+          schema: CLUSTER_ASSESSMENT_SCHEMA as unknown as Record<string, unknown>,
           temperature: 0.3,
+          signal,
         });
+        const label = typeof raw.label === "string" ? raw.label.trim() : "";
+        const why = typeof raw.why === "string" ? raw.why.trim() : "";
+        if (!label || !why) throw new Error("Cluster assessment was incomplete.");
+        result = {
+          label,
+          why,
+          downstream: (Array.isArray(raw.downstream) ? raw.downstream : [])
+            .filter((topic): topic is string => typeof topic === "string")
+            .map((topic) => topic.trim())
+            .filter(Boolean)
+            .slice(0, 4),
+          severity: Number.isFinite(raw.severity)
+            ? Math.min(5, Math.max(1, Math.round(raw.severity)))
+            : 1,
+        };
       } catch {
-        // Fall back to the most common member signature, so a failed call
-        // still leaves the lecturer a readable, evidence-backed cluster.
+        if (signal?.aborted) ensureActive();
+        // Use a member signature and leave damage unassessed. This stays
+        // evidence-backed without inventing a downstream claim.
         result = {
           label: signatures[0],
           why: "Automatic labelling failed for this group. The shared signature above is taken from a member answer; rename it to something you would recognise.",
+          downstream: [],
+          severity: 1,
         };
       }
       labelled += 1;
@@ -271,34 +344,13 @@ export async function runPipeline(
 
   onProgress({ stage: "label", progress: 1 });
 
-  /* --- Step 5: prerequisite damage ------------------------------- */
+  // Damage was returned by the same structured call. Preserve the distinct
+  // stage event so existing progress UI remains truthful and compatible.
   onProgress({ stage: "damage", progress: 0 });
-
-  let assessed = 0;
-  const damages = await mapWithConcurrency(labels, CONCURRENCY, async (label) => {
-    let result: RawDamage;
-    try {
-      result = await generateJson<RawDamage>({
-        prompt: damagePrompt(input, label.label),
-        schema: DAMAGE_SCHEMA as unknown as Record<string, unknown>,
-        temperature: 0.3,
-      });
-    } catch {
-      // Severity 1 with no named topics reads honestly as "not assessed"
-      // rather than inventing a damage claim the lecturer cannot check.
-      result = { downstream: [], severity: 1 };
-    }
-    assessed += 1;
-    onProgress({ stage: "damage", progress: assessed / Math.max(1, labels.length) });
-    return {
-      downstream: (result.downstream ?? []).filter(
-        (t) => typeof t === "string" && t.trim().length > 0,
-      ),
-      severity: Math.min(5, Math.max(1, Math.round(result.severity ?? 1))),
-    };
-  });
-
   onProgress({ stage: "damage", progress: 1 });
+
+  const labels = assessments;
+  const damages = assessments;
 
   /* --- Assembly --------------------------------------------------- */
 

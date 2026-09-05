@@ -8,7 +8,7 @@ import { Page } from "@/components/shell";
 import { Badge, Button, Card, CardHead, EmptyState, buttonClass } from "@/components/ui";
 import { useSession } from "@/components/session-provider";
 import { clusterToneClasses } from "@/lib/cluster-tone";
-import { learningChange, prevalence } from "@/lib/learning-change";
+import { learningChange, prevalence, responsesForOutcome } from "@/lib/learning-change";
 import {
   readDiagnosticResponses,
   subscribeToDiagnostics,
@@ -24,7 +24,7 @@ import type { DiagnosticResponse } from "@/lib/types";
  * than no figure at all.
  */
 export default function OutcomePage() {
-  const { clusters, answers, processed, sessionId } = useSession();
+  const { clusters, answers, processed, sessionId, isDemo } = useSession();
   const [local, setLocal] = useState<DiagnosticResponse[]>([]);
   const [remote, setRemote] = useState<DiagnosticResponse[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
@@ -68,26 +68,12 @@ export default function OutcomePage() {
     };
   }, [sessionId]);
 
-  /*
-   * The saved copy wins where both exist. A response can be recorded in the
-   * database before its verdict is, so the same submission can appear graded
-   * here and ungraded there — but the database is the copy that outlives the
-   * browser, and the one every other device agrees on.
-   */
-  const responses = useMemo(() => {
-    const key = (r: DiagnosticResponse) => `${r.answerId}#${r.questionIndex}`;
-    const merged = new Map(local.map((r) => [key(r), r]));
-    for (const row of remote) {
-      const existing = merged.get(key(row));
-      // Keep a local verdict only when the saved row has none yet.
-      merged.set(key(row), {
-        ...row,
-        verdict: row.verdict ?? existing?.verdict ?? null,
-        rationale: row.rationale || (existing?.rationale ?? ""),
-      });
-    }
-    return [...merged.values()];
-  }, [local, remote]);
+  // Browser storage belongs to the credential-free demo. A saved run uses
+  // only the durable rows shared by the student's and lecturer's devices.
+  const responses = useMemo(
+    () => responsesForOutcome(isDemo, local, remote),
+    [isDemo, local, remote],
+  );
 
   const changes = useMemo(
     () => learningChange(clusters, answers, responses),

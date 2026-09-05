@@ -41,6 +41,7 @@ export default function ReteachPackPage() {
     setReteachPack,
     context,
     sessionId,
+    flushChanges,
   } = useSession();
   const [copied, setCopied] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -60,6 +61,12 @@ export default function ReteachPackPage() {
     setGenerating(true);
     setGenerateError(null);
     try {
+      if (!(await flushChanges())) {
+        setGenerateError(
+          "The latest edits have not been saved. Resolve the save error, then try again.",
+        );
+        return;
+      }
       const { generateReteachAction } = await import("@/app/actions");
       const result = await generateReteachAction({
         context,
@@ -79,7 +86,7 @@ export default function ReteachPackPage() {
     } finally {
       setGenerating(false);
     }
-  }, [cluster, members, context, sessionId, generating, setReteachPack]);
+  }, [cluster, members, context, sessionId, generating, setReteachPack, flushChanges]);
 
   if (!processed) {
     return (

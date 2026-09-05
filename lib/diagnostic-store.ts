@@ -16,13 +16,31 @@ import type { DiagnosticResponse } from "./types";
 
 const STORAGE_KEY = "markwise:diagnostics";
 
+function isDiagnosticResponse(value: unknown): value is DiagnosticResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const row = value as Record<string, unknown>;
+  return (
+    typeof row.answerId === "string" &&
+    row.answerId.length > 0 &&
+    typeof row.questionIndex === "number" &&
+    Number.isInteger(row.questionIndex) &&
+    row.questionIndex >= 0 &&
+    typeof row.responseText === "string" &&
+    (row.verdict === null ||
+      row.verdict === "holds" ||
+      row.verdict === "corrected" ||
+      row.verdict === "unclear") &&
+    typeof row.rationale === "string"
+  );
+}
+
 export function readDiagnosticResponses(): DiagnosticResponse[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as DiagnosticResponse[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isDiagnosticResponse) : [];
   } catch {
     // Blocked storage, private browsing, or a corrupt entry. An empty set is
     // the honest answer: nothing measured rather than something invented.
@@ -36,8 +54,8 @@ export function readDiagnosticResponses(): DiagnosticResponse[] {
  */
 export function recordDiagnosticResponses(
   incoming: DiagnosticResponse[],
-): DiagnosticResponse[] {
-  if (typeof window === "undefined") return incoming;
+): { ok: boolean; responses: DiagnosticResponse[] } {
+  if (typeof window === "undefined") return { ok: false, responses: incoming };
 
   const existing = readDiagnosticResponses();
   const key = (r: DiagnosticResponse) => `${r.answerId}#${r.questionIndex}`;
@@ -46,10 +64,11 @@ export function recordDiagnosticResponses(
 
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    return { ok: true, responses: merged };
   } catch {
-    // Over quota or blocked; the caller still has what it just recorded.
+    // Over quota or blocked. The caller must not claim this was saved.
+    return { ok: false, responses: existing };
   }
-  return merged;
 }
 
 export function clearDiagnosticResponses(): void {

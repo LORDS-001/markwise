@@ -51,11 +51,15 @@ export default function ExportPage() {
     courseCode,
     courseTitle,
     sessionId,
+    flushChanges,
   } = useSession();
 
   const [format, setFormat] = useState<Format>("xlsx");
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const confirmingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmationError, setConfirmationError] = useState<string | null>(null);
   const confirmationControlsRef = useRef<HTMLDivElement>(null);
   const confirmationFocusIntentRef = useRef<"confirm" | "reopen" | null>(null);
 
@@ -69,21 +73,33 @@ export default function ExportPage() {
       ?.focus();
   }, [confirmed]);
 
-  function updateConfirmation(nextConfirmed: boolean) {
-    confirmationFocusIntentRef.current = nextConfirmed ? "reopen" : "confirm";
-    setConfirmed(nextConfirmed);
-
-    // The provenance footer claims the batch was confirmed by a named person
-    // on a date, so a saved run records who and when — the claim has to be
-    // backed by something more durable than this tab.
-    if (nextConfirmed && sessionId) {
-      void import("@/app/actions")
-        .then((actions) =>
-          actions.confirmBatchAction({ sessionId, confirmedBy }),
-        )
-        .catch(() => {
-          // The export itself is unaffected; it carries the footer regardless.
-        });
+  async function updateConfirmation(nextConfirmed: boolean) {
+    if (confirmingRef.current) return;
+    if (!nextConfirmed) {
+      confirmationFocusIntentRef.current = "confirm";
+      setConfirmed(false);
+      return;
+    }
+    if (!confirmedBy.trim() || !exportReady) return;
+    setConfirmationError(null);
+    confirmingRef.current = true;
+    setConfirming(true);
+    try {
+      if (sessionId) {
+        if (!(await flushChanges())) {
+          throw new Error("Some changes have not saved. Retry saving before confirming this batch.");
+        }
+        const { confirmBatchAction } = await import("@/app/actions");
+        const result = await confirmBatchAction({ sessionId, confirmedBy: confirmedBy.trim() });
+        if (!result.ok) throw new Error(result.error || "The confirmation could not be saved. Please try again.");
+      }
+      confirmationFocusIntentRef.current = "reopen";
+      setConfirmed(true);
+    } catch (cause) {
+      setConfirmationError(cause instanceof Error ? cause.message : "The confirmation could not be saved. Please try again.");
+    } finally {
+      confirmingRef.current = false;
+      setConfirming(false);
     }
   }
 
@@ -107,7 +123,7 @@ export default function ExportPage() {
   );
 
   async function runExport() {
-    if (busy) return;
+    if (busy || !confirmed || !exportReady) return;
 
     setBusy(true);
     setError(null);
@@ -216,7 +232,7 @@ export default function ExportPage() {
           </div>
           <dl className="grid grid-cols-2 gap-x-5 gap-y-1 text-[12.5px] sm:grid-cols-4">
             <SummaryRow label="Students" value={`${rows.length}`} />
-            <SummaryRow label="Mean" value={`${stats.mean.toFixed(1)} / 10`} />
+            <SummaryRow label="Mean" value={`${stats.mean.toFixed(1)} / ${rows[0]?.max ?? 0}`} />
             <SummaryRow label="Median" value={`${stats.median}`} />
             <SummaryRow label="Pass rate" value={`${stats.passRate.toFixed(0)}%`} />
           </dl>
@@ -237,7 +253,7 @@ export default function ExportPage() {
             id="lecturer"
             value={confirmedBy}
             onChange={(e) => setConfirmedBy(e.target.value)}
-            disabled={confirmed}
+            disabled={confirmed || confirming}
             placeholder="Your name as it should appear"
           />
           <p className="text-[13px] italic text-ink-2">
@@ -252,7 +268,7 @@ export default function ExportPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => updateConfirmation(false)}
+                onClick={() => void updateConfirmation(false)}
                 data-confirmation-focus="reopen"
               >
                 Reopen for edits
@@ -261,13 +277,13 @@ export default function ExportPage() {
           ) : (
             <Button
               size="lg"
-              onClick={() => updateConfirmation(true)}
-              disabled={!confirmedBy.trim()}
+              onClick={() => void updateConfirmation(true)}
+              disabled={!confirmedBy.trim() || confirming}
               className="self-start"
               data-confirmation-focus="confirm"
             >
               <Check size={17} strokeWidth={2.2} aria-hidden />
-              Confirm reviewer
+              {confirming ? "Confirming…" : "Confirm reviewer"}
             </Button>
           )}
         </div>
@@ -379,10 +395,10 @@ export default function ExportPage() {
           </div>
         </Card>
       ) : null}
-      {error ? (
+      {confirmationError || error ? (
         <p className="flex items-start gap-1.5 px-1 text-[13px] text-crit" role="alert">
           <TriangleAlert size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden />
-          {error}
+          {confirmationError ?? error}
         </p>
       ) : null}
     </Page>

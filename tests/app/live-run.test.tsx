@@ -228,7 +228,7 @@ it("shows the run as complete once the result arrives", async () => {
   renderRun();
 
   expect(
-    await screen.findByRole("heading", { level: 1, name: "Sample analysis ready" }),
+    await screen.findByRole("heading", { level: 1, name: "Class analysis ready" }),
   ).toBeVisible();
 });
 

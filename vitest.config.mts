@@ -1,9 +1,9 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
-import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
-  plugins: [tsconfigPaths(), react()],
+  plugins: [react()],
+  resolve: { tsconfigPaths: true },
   test: {
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
@@ -15,10 +15,13 @@ export default defineConfig({
      * start timing out — a different one each run, which reads as flakiness in
      * the suite rather than the resource starvation it actually is.
      *
-     * Two workers still parallelise the run while leaving headroom. Raise it
-     * on a bigger machine; the suite is not order-dependent.
+     * A single worker leaves headroom for the application and editor. The
+     * suite stays isolated per file and does not depend on execution order.
      */
-    maxWorkers: 2,
+    // Threads avoid Windows child-process startup timeouts; one worker leaves
+    // enough memory for the larger jsdom workflows.
+    pool: "threads",
+    maxWorkers: 1,
     /*
      * jsdom setup alone can take a second or two under that contention, which
      * eats most of the 5s default before a test body starts.

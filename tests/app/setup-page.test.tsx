@@ -1,8 +1,9 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import SetupPage from "@/app/page";
-import { SessionProvider } from "@/components/session-provider";
+import SetupForm from "@/components/setup-page";
+import { SessionProvider, useSession } from "@/components/session-provider";
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }));
 
@@ -68,6 +69,34 @@ function renderSetup() {
     </SessionProvider>,
   );
 }
+
+it("keeps sample preview local instead of scheduling a paid live request", () => {
+  function Probe() {
+    const { pendingRun, processed } = useSession();
+    return <p data-testid="run-mode">{pendingRun ? "live" : processed ? "ready" : "sample"}</p>;
+  }
+  render(<SessionProvider><SetupPage /><Probe /></SessionProvider>);
+  fireEvent.click(screen.getByRole("button", { name: "Preview sample analysis" }));
+  expect(screen.getByTestId("run-mode")).toHaveTextContent("sample");
+});
+
+it("requires whole positive criterion marks before starting", () => {
+  renderSetup();
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Marks for criterion 1" }), { target: { value: "1.5" } });
+  expect(screen.getByRole("button", { name: "Preview sample analysis" })).toBeDisabled();
+  expect(screen.getByText(/whole numbers from 1 to 1,000/)).toBeVisible();
+});
+
+it("labels configured live analysis truthfully and sends the entered answers", () => {
+  function Probe() {
+    const { pendingRun } = useSession();
+    return <p data-testid="live-count">{pendingRun?.input.answers.length ?? 0}</p>;
+  }
+  render(<SessionProvider><SetupForm liveEnabled /><Probe /></SessionProvider>);
+  expect(screen.getByText(/answer text and marking scheme are sent to Gemini/)).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Analyse class answers" }));
+  expect(screen.getByTestId("live-count")).toHaveTextContent("40");
+});
 
 it("presents one truthful primary action and optional advanced guidance", () => {
   const { container } = render(

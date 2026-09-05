@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -17,6 +18,7 @@ import {
   RETEACH_PACKS,
   SESSION,
 } from "@/lib/mock";
+import { getBrowserClient } from "@/lib/supabase/client";
 import type {
   Cluster,
   ReteachPack,
@@ -26,7 +28,6 @@ import type {
 } from "@/lib/types";
 import type { PipelineInput, PipelineResult } from "@/lib/pipeline/types";
 
-/** The setup screen's output, held until the processing screen consumes it. */
 export interface PendingRun {
   input: PipelineInput;
   prediction: string;
@@ -34,7 +35,6 @@ export interface PendingRun {
   courseTitle?: string;
 }
 
-/** Everything the reteach and export screens need about the run's origin. */
 export type RunContext = Omit<PipelineInput, "answers">;
 
 const DEMO_CONTEXT: RunContext = {
@@ -46,6 +46,11 @@ const DEMO_CONTEXT: RunContext = {
   level: SESSION.level,
 };
 
+interface CourseIdentity {
+  code: string;
+  title: string;
+}
+
 interface SessionState {
   answers: StudentAnswer[];
   clusters: Cluster[];
@@ -54,65 +59,52 @@ interface SessionState {
   processed: boolean;
   confirmed: boolean;
   confirmedBy: string;
-
   reviewedCount: number;
   needsAttention: number;
   exportReady: boolean;
-  /**
-   * Rows still standing between the lecturer and an export: unreviewed, or
-   * flagged. PRD §6 step 7 gates on both — a flagged row is one the lecturer
-   * has looked at and objected to, so treating it as settled would let the
-   * exact scores they distrusted reach the registry.
-   */
   blockedCount: number;
   flaggedCount: number;
-
-  /** True while the screens are showing the seeded demo class. */
   isDemo: boolean;
-  /** The row id of a persisted run, or null when nothing was saved. */
   sessionId: string | null;
   context: RunContext;
   pendingRun: PendingRun | null;
   reteachPacks: Record<string, ReteachPack>;
-
-  /**
-   * This run's own size. Every percentage on every screen divides by it, so a
-   * batch of 12 must not be scored against the demo class's 40.
-   */
   totalAnswers: number;
   courseCode: string;
   courseTitle: string;
-  /** Resolves a criterion id against this run's scheme, not the demo's. */
+  saving: boolean;
+  saveError: string | null;
+  flushChanges: () => Promise<boolean>;
+  retrySave: () => Promise<boolean>;
+  previewDemo: () => void;
   criterionLabel: (id: string) => string;
-
   setScore: (answerId: string, score: number) => void;
   setStatus: (answerId: string, status: ReviewStatus) => void;
   acceptAbove: (threshold: number) => void;
   resetReview: () => void;
-
   renameCluster: (clusterId: string, label: string) => void;
   rejectCluster: (clusterId: string) => void;
   mergeCluster: (sourceId: string, targetId: string) => void;
   splitOut: (clusterId: string, answerIds: string[], label: string) => void;
-
   setPrediction: (value: string) => void;
   setSortMode: (mode: SortMode) => void;
   setProcessed: (value: boolean) => void;
   setConfirmed: (value: boolean) => void;
   setConfirmedBy: (value: string) => void;
-
   startRun: (run: PendingRun) => void;
   applyRun: (
     result: PipelineResult,
     sessionId: string | null,
     context: RunContext,
+    course?: CourseIdentity,
+    prediction?: string,
   ) => void;
   setReteachPack: (clusterId: string, pack: ReteachPack) => void;
 }
 
 const Ctx = createContext<SessionState | null>(null);
-
-const STORAGE_KEY = "markwise:run";
+const STORAGE_PREFIX = "markwise:run:";
+const LEGACY_STORAGE_KEY = "markwise:run";
 
 interface StoredRun {
   answers: StudentAnswer[];
@@ -121,352 +113,543 @@ interface StoredRun {
   context: RunContext;
   prediction: string;
   sessionId: string | null;
+  courseCode: string;
+  courseTitle: string;
+  ownerKey: string;
+  saveState?: "clean" | "pending" | "failed";
+  saveError?: string | null;
+}
+
+type ActionResult = { ok: boolean; error?: string } | void;
+
+function requireSuccess(result: ActionResult) {
+  if (result && !result.ok) throw new Error(result.error ?? "The change could not be saved.");
+}
+
+function savedRun(value: unknown, ownerKey: string): StoredRun | null {
+  if (!value || typeof value !== "object") return null;
+  const run = value as Partial<StoredRun>;
+  if (!Array.isArray(run.answers) || run.answers.length === 0) return null;
+  if (!Array.isArray(run.clusters) || !run.context || run.ownerKey !== ownerKey) return null;
+  return {
+    answers: run.answers,
+    clusters: run.clusters,
+    reteachPacks: run.reteachPacks ?? {},
+    context: run.context,
+    prediction: run.prediction ?? "",
+    sessionId: run.sessionId ?? null,
+    courseCode: run.courseCode ?? "",
+    courseTitle: run.courseTitle ?? "",
+    ownerKey,
+    saveState: run.saveState ?? "clean",
+    saveError: run.saveError ?? null,
+  };
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [answers, setAnswers] = useState<StudentAnswer[]>(ANSWERS);
-  const [clusters, setClusters] = useState<Cluster[]>(CLUSTERS);
+  const browserClient = useMemo(() => getBrowserClient(), []);
+  const [storageOwnerKey, setStorageOwnerKey] = useState<string | null>(
+    browserClient ? null : "local",
+  );
+  const [answers, setAnswersState] = useState<StudentAnswer[]>(ANSWERS);
+  const [clusters, setClustersState] = useState<Cluster[]>(CLUSTERS);
   const [prediction, setPrediction] = useState(SESSION.prediction ?? "");
   const [sortMode, setSortMode] = useState<SortMode>("spread");
-  // The seeded demo class arrives already processed, so every screen has
-  // something real to show on a cold visit. Running from setup resets this.
   const [processed, setProcessed] = useState(true);
   const [confirmed, setConfirmed] = useState(false);
   const [confirmedBy, setConfirmedBy] = useState("Dr. A. Daniel");
-
   const [isDemo, setIsDemo] = useState(true);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionIdState] = useState<string | null>(null);
   const [context, setContext] = useState<RunContext>(DEMO_CONTEXT);
   const [pendingRun, setPendingRun] = useState<PendingRun | null>(null);
-  const [reteachPacks, setReteachPacks] =
+  const [reteachPacks, setReteachPacksState] =
     useState<Record<string, ReteachPack>>(RETEACH_PACKS);
+  const [courseCode, setCourseCode] = useState(SESSION.courseCode);
+  const [courseTitle, setCourseTitle] = useState(SESSION.courseTitle);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [snapshotSaveState, setSnapshotSaveState] =
+    useState<"clean" | "pending" | "failed">("clean");
 
-  /**
-   * A real run is restored after mount rather than during the first render.
-   * Reading storage inline would make the server and client render different
-   * markup, and React would throw a hydration mismatch on every reload that
-   * follows a run.
-   */
+  const answersRef = useRef(answers);
+  const clustersRef = useRef(clusters);
+  const packsRef = useRef(reteachPacks);
+  const sessionIdRef = useRef(sessionId);
+  const isDemoRef = useRef(true);
+  const editQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingWritesRef = useRef(0);
+  const failedWritesRef = useRef(false);
+  const initialSaveInFlightRef = useRef(false);
+  const initialSavePromiseRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const clusterAliasesRef = useRef(new Map<string, string>());
+  const stateGenerationRef = useRef(0);
+
+  const resolveClusterId = useCallback((id: string) => {
+    let current = id;
+    const seen = new Set<string>();
+    while (clusterAliasesRef.current.has(current) && !seen.has(current)) {
+      seen.add(current);
+      current = clusterAliasesRef.current.get(current)!;
+    }
+    return current;
+  }, []);
+
+  const replaceAnswers = useCallback(
+    (next: StudentAnswer[] | ((current: StudentAnswer[]) => StudentAnswer[])) => {
+      const value = typeof next === "function" ? next(answersRef.current) : next;
+      answersRef.current = value;
+      setAnswersState(value);
+      return value;
+    },
+    [],
+  );
+  const replaceClusters = useCallback(
+    (next: Cluster[] | ((current: Cluster[]) => Cluster[])) => {
+      const value = typeof next === "function" ? next(clustersRef.current) : next;
+      clustersRef.current = value;
+      setClustersState(value);
+      return value;
+    },
+    [],
+  );
+  const replacePacks = useCallback(
+    (
+      next:
+        | Record<string, ReteachPack>
+        | ((current: Record<string, ReteachPack>) => Record<string, ReteachPack>),
+    ) => {
+      const value = typeof next === "function" ? next(packsRef.current) : next;
+      packsRef.current = value;
+      setReteachPacksState(value);
+      return value;
+    },
+    [],
+  );
+  const replaceSessionId = useCallback((next: string | null) => {
+    sessionIdRef.current = next;
+    setSessionIdState(next);
+  }, []);
+
+  const resetToDemo = useCallback(() => {
+    stateGenerationRef.current += 1;
+    clusterAliasesRef.current.clear();
+    replaceAnswers(ANSWERS);
+    replaceClusters(CLUSTERS);
+    replacePacks(RETEACH_PACKS);
+    replaceSessionId(null);
+    setContext(DEMO_CONTEXT);
+    setPrediction(SESSION.prediction ?? "");
+    setCourseCode(SESSION.courseCode);
+    setCourseTitle(SESSION.courseTitle);
+    setPendingRun(null);
+    setProcessed(true);
+    setConfirmed(false);
+    setIsDemo(true);
+    isDemoRef.current = true;
+    setSaveError(null);
+    setSnapshotSaveState("clean");
+    failedWritesRef.current = false;
+  }, [replaceAnswers, replaceClusters, replacePacks, replaceSessionId]);
+
   useEffect(() => {
-    let stored: string | null = null;
+    if (!browserClient) return;
+    let cancelled = false;
+    let currentAccount: string | null = null;
+    const applyAccount = (id: string | null) => {
+      if (cancelled) return;
+      if (currentAccount && currentAccount !== id) resetToDemo();
+      currentAccount = id;
+      setStorageOwnerKey(id ? `user:${id}` : null);
+    };
+
+    void browserClient.auth
+      .getUser()
+      .then(({ data }) => applyAccount(data.user?.id ?? null))
+      .catch(() => applyAccount(null));
+    const { data: subscription } = browserClient.auth.onAuthStateChange((_event, next) => {
+      applyAccount(next?.user.id ?? null);
+    });
+    return () => {
+      cancelled = true;
+      subscription.subscription.unsubscribe();
+    };
+  }, [browserClient, resetToDemo]);
+
+  useEffect(() => {
+    if (!storageOwnerKey) return;
+    const key = `${STORAGE_PREFIX}${storageOwnerKey}`;
+    let raw: string | null = null;
     try {
-      stored = window.sessionStorage.getItem(STORAGE_KEY);
+      raw = window.sessionStorage.getItem(key);
+      if (!raw && storageOwnerKey === "local") {
+        const legacy = window.sessionStorage.getItem(LEGACY_STORAGE_KEY);
+        if (legacy) {
+          const parsed = JSON.parse(legacy) as Omit<StoredRun, "ownerKey">;
+          raw = JSON.stringify({ ...parsed, ownerKey: "local" });
+        }
+      }
     } catch {
-      // Private browsing and blocked storage both land here. The demo class
-      // is the correct fallback, so there is nothing to report.
       return;
     }
-    if (!stored) return;
+    if (!raw) return;
 
     try {
-      const run = JSON.parse(stored) as StoredRun;
-      if (!Array.isArray(run.answers) || run.answers.length === 0) return;
-      /* eslint-disable react-hooks/set-state-in-effect --
-       * Restoring after mount is the point, not an oversight. sessionStorage
-       * does not exist during the server render, so reading it any earlier
-       * would make the server and client produce different markup and throw a
-       * hydration mismatch on every reload that follows a run. This runs once,
-       * only when a stored run exists, and the cascading render it costs is
-       * the price of correct hydration. */
-      setAnswers(run.answers);
-      setClusters(run.clusters ?? []);
-      setReteachPacks(run.reteachPacks ?? {});
-      setContext(run.context ?? DEMO_CONTEXT);
-      setPrediction(run.prediction ?? "");
-      setSessionId(run.sessionId ?? null);
+      const run = savedRun(JSON.parse(raw), storageOwnerKey);
+      if (!run) return;
+      stateGenerationRef.current += 1;
+      clusterAliasesRef.current.clear();
+      /* eslint-disable react-hooks/set-state-in-effect -- storage is unavailable during SSR */
+      replaceAnswers(run.answers);
+      replaceClusters(run.clusters);
+      replacePacks(run.reteachPacks);
+      replaceSessionId(run.sessionId);
+      setContext(run.context);
+      setPrediction(run.prediction);
+      setCourseCode(run.courseCode);
+      setCourseTitle(run.courseTitle);
       setIsDemo(false);
+      isDemoRef.current = false;
       setProcessed(true);
+      setPendingRun(null);
+      if (run.saveState && run.saveState !== "clean") {
+        failedWritesRef.current = true;
+        setSnapshotSaveState("failed");
+        setSaveError(
+          run.saveError ??
+            "Some local edits were not confirmed by the database. Reopen the saved copy before exporting.",
+        );
+      } else {
+        failedWritesRef.current = false;
+        setSnapshotSaveState("clean");
+        setSaveError(null);
+      }
       /* eslint-enable react-hooks/set-state-in-effect */
     } catch {
       try {
-        window.sessionStorage.removeItem(STORAGE_KEY);
+        window.sessionStorage.removeItem(key);
       } catch {
-        // Nothing further to do; the demo class stands.
+        // The seeded demo remains available when browser storage is blocked.
       }
     }
-  }, []);
+  }, [storageOwnerKey, replaceAnswers, replaceClusters, replacePacks, replaceSessionId]);
 
-  const persist = useCallback((run: StoredRun) => {
-    try {
-      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(run));
-    } catch {
-      // Over quota or blocked. The run stays in memory for this visit.
-    }
-  }, []);
-
-  /**
-   * Mirrors a change to Supabase when the run was saved there.
-   *
-   * Imported lazily and only for a persisted run, so the seeded demo class
-   * never pulls the server-action module into the client at all.
-   */
-  const mirror = useCallback(
-    (apply: (actions: typeof import("@/app/actions")) => Promise<unknown>) => {
-      if (!sessionId) return;
-      void import("@/app/actions")
-        .then(apply)
-        .catch(() => {
-          // The edit is already applied locally and stored for this visit.
-          // Surfacing a database hiccup mid-review would cost more than it
-          // saves; the lecturer's work is not lost either way.
+  const enqueueMirror = useCallback(
+    (
+      apply: (
+        actions: typeof import("@/app/actions"),
+        sessionActions: typeof import("@/app/session-actions"),
+      ) => Promise<ActionResult>,
+    ) => {
+      if (!sessionIdRef.current) return;
+      const generation = stateGenerationRef.current;
+      pendingWritesRef.current += 1;
+      setSaving(true);
+      setSnapshotSaveState("pending");
+      const queued = editQueueRef.current
+        .then(async () => {
+          const [actions, sessionActions] = await Promise.all([
+            import("@/app/actions"),
+            import("@/app/session-actions"),
+          ]);
+          requireSuccess(await apply(actions, sessionActions));
+        })
+        .catch((error: unknown) => {
+          if (stateGenerationRef.current === generation) {
+            failedWritesRef.current = true;
+            setSnapshotSaveState("failed");
+            setSaveError(error instanceof Error ? error.message : "The change could not be saved.");
+          }
+        })
+        .finally(() => {
+          pendingWritesRef.current -= 1;
+          if (pendingWritesRef.current === 0 && stateGenerationRef.current === generation) {
+            setSaving(false);
+            if (!failedWritesRef.current) setSnapshotSaveState("clean");
+          }
         });
+      editQueueRef.current = queued;
     },
-    [sessionId],
+    [],
   );
+
+  const flushChanges = useCallback(async () => {
+    await editQueueRef.current;
+    await initialSavePromiseRef.current;
+    return isDemoRef.current || (!failedWritesRef.current && !!sessionIdRef.current);
+  }, []);
 
   const setScore = useCallback(
     (answerId: string, score: number) => {
-      let saved: { score: number; status: ReviewStatus } | null = null;
-
-      setAnswers((prev) =>
-        prev.map((a) => {
-          if (a.id !== answerId) return a;
-          const next = {
-            ...a,
-            provisionalScore: Math.max(0, Math.min(a.maxScore, score)),
-            status: (score === a.provisionalScore
-              ? a.status
-              : "edited") as ReviewStatus,
-          };
-          saved = { score: next.provisionalScore, status: next.status };
-          return next;
-        }),
+      if (initialSaveInFlightRef.current) return;
+      if (!Number.isFinite(score)) return;
+      const current = answersRef.current.find((answer) => answer.id === answerId);
+      if (!current) return;
+      const nextScore = Math.max(0, Math.min(current.maxScore, Math.round(score)));
+      const status = nextScore === current.provisionalScore ? current.status : "edited";
+      replaceAnswers((items) =>
+        items.map((answer) =>
+          answer.id === answerId
+            ? { ...answer, provisionalScore: nextScore, status }
+            : answer,
+        ),
       );
-
-      mirror((actions) =>
-        saved
-          ? actions.saveScoreAction({ answerId, ...saved })
-          : Promise.resolve({ ok: true }),
-      );
+      setConfirmed(false);
+      enqueueMirror(async (actions) => actions.saveScoreAction({ answerId, score: nextScore, status }));
     },
-    [mirror],
+    [enqueueMirror, replaceAnswers],
   );
 
   const setStatus = useCallback(
     (answerId: string, status: ReviewStatus) => {
-      setAnswers((prev) =>
-        prev.map((a) => (a.id === answerId ? { ...a, status } : a)),
+      if (initialSaveInFlightRef.current) return;
+      if (!answersRef.current.some((answer) => answer.id === answerId)) return;
+      replaceAnswers((items) =>
+        items.map((answer) => (answer.id === answerId ? { ...answer, status } : answer)),
       );
-      mirror((actions) =>
-        actions.saveStatusAction({ answerIds: [answerId], status }),
-      );
+      setConfirmed(false);
+      enqueueMirror(async (actions) => actions.saveStatusAction({ answerIds: [answerId], status }));
     },
-    [mirror],
+    [enqueueMirror, replaceAnswers],
   );
 
   const acceptAbove = useCallback(
     (threshold: number) => {
-      let affected: string[] = [];
-
-      setAnswers((prev) => {
-        affected = prev
-          .filter((a) => a.status === "unreviewed" && a.confidence >= threshold)
-          .map((a) => a.id);
-        return prev.map((a) =>
-          a.status === "unreviewed" && a.confidence >= threshold
-            ? { ...a, status: "accepted" }
-            : a,
-        );
-      });
-
-      mirror((actions) =>
-        affected.length > 0
-          ? actions.saveStatusAction({ answerIds: affected, status: "accepted" })
-          : Promise.resolve({ ok: true }),
+      if (initialSaveInFlightRef.current) return;
+      const ids = answersRef.current
+        .filter((answer) => answer.status === "unreviewed" && answer.confidence >= threshold)
+        .map((answer) => answer.id);
+      if (ids.length === 0) return;
+      const idSet = new Set(ids);
+      replaceAnswers((items) =>
+        items.map((answer) =>
+          idSet.has(answer.id) ? { ...answer, status: "accepted" } : answer,
+        ),
+      );
+      setConfirmed(false);
+      enqueueMirror(async (actions) =>
+        actions.saveStatusAction({ answerIds: ids, status: "accepted" }),
       );
     },
-    [mirror],
+    [enqueueMirror, replaceAnswers],
   );
 
   const resetReview = useCallback(() => {
-    let ids: string[] = [];
-
-    setAnswers((prev) => {
-      ids = prev.map((a) => a.id);
-      return prev.map((a) => ({ ...a, status: "unreviewed" }));
-    });
+    if (initialSaveInFlightRef.current) return;
+    const ids = answersRef.current.map((answer) => answer.id);
+    replaceAnswers((items) => items.map((answer) => ({ ...answer, status: "unreviewed" })));
     setConfirmed(false);
+    if (ids.length > 0) {
+      enqueueMirror(async (actions) =>
+        actions.saveStatusAction({ answerIds: ids, status: "unreviewed" }),
+      );
+    }
+  }, [enqueueMirror, replaceAnswers]);
 
-    mirror((actions) =>
-      ids.length > 0
-        ? actions.saveStatusAction({ answerIds: ids, status: "unreviewed" })
-        : Promise.resolve({ ok: true }),
-    );
-  }, [mirror]);
+  const invalidateLocalPacks = useCallback(
+    (ids: string[]) => {
+      const stale = new Set(ids);
+      replacePacks((items) =>
+        Object.fromEntries(Object.entries(items).filter(([id]) => !stale.has(id))),
+      );
+    },
+    [replacePacks],
+  );
 
   const renameCluster = useCallback(
     (clusterId: string, label: string) => {
-      setClusters((prev) =>
-        prev.map((c) => (c.id === clusterId ? { ...c, label } : c)),
+      if (initialSaveInFlightRef.current) return;
+      if (!clustersRef.current.some((cluster) => cluster.id === clusterId)) return;
+      replaceClusters((items) =>
+        items.map((cluster) => (cluster.id === clusterId ? { ...cluster, label } : cluster)),
       );
-      mirror((actions) => actions.renameClusterAction({ clusterId, label }));
+      invalidateLocalPacks([clusterId]);
+      enqueueMirror(async (actions, sessionActions) => {
+        const remoteClusterId = resolveClusterId(clusterId);
+        requireSuccess(await actions.renameClusterAction({ clusterId: remoteClusterId, label }));
+        return sessionActions.invalidateReteachPacksAction({ clusterIds: [remoteClusterId] });
+      });
     },
-    [mirror],
+    [enqueueMirror, invalidateLocalPacks, replaceClusters, resolveClusterId],
   );
 
-  /** Rejecting sends the members to the one-off bucket; nothing is deleted. */
   const rejectCluster = useCallback(
     (clusterId: string) => {
-      let movedIds: string[] = [];
-      let otherId: string | null = null;
-
-      setClusters((prev) => {
-        const current = prev.find((c) => c.id === clusterId);
-        if (!current || current.isOther) return prev;
-        movedIds = current.memberIds;
-        otherId = prev.find((c) => c.isOther)?.id ?? null;
-        return prev
-          .map((c) =>
-            c.isOther
-              ? { ...c, memberIds: [...c.memberIds, ...current.memberIds] }
-              : c,
-          )
-          .filter((c) => c.id !== clusterId);
-      });
-      setAnswers((prev) =>
-        prev.map((a) =>
-          a.clusterId === clusterId ? { ...a, clusterId: "cl-other" } : a,
+      if (initialSaveInFlightRef.current) return;
+      const current = clustersRef.current.find((cluster) => cluster.id === clusterId);
+      const other = clustersRef.current.find((cluster) => cluster.isOther);
+      if (!current || current.isOther || !other) return;
+      const movedIds = [...current.memberIds];
+      const moved = new Set(movedIds);
+      replaceClusters((items) =>
+        items
+          .filter((cluster) => cluster.id !== clusterId)
+          .map((cluster) =>
+            cluster.id === other.id
+              ? { ...cluster, memberIds: Array.from(new Set([...cluster.memberIds, ...movedIds])) }
+              : cluster,
+          ),
+      );
+      replaceAnswers((items) =>
+        items.map((answer) =>
+          moved.has(answer.id) ? { ...answer, clusterId: other.id } : answer,
         ),
       );
-
-      mirror(async (actions) => {
-        if (movedIds.length > 0) {
-          await actions.reassignAnswersAction({
-            answerIds: movedIds,
-            clusterId: otherId,
-          });
-        }
-        return actions.deleteClusterAction({ clusterId });
+      invalidateLocalPacks([clusterId, other.id]);
+      enqueueMirror(async (actions, sessionActions) => {
+        const remoteClusterId = resolveClusterId(clusterId);
+        const remoteOtherId = resolveClusterId(other.id);
+        requireSuccess(
+          await actions.reassignAnswersAction({ answerIds: movedIds, clusterId: remoteOtherId }),
+        );
+        requireSuccess(
+          await sessionActions.invalidateReteachPacksAction({
+            clusterIds: [remoteClusterId, remoteOtherId],
+          }),
+        );
+        return actions.deleteClusterAction({ clusterId: remoteClusterId });
       });
     },
-    [mirror],
+    [enqueueMirror, invalidateLocalPacks, replaceAnswers, replaceClusters, resolveClusterId],
   );
 
   const mergeCluster = useCallback(
     (sourceId: string, targetId: string) => {
+      if (initialSaveInFlightRef.current) return;
       if (sourceId === targetId) return;
-      let movedIds: string[] = [];
-
-      setClusters((prev) => {
-        const source = prev.find((c) => c.id === sourceId);
-        const target = prev.find((c) => c.id === targetId);
-        if (!source || !target) return prev;
-        movedIds = source.memberIds;
-        return prev
-          .map((c) =>
-            c.id === targetId
+      const source = clustersRef.current.find((cluster) => cluster.id === sourceId);
+      const target = clustersRef.current.find((cluster) => cluster.id === targetId);
+      if (!source || !target) return;
+      const movedIds = [...source.memberIds];
+      const moved = new Set(movedIds);
+      const mergedSeverity = Math.max(target.severity, source.severity);
+      const mergedDownstream = Array.from(new Set([...target.downstream, ...source.downstream]));
+      replaceClusters((items) =>
+        items
+          .filter((cluster) => cluster.id !== sourceId)
+          .map((cluster) =>
+            cluster.id === targetId
               ? {
-                  ...c,
-                  memberIds: [...c.memberIds, ...source.memberIds],
-                  severity: Math.max(c.severity, source.severity),
-                  downstream: Array.from(
-                    new Set([...c.downstream, ...source.downstream]),
-                  ),
+                  ...cluster,
+                  memberIds: Array.from(new Set([...cluster.memberIds, ...movedIds])),
+                  severity: mergedSeverity,
+                  downstream: mergedDownstream,
                 }
-              : c,
-          )
-          .filter((c) => c.id !== sourceId);
-      });
-      setAnswers((prev) =>
-        prev.map((a) =>
-          a.clusterId === sourceId ? { ...a, clusterId: targetId } : a,
+              : cluster,
+          ),
+      );
+      replaceAnswers((items) =>
+        items.map((answer) =>
+          moved.has(answer.id) ? { ...answer, clusterId: targetId } : answer,
         ),
       );
-
-      mirror(async (actions) => {
-        if (movedIds.length > 0) {
-          await actions.reassignAnswersAction({
-            answerIds: movedIds,
-            clusterId: targetId,
-          });
-        }
-        return actions.deleteClusterAction({ clusterId: sourceId });
+      invalidateLocalPacks([sourceId, targetId]);
+      enqueueMirror(async (actions, sessionActions) => {
+        const remoteSourceId = resolveClusterId(sourceId);
+        const remoteTargetId = resolveClusterId(targetId);
+        requireSuccess(
+          await actions.reassignAnswersAction({ answerIds: movedIds, clusterId: remoteTargetId }),
+        );
+        requireSuccess(
+          await sessionActions.updateClusterShapeAction({
+            clusterId: remoteTargetId,
+            severity: mergedSeverity,
+            downstream: mergedDownstream,
+          }),
+        );
+        requireSuccess(
+          await sessionActions.invalidateReteachPacksAction({
+            clusterIds: [remoteSourceId, remoteTargetId],
+          }),
+        );
+        return actions.deleteClusterAction({ clusterId: remoteSourceId });
       });
     },
-    [mirror],
+    [enqueueMirror, invalidateLocalPacks, replaceAnswers, replaceClusters, resolveClusterId],
   );
 
   const splitOut = useCallback(
     (clusterId: string, answerIds: string[], label: string) => {
+      if (initialSaveInFlightRef.current) return;
       if (answerIds.length === 0) return;
-      const newId = `cl-split-${Date.now().toString(36)}`;
-
-      // Chosen inside the updater, against the freshest cluster set. Picking a
-      // tone from a snapshot taken outside would hand two splits made in the
-      // same batch the same colour, because the first is not in that snapshot.
-      let spec: Omit<Cluster, "id" | "memberIds"> | null = null;
-      let rank = 0;
-
-      setClusters((prev) => {
-        const current = prev.find((c) => c.id === clusterId);
-        if (!current) return prev;
-        const remaining = current.memberIds.filter(
-          (id) => !answerIds.includes(id),
+      const current = clustersRef.current.find((cluster) => cluster.id === clusterId);
+      if (!current) return;
+      const selected = new Set(answerIds.filter((id) => current.memberIds.includes(id)));
+      if (selected.size === 0) return;
+      const localId = `cl-split-${globalThis.crypto.randomUUID()}`;
+      const usedTones = new Set(clustersRef.current.map((cluster) => cluster.tone));
+      const tone = ([1, 2, 3, 4, 5, 6] as const).find((value) => !usedTones.has(value)) ?? 6;
+      const sourceIndex = clustersRef.current.findIndex((cluster) => cluster.id === clusterId);
+      const spec: Omit<Cluster, "id" | "memberIds"> = {
+        tone,
+        label,
+        why: `Split out by the lecturer from “${current.label}”.`,
+        severity: current.severity,
+        downstream: [...current.downstream],
+        isOther: false,
+      };
+      const movedIds = [...selected];
+      replaceClusters((items) => {
+        const updated = items.map((cluster) =>
+          cluster.id === clusterId
+            ? { ...cluster, memberIds: cluster.memberIds.filter((id) => !selected.has(id)) }
+            : cluster,
         );
-        const usedTones = new Set(prev.map((c) => c.tone));
-        const tone = ([1, 2, 3, 4, 5, 6] as const).find(
-          (t) => !usedTones.has(t),
-        );
-        const updated = prev.map((c) =>
-          c.id === clusterId ? { ...c, memberIds: remaining } : c,
-        );
-        const insertAt = updated.findIndex((c) => c.id === clusterId) + 1;
-        spec = {
-          tone: tone ?? 6,
-          label,
-          why: "Split out by the lecturer from “" + current.label + "”.",
-          severity: current.severity,
-          downstream: current.downstream,
-          isOther: false,
-        };
-        rank = insertAt;
-        const next: Cluster = { ...spec, id: newId, memberIds: answerIds };
-        return [
-          ...updated.slice(0, insertAt),
-          next,
-          ...updated.slice(insertAt),
-        ].filter((c) => c.memberIds.length > 0 || c.isOther);
+        updated.splice(sourceIndex + 1, 0, { ...spec, id: localId, memberIds: movedIds });
+        return updated.filter((cluster) => cluster.isOther || cluster.memberIds.length > 0);
       });
-      setAnswers((prev) =>
-        prev.map((a) =>
-          answerIds.includes(a.id) ? { ...a, clusterId: newId } : a,
+      replaceAnswers((items) =>
+        items.map((answer) =>
+          selected.has(answer.id) ? { ...answer, clusterId: localId } : answer,
         ),
       );
-
-      mirror(async (actions) => {
-        // The updater above has run by now: React processes it during the
-        // render this call schedules, which lands well before a dynamic
-        // import resolves.
-        if (!sessionId || !spec) return;
-        const { clusterId: realId } = await actions.createClusterAction({
-          sessionId,
+      invalidateLocalPacks([clusterId]);
+      const targetSessionId = sessionIdRef.current;
+      const generation = stateGenerationRef.current;
+      enqueueMirror(async (actions, sessionActions) => {
+        if (!targetSessionId) return;
+        const created = await actions.createClusterAction({
+          sessionId: targetSessionId,
           cluster: spec,
-          rank,
+          rank: sourceIndex + 1,
         });
-        if (!realId) return;
-        // Re-key the optimistic cluster to the row that now backs it, so a
-        // later rename or merge addresses the real row rather than a local id.
-        setClusters((prev) =>
-          prev.map((c) => (c.id === newId ? { ...c, id: realId } : c)),
+        requireSuccess(created);
+        if (!created.clusterId) throw new Error("The split cluster could not be saved.");
+        clusterAliasesRef.current.set(localId, created.clusterId);
+        requireSuccess(
+          await actions.reassignAnswersAction({
+            answerIds: movedIds,
+            clusterId: created.clusterId,
+          }),
         );
-        setAnswers((prev) =>
-          prev.map((a) =>
-            a.clusterId === newId ? { ...a, clusterId: realId } : a,
+        requireSuccess(
+          await sessionActions.invalidateReteachPacksAction({
+            clusterIds: [resolveClusterId(clusterId)],
+          }),
+        );
+        if (stateGenerationRef.current !== generation) return;
+        replaceClusters((items) =>
+          items.map((cluster) =>
+            cluster.id === localId ? { ...cluster, id: created.clusterId! } : cluster,
           ),
         );
-        return actions.reassignAnswersAction({ answerIds, clusterId: realId });
+        replaceAnswers((items) =>
+          items.map((answer) =>
+            answer.clusterId === localId ? { ...answer, clusterId: created.clusterId } : answer,
+          ),
+        );
       });
     },
-    // Deliberately not depending on `clusters`: everything this needs is read
-    // from the updater's own `prev`. Depending on it would give the callback a
-    // new identity after every split, restarting any effect keyed on it.
-    [mirror, sessionId],
+    [enqueueMirror, invalidateLocalPacks, replaceAnswers, replaceClusters, resolveClusterId],
   );
 
   const startRun = useCallback((run: PendingRun) => {
+    if (initialSaveInFlightRef.current) return;
     setPendingRun(run);
     setPrediction(run.prediction);
+    setCourseCode(run.courseCode?.trim() ?? "");
+    setCourseTitle(run.courseTitle?.trim() ?? "");
     setProcessed(false);
+    setConfirmed(false);
   }, []);
 
   const applyRun = useCallback(
@@ -474,71 +657,207 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       result: PipelineResult,
       newSessionId: string | null,
       runContext: RunContext,
+      course?: CourseIdentity,
+      runPrediction?: string,
     ) => {
-      setAnswers(result.answers);
-      setClusters(result.clusters);
-      setReteachPacks(result.reteachPacks ?? {});
-      setSessionId(newSessionId);
-      // Taken as an argument rather than read back out of pendingRun inside a
-      // state updater: updaters must stay pure, and React would run that one
-      // twice in development, calling setContext as a side effect each time.
+      stateGenerationRef.current += 1;
+      clusterAliasesRef.current.clear();
+      replaceAnswers(result.answers);
+      replaceClusters(result.clusters);
+      replacePacks(result.reteachPacks ?? {});
+      replaceSessionId(newSessionId);
       setContext(runContext);
+      if (course) {
+        setCourseCode(course.code);
+        setCourseTitle(course.title);
+      }
+      if (runPrediction !== undefined) setPrediction(runPrediction);
       setIsDemo(false);
+      isDemoRef.current = false;
       setProcessed(true);
       setConfirmed(false);
       setPendingRun(null);
+      if (newSessionId) {
+        setSaveError(null);
+        setSnapshotSaveState("clean");
+        failedWritesRef.current = false;
+      } else {
+        setSaveError("This run has not been saved. Retry without rerunning the analysis.");
+        setSnapshotSaveState("failed");
+        failedWritesRef.current = true;
+      }
     },
-    [],
+    [replaceAnswers, replaceClusters, replacePacks, replaceSessionId],
   );
 
-  const setReteachPack = useCallback((clusterId: string, pack: ReteachPack) => {
-    setReteachPacks((prev) => ({ ...prev, [clusterId]: pack }));
-  }, []);
+  const previewDemo = useCallback(() => {
+    stateGenerationRef.current += 1;
+    clusterAliasesRef.current.clear();
+    replaceAnswers(ANSWERS);
+    replaceClusters(CLUSTERS);
+    replacePacks(RETEACH_PACKS);
+    replaceSessionId(null);
+    setContext(DEMO_CONTEXT);
+    setCourseCode(SESSION.courseCode);
+    setCourseTitle(SESSION.courseTitle);
+    setPendingRun(null);
+    setProcessed(false);
+    setConfirmed(false);
+    setIsDemo(true);
+    isDemoRef.current = true;
+    failedWritesRef.current = false;
+    setSnapshotSaveState("clean");
+    setSaveError(null);
+  }, [replaceAnswers, replaceClusters, replacePacks, replaceSessionId]);
 
-  // Whatever changed, a real run is written back so a reload does not discard
-  // a lecturer's marking. The demo class is never stored — it is regenerated
-  // identically on every visit, and storing it would shadow a later real run.
-  useEffect(() => {
-    if (isDemo) return;
-    persist({ answers, clusters, reteachPacks, context, prediction, sessionId });
+  const retrySave = useCallback(async () => {
+    if (isDemo || sessionIdRef.current) return true;
+    if (initialSaveInFlightRef.current) return initialSavePromiseRef.current;
+
+    const generation = stateGenerationRef.current;
+    const input: Omit<PipelineInput, "answers"> = {
+      question: context.question,
+      scheme: context.scheme,
+      criteria: context.criteria,
+      subject: context.subject,
+      level: context.level,
+    };
+    const result: PipelineResult = {
+      answers: answersRef.current,
+      clusters: clustersRef.current,
+      reteachPacks: packsRef.current,
+      maxScore:
+        answersRef.current[0]?.maxScore ??
+        context.criteria.reduce((total, criterion) => total + criterion.marks, 0),
+    };
+    initialSaveInFlightRef.current = true;
+    setSaving(true);
+    setConfirmed(false);
+    setSaveError(null);
+    setSnapshotSaveState("pending");
+
+    const attempt = import("@/app/session-actions")
+      .then((actions) =>
+        actions.saveCompletedRunAction({
+          input,
+          result,
+          prediction,
+          course: { code: courseCode, title: courseTitle },
+        }),
+      )
+      .then((saved) => {
+        if (!saved.ok) throw new Error(saved.error);
+        if (stateGenerationRef.current !== generation) return true;
+        replaceAnswers(saved.result.answers);
+        replaceClusters(saved.result.clusters);
+        replacePacks(saved.result.reteachPacks ?? {});
+        replaceSessionId(saved.sessionId);
+        failedWritesRef.current = false;
+        setSnapshotSaveState("clean");
+        setSaveError(null);
+        return true;
+      })
+      .catch((error: unknown) => {
+        if (stateGenerationRef.current === generation) {
+          failedWritesRef.current = true;
+          setSnapshotSaveState("failed");
+          setSaveError(error instanceof Error ? error.message : "The run could not be saved.");
+        }
+        return false;
+      })
+      .finally(() => {
+        initialSaveInFlightRef.current = false;
+        if (stateGenerationRef.current === generation) setSaving(false);
+      });
+    initialSavePromiseRef.current = attempt;
+    return attempt;
   }, [
     isDemo,
+    context,
+    prediction,
+    courseCode,
+    courseTitle,
+    replaceAnswers,
+    replaceClusters,
+    replacePacks,
+    replaceSessionId,
+  ]);
+
+  const setReteachPack = useCallback(
+    (clusterId: string, pack: ReteachPack) => {
+      if (initialSaveInFlightRef.current) return;
+      replacePacks((items) => ({ ...items, [clusterId]: pack }));
+    },
+    [replacePacks],
+  );
+
+  useEffect(() => {
+    if (isDemo || !storageOwnerKey) return;
+    const run: StoredRun = {
+      answers,
+      clusters,
+      reteachPacks,
+      context,
+      prediction,
+      sessionId,
+      courseCode,
+      courseTitle,
+      ownerKey: storageOwnerKey,
+      saveState: snapshotSaveState,
+      saveError,
+    };
+    try {
+      window.sessionStorage.setItem(
+        `${STORAGE_PREFIX}${storageOwnerKey}`,
+        JSON.stringify(run),
+      );
+    } catch {
+      // Remote persistence remains authoritative when browser storage is
+      // blocked or full; Saved sessions can still recover the run.
+    }
+  }, [
+    isDemo,
+    storageOwnerKey,
     answers,
     clusters,
     reteachPacks,
     context,
     prediction,
     sessionId,
-    persist,
+    courseCode,
+    courseTitle,
+    snapshotSaveState,
+    saveError,
   ]);
 
   const criterionLabel = useCallback(
-    (id: string) => context.criteria.find((c) => c.id === id)?.label ?? id,
+    (id: string) => context.criteria.find((criterion) => criterion.id === id)?.label ?? id,
     [context.criteria],
   );
-
+  const updatePrediction = useCallback((value: string) => {
+    if (initialSaveInFlightRef.current) return;
+    setPrediction(value);
+  }, []);
   const reviewedCount = useMemo(
-    () => answers.filter((a) => a.status !== "unreviewed").length,
+    () => answers.filter((answer) => answer.status !== "unreviewed").length,
     [answers],
   );
-
   const needsAttention = useMemo(
     () =>
       answers.filter(
-        (a) => a.status === "unreviewed" && a.confidence < CONFIDENCE_THRESHOLD,
+        (answer) => answer.status === "unreviewed" && answer.confidence < CONFIDENCE_THRESHOLD,
       ).length,
     [answers],
   );
-
   const flaggedCount = useMemo(
-    () => answers.filter((a) => a.status === "flagged").length,
+    () => answers.filter((answer) => answer.status === "flagged").length,
     [answers],
   );
-
   const blockedCount = useMemo(
     () =>
-      answers.filter((a) => a.status === "unreviewed" || a.status === "flagged")
-        .length,
+      answers.filter(
+        (answer) => answer.status === "unreviewed" || answer.status === "flagged",
+      ).length,
     [answers],
   );
 
@@ -553,8 +872,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       confirmedBy,
       reviewedCount,
       needsAttention,
-      // Counted against this run's own size, not a constant — a batch of 12
-      // answers must be able to reach a reviewed state just as a batch of 40 can.
       exportReady: answers.length > 0 && blockedCount === 0,
       blockedCount,
       flaggedCount,
@@ -564,8 +881,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       pendingRun,
       reteachPacks,
       totalAnswers: answers.length,
-      courseCode: isDemo ? SESSION.courseCode : (pendingRun?.courseCode ?? ""),
-      courseTitle: isDemo ? SESSION.courseTitle : (pendingRun?.courseTitle ?? ""),
+      courseCode,
+      courseTitle,
+      saving,
+      saveError,
+      flushChanges,
+      retrySave,
+      previewDemo,
       criterionLabel,
       setScore,
       setStatus,
@@ -575,7 +897,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       rejectCluster,
       mergeCluster,
       splitOut,
-      setPrediction,
+      setPrediction: updatePrediction,
       setSortMode,
       setProcessed,
       setConfirmed,
@@ -601,6 +923,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       context,
       pendingRun,
       reteachPacks,
+      courseCode,
+      courseTitle,
+      saving,
+      saveError,
+      flushChanges,
+      retrySave,
+      previewDemo,
       criterionLabel,
       setScore,
       setStatus,
@@ -613,6 +942,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       startRun,
       applyRun,
       setReteachPack,
+      updatePrediction,
     ],
   );
 

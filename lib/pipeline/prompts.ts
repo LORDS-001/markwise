@@ -75,6 +75,7 @@ export function extractionSystemPrompt(): string {
 export function extractionPrompt(
   input: PipelineInput,
   answer: RawAnswer,
+  correlationReference = "submission",
 ): string {
   const total = input.criteria.reduce((sum, c) => sum + c.marks, 0);
 
@@ -92,7 +93,7 @@ ${criteriaBlock(input.criteria)}
 
 TOTAL MARKS AVAILABLE: ${total}
 
-STUDENT ANSWER (id ${answer.studentRef}):
+STUDENT ANSWER (reference ${correlationReference}):
 ---
 ${answer.text}
 ---
@@ -205,6 +206,37 @@ export const DAMAGE_SCHEMA = {
     severity: { type: "integer" },
   },
   required: ["downstream", "severity"],
+} as const;
+
+/**
+ * Labels a cluster and assesses its downstream damage in one model request.
+ * These judgments share the same misconception context; combining them keeps
+ * a default 40-answer run inside the conservative request-rate budget.
+ */
+export function clusterAssessmentPrompt(
+  input: PipelineInput,
+  signatures: string[],
+): string {
+  return `${labelPrompt(input, signatures)}
+
+After choosing that canonical misconception, assess its prerequisite damage.
+
+Rules for downstream damage:
+- Name between 1 and 4 real later topics in this subject and level.
+- Order them by how soon the student encounters them.
+- severity is 1 to 5: 1 is contained to this question; 5 blocks a foundational chain.
+- Judge severity by what the belief blocks, never by how many students hold it.`;
+}
+
+export const CLUSTER_ASSESSMENT_SCHEMA = {
+  type: "object",
+  properties: {
+    label: { type: "string" },
+    why: { type: "string" },
+    downstream: { type: "array", items: { type: "string" } },
+    severity: { type: "integer" },
+  },
+  required: ["label", "why", "downstream", "severity"],
 } as const;
 
 /* ------------------------------------------------------------------ */

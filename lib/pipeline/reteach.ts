@@ -63,17 +63,44 @@ export async function generateReteachPack(
     temperature: 0.4,
   });
 
+  if (!Array.isArray(raw.lesson) || raw.lesson.length !== 5) {
+    throw new Error("The generated reteach pack must contain exactly five lesson sections.");
+  }
+  const lesson = raw.lesson.map((section) => {
+    const heading =
+      typeof section?.heading === "string" ? section.heading.trim() : "";
+    const body = typeof section?.body === "string" ? section.body.trim() : "";
+    if (!heading || !body) {
+      throw new Error("Every reteach lesson section needs a heading and body.");
+    }
+    return { heading, body };
+  });
+
+  if (!Array.isArray(raw.diagnostics) || raw.diagnostics.length !== 2) {
+    throw new Error("The generated reteach pack must contain exactly two diagnostics.");
+  }
+  const diagnostics = raw.diagnostics.map((diagnostic) => {
+    const prompt =
+      typeof diagnostic?.prompt === "string" ? diagnostic.prompt.trim() : "";
+    const holderAnswers =
+      typeof diagnostic?.holder_answers === "string"
+        ? diagnostic.holder_answers.trim()
+        : "";
+    const correctedAnswers =
+      typeof diagnostic?.corrected_answers === "string"
+        ? diagnostic.corrected_answers.trim()
+        : "";
+    if (!prompt || !holderAnswers || !correctedAnswers) {
+      throw new Error(
+        "Every diagnostic needs a prompt plus holder and corrected answers.",
+      );
+    }
+    return { prompt, holderAnswers, correctedAnswers };
+  });
+
   return {
     clusterId: cluster.id,
-    lesson: (raw.lesson ?? [])
-      .filter((s) => s?.heading?.trim() && s?.body?.trim())
-      .map((s) => ({ heading: s.heading.trim(), body: s.body.trim() })),
-    diagnostics: (raw.diagnostics ?? [])
-      .filter((d) => d?.prompt?.trim())
-      .map((d) => ({
-        prompt: d.prompt.trim(),
-        holderAnswers: (d.holder_answers ?? "").trim(),
-        correctedAnswers: (d.corrected_answers ?? "").trim(),
-      })),
+    lesson,
+    diagnostics,
   };
 }

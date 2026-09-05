@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { learningChange, prevalence, verdictForStudent } from "@/lib/learning-change";
+import {
+  learningChange,
+  prevalence,
+  responsesForOutcome,
+  verdictForStudent,
+} from "@/lib/learning-change";
 import type { Cluster, DiagnosticResponse, StudentAnswer } from "@/lib/types";
 
 /**
@@ -72,6 +77,11 @@ describe("verdictForStudent", () => {
   it("counts them as corrected only when every question is", () => {
     expect(verdictForStudent(["corrected", "corrected"])).toBe("corrected");
     expect(verdictForStudent(["corrected", "unclear"])).toBe("unclear");
+  });
+
+  it("does not classify an incomplete or partly ungraded attempt as corrected", () => {
+    expect(verdictForStudent(["corrected"])).toBeNull();
+    expect(verdictForStudent(["corrected", null])).toBeNull();
   });
 
   it("does not let an unclear answer become a correction", () => {
@@ -194,5 +204,19 @@ describe("prevalence", () => {
 
   it("starts from the whole affected group", () => {
     expect(prevalence(base).before).toBe(100);
+  });
+});
+
+describe("responsesForOutcome", () => {
+  it("ignores browser-local verdicts for a saved run", () => {
+    const local = [response("a", 0, "corrected")];
+    const remote = [response("a", 0, "holds")];
+
+    expect(responsesForOutcome(false, local, remote)).toEqual(remote);
+  });
+
+  it("uses browser-local responses only for the credential-free demo", () => {
+    const local = [response("a", 0, null)];
+    expect(responsesForOutcome(true, local, [])).toEqual(local);
   });
 });

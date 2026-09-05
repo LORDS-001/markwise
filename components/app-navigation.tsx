@@ -9,6 +9,7 @@ import {
   Download,
   Eye,
   FileText,
+  History,
   Network,
   Settings,
   Table2,
@@ -38,6 +39,7 @@ export const STEPS = [
 ] as const;
 
 export function resolveStep(pathname: string) {
+  if (pathname.startsWith("/sessions")) return "/sessions";
   if (pathname.startsWith("/clusters")) return "/map";
   const match = STEPS.find((step) =>
     step.href === "/" ? pathname === "/" : pathname.startsWith(step.href),
@@ -106,6 +108,23 @@ export function AppNavigation({
           </span>
         </span>
       </Link>
+
+      <div className="px-3 pt-3">
+        <Link
+          href="/sessions"
+          onClick={onNavigate}
+          aria-current={pathname.startsWith("/sessions") ? "page" : undefined}
+          className={cn(
+            "flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-[13px] font-semibold transition-colors",
+            pathname.startsWith("/sessions")
+              ? "bg-brand-soft text-brand"
+              : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+          )}
+        >
+          <History size={16} strokeWidth={1.9} aria-hidden />
+          Saved sessions
+        </Link>
+      </div>
 
       <nav className="scroll-thin flex-1 overflow-y-auto px-3 py-3" aria-label="Session steps">
         <p className="label-caps px-2 pb-2 text-ink-3">This session</p>
