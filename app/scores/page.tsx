@@ -154,7 +154,7 @@ export default function ScoresPage() {
 
   return (
     <Page
-      eyebrow="Step 6 of 7"
+      eyebrow="Step 7 of 8"
       title="Review provisional scores"
       lead="Check low-confidence or flagged responses, then confirm the class for export."
     >
@@ -187,7 +187,7 @@ export default function ScoresPage() {
               aria-label="Score review controls"
               className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:px-5 lg:flex-row lg:items-center"
             >
-              <div className="flex flex-1 flex-wrap items-center gap-3">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
                 <input
                   ref={searchRef}
                   type="search"
@@ -195,9 +195,9 @@ export default function ScoresPage() {
                   onChange={(event) => setQuery(event.target.value)}
                   aria-label="Search responses"
                   placeholder="Search responses"
-                  className="h-8 w-full rounded-[10px] border border-control-border bg-surface px-3 text-[13px] text-ink placeholder:text-ink-3 hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--brand-line)] sm:w-52"
+                  className="h-10 w-full min-w-0 rounded-[var(--r-input)] border border-control-border bg-surface px-3 text-[14px] text-ink placeholder:text-ink-3 hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--brand-line)] sm:w-52"
                 />
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="label-caps text-ink-3">Status filter</span>
                   <label className="flex cursor-pointer select-none items-center gap-2 text-[13px] text-ink-2">
                     <input
@@ -260,7 +260,8 @@ export default function ScoresPage() {
               </div>
             </div>
 
-            <div className="hidden max-h-[70vh] overflow-x-auto overflow-y-auto scroll-thin lg:block">
+            {/* Keep absolute screen-reader labels inside the table's scroll area. */}
+            <div className="relative hidden max-h-[70vh] overflow-x-auto overflow-y-auto scroll-thin lg:block">
               <table className="w-full min-w-[960px] border-collapse text-left">
                 <caption className="sr-only">Student score review</caption>
                 <thead className="sticky top-0 z-10 bg-surface-2 label-caps text-ink-3">
@@ -318,8 +319,8 @@ export default function ScoresPage() {
         <aside className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-[80px]">
           <Card>
             <CardHead title="Class summary" hint="Provisional — updates as you edit" />
-            <dl className="flex flex-col gap-2.5 px-5 py-4 text-[13.5px]">
-              <SummaryRow label="Mean score" value={`${mean.toFixed(1)} / 10`} />
+            <dl className="flex flex-col gap-2.5 px-5 py-4 text-[14px]">
+              <SummaryRow label="Mean score" value={`${mean.toFixed(1)} / ${answers[0]?.maxScore ?? 0}`} />
               <SummaryRow label="Pass rate (≥40%)" value={`${passRate.toFixed(0)}%`} />
               <SummaryRow
                 label="Correct answers"
@@ -374,13 +375,13 @@ function TableRow({ a, clusterOf, setScore, changeStatusWithFocus, open, setOpen
         )}
       >
         <td className="px-4 py-1.5">
-          <div className="max-w-[120px] truncate font-mono text-[12.5px] text-ink">
+          <div className="max-w-[120px] truncate font-sans tnum text-[13px] text-ink">
             {a.studentId}
           </div>
           <div className="text-[12px] text-ink-3">{a.initials}</div>
         </td>
         <td className="px-3 py-1.5">
-          <p className="max-w-[320px] truncate text-[12.5px] text-ink-2" title={a.answer}>
+          <p className="max-w-[320px] truncate text-[13px] text-ink-2" title={a.answer}>
             {a.answer}
           </p>
         </td>
@@ -443,7 +444,7 @@ function MobileRow({ a, clusterOf, setScore, changeStatusWithFocus, open, setOpe
       <div className="flex flex-col gap-3 px-4 py-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="truncate font-mono text-[13px]">{a.studentId}</div>
+            <div className="truncate font-sans tnum text-[13px]">{a.studentId}</div>
             <div className="text-[12px] text-ink-3">{a.initials}</div>
           </div>
           <ClusterCell cluster={cluster} />
@@ -454,7 +455,7 @@ function MobileRow({ a, clusterOf, setScore, changeStatusWithFocus, open, setOpe
           <StatusCell a={a} changeStatus={changeStatusWithFocus} />
         </div>
 
-        <p className="line-clamp-2 text-[12.5px] leading-relaxed text-ink-2" title={a.answer}>
+        <p className="line-clamp-2 text-[13px] leading-relaxed text-ink-2" title={a.answer}>
           {a.answer}
         </p>
 
@@ -467,7 +468,7 @@ function MobileRow({ a, clusterOf, setScore, changeStatusWithFocus, open, setOpe
           type="button"
           onClick={() => setOpen(expanded ? null : a.id)}
           aria-expanded={expanded}
-          className="inline-flex w-fit items-center gap-1 text-[12.5px] text-ink-2 hover:text-ink"
+          className="inline-flex w-fit items-center gap-1 text-[13px] text-ink-2 hover:text-ink"
         >
           {expanded ? "Hide evidence" : "Show evidence"}
           <ChevronDown
@@ -500,7 +501,7 @@ function ScoreInput({
         aria-label={"Score for " + a.initials}
         className="h-8 w-[52px] rounded-[9px] border border-control-border bg-surface text-center text-[14px] font-semibold tnum hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--brand-line)]"
       />
-      <span className="text-[12.5px] text-ink-3 tnum">/{a.maxScore}</span>
+      <span className="text-[13px] text-ink-3 tnum">/{a.maxScore}</span>
     </div>
   );
 }
@@ -526,7 +527,7 @@ function CriteriaMeter({ a }: { a: StudentAnswer }) {
           />
         ))}
       </span>
-      <span className="shrink-0 text-[12.5px] text-ink-2 tnum">
+      <span className="shrink-0 text-[13px] text-ink-2 tnum">
         {met}/{total}
       </span>
       <span className="sr-only">criteria met</span>
@@ -548,7 +549,7 @@ function ClusterCell({
             style={{ background: toneColor(cluster.tone) }}
             aria-hidden
           />
-          <span className="truncate text-[12.5px] text-ink-2" title={cluster.label}>
+          <span className="truncate text-[13px] text-ink-2" title={cluster.label}>
             {cluster.label}
           </span>
         </>
@@ -626,11 +627,11 @@ function ExpandedPanel({ a }: { a: StudentAnswer }) {
     <div className="grid gap-4 border-t border-border bg-surface px-4 pb-5 pt-1 sm:px-5 md:grid-cols-2">
       <div className="pt-4">
         <div className="mb-2 label-caps text-ink-3">The answer</div>
-        <p className="rounded-[12px] bg-surface-2 px-3.5 py-3 text-[13.5px] leading-relaxed text-ink-2">
+        <p className="rounded-[12px] bg-surface-2 px-3.5 py-3 text-[14px] leading-relaxed text-ink-2">
           {a.answer}
         </p>
         {a.errorSignature ? (
-          <p className="mt-2 text-[12.5px] text-ink-2">
+          <p className="mt-2 text-[13px] text-ink-2">
             <span className="mr-1.5 label-caps text-ink-3">Signature</span>
             {a.errorSignature}
           </p>
@@ -672,7 +673,7 @@ function ExpandedPanel({ a }: { a: StudentAnswer }) {
             );
           })}
         </ul>
-        <p className="mt-2.5 text-[12.5px] text-ink-2">
+        <p className="mt-2.5 text-[13px] text-ink-2">
           <span className="mr-1.5 label-caps text-ink-3">Rationale</span>
           {a.scoreRationale}
         </p>

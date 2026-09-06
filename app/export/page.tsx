@@ -154,7 +154,7 @@ export default function ExportPage() {
   if (!exportReady) {
     return (
       <Page
-        eyebrow="Step 7 of 7"
+        eyebrow="Step 8 of 8"
         title="Export is locked"
         lead="Nothing leaves this session while a score is still unreviewed or flagged. That gate is the whole basis of the claim that a person, not the model, assigned these marks."
       >
@@ -192,7 +192,7 @@ export default function ExportPage() {
 
         <Card>
           <CardHead title="What the export will contain" hint="Once the gate opens" />
-          <ul className="px-5 py-4 grid gap-2.5 sm:grid-cols-2 text-[13.5px] text-ink-2">
+          <ul className="px-5 py-4 grid gap-2.5 sm:grid-cols-2 text-[14px] text-ink-2">
             {[
               "Student ID and initials",
               "Score, max, and percentage",
@@ -215,7 +215,7 @@ export default function ExportPage() {
   /* ------------------------- Ready state ------------------------- */
   return (
     <Page
-      eyebrow="Step 7 of 7"
+      eyebrow="Step 8 of 8"
       title="Export reviewed results"
       lead="Confirm the reviewer, choose a format, and download the reviewed sample."
     >
@@ -230,7 +230,7 @@ export default function ExportPage() {
               </p>
             </div>
           </div>
-          <dl className="grid grid-cols-2 gap-x-5 gap-y-1 text-[12.5px] sm:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-x-5 gap-y-1 text-[13px] sm:grid-cols-4">
             <SummaryRow label="Students" value={`${rows.length}`} />
             <SummaryRow label="Mean" value={`${stats.mean.toFixed(1)} / ${rows[0]?.max ?? 0}`} />
             <SummaryRow label="Median" value={`${stats.median}`} />
@@ -261,7 +261,7 @@ export default function ExportPage() {
           </p>
           {confirmed ? (
             <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2 text-[13.5px] font-medium text-ok">
+              <div className="flex items-center gap-2 text-[14px] font-medium text-ok">
                 <ShieldCheck size={16} strokeWidth={2} aria-hidden />
                 All {totalAnswers} rows reviewed and confirmed
               </div>
@@ -341,7 +341,7 @@ export default function ExportPage() {
             <tbody>
               {rows.slice(0, 6).map((r) => (
                 <tr key={r.studentId} className="border-b border-border">
-                  <td className="px-3 py-2 font-mono text-[12px] whitespace-nowrap">{r.studentId}</td>
+                  <td className="px-3 py-2 font-sans tnum text-[12px] whitespace-nowrap">{r.studentId}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{r.initials}</td>
                   <td className="px-3 py-2 tnum whitespace-nowrap">
                     {r.score}/{r.max}
@@ -359,7 +359,7 @@ export default function ExportPage() {
                 </tr>
               ))}
               <tr className="bg-surface-2">
-                <td colSpan={7} className="px-3 py-2 text-[12.5px] text-ink-3">
+                <td colSpan={7} className="px-3 py-2 text-[13px] text-ink-3">
                   …and {Math.max(0, rows.length - 6)} more rows, then the class summary block.
                 </td>
               </tr>

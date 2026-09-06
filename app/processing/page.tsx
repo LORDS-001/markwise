@@ -297,10 +297,10 @@ export default function ProcessingPage() {
     <Page
       eyebrow={
         failed
-          ? "Step 2 of 7 · stopped"
+          ? "Step 2 of 8 · stopped"
           : done
-            ? "Step 2 of 7 · complete"
-            : "Step 2 of 7 · preparing"
+            ? "Step 2 of 8 · complete"
+            : "Step 2 of 8 · preparing"
       }
       title={
         failed
@@ -352,7 +352,7 @@ export default function ProcessingPage() {
               className="mt-0.5 shrink-0 text-crit"
               aria-hidden
             />
-            <div className="text-[13.5px]">
+            <div className="text-[14px]">
               <p className="font-semibold mb-1">The pipeline could not finish</p>
               <p className="text-ink-2" role="alert">
                 {runError}
@@ -372,7 +372,7 @@ export default function ProcessingPage() {
 
       <Card>
         <div className="px-5 sm:px-6 py-5 border-b border-border">
-          <div className="flex items-baseline justify-between gap-4 mb-2.5">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
             <span
               className="text-[14px] font-semibold"
               aria-live="polite"
@@ -384,7 +384,7 @@ export default function ProcessingPage() {
                   ? stageText(STAGE_PRESENTATION[currentStage.id].label)
                   : stageText("Starting sample analysis")}
             </span>
-            <span className="tnum text-[13px] text-ink-2">
+            <span className="shrink-0 text-[13px] text-ink-2 tnum">
               {Math.round(pct)}% · {(shownElapsed / 1000).toFixed(1)}s
             </span>
           </div>
@@ -397,7 +397,7 @@ export default function ProcessingPage() {
 
         <ol className="divide-y divide-border">
           {stages.map((s, i) => (
-            <li key={s.id} className="flex min-h-12 gap-3 px-5 py-2 sm:px-6">
+            <li key={s.id} className="flex min-h-12 gap-3 px-5 py-4 sm:px-6">
               <span className="shrink-0" aria-hidden>
                 {s.state === "done" ? (
                   <span className="grid place-items-center w-6 h-6 rounded-full bg-ok-soft border border-ok-line text-ok">
@@ -418,7 +418,7 @@ export default function ProcessingPage() {
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                   <span
                     className={cn(
-                      "text-[13.5px] font-medium leading-5",
+                      "text-[14px] font-medium leading-5",
                       s.state === "pending" ? "text-ink-3" : "text-ink",
                     )}
                   >
@@ -432,7 +432,7 @@ export default function ProcessingPage() {
                       {answersRead} / {totalAnswers}
                     </Badge>
                   ) : s.state === "done" ? (
-                    <span className="text-[12.5px] text-ok font-medium">done</span>
+                    <span className="text-[13px] text-ok font-medium">done</span>
                   ) : null}
                 </div>
                 <p
@@ -493,12 +493,12 @@ export default function ProcessingPage() {
 
 function Counter({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="bg-surface px-4 py-3.5">
+    <div className="min-w-0 bg-surface px-3 py-5 sm:px-5">
       <dt className="label-caps text-ink-3">{label}</dt>
-      <dd className="font-display text-[22px] font-semibold tnum leading-tight mt-0.5">
+      <dd className="mt-2 font-display text-[24px] font-bold leading-tight tnum">
         {value}
       </dd>
-      <dd className="text-[12px] text-ink-3">{sub}</dd>
+      <dd className="mt-1 text-[12px] text-ink-3">{sub}</dd>
     </div>
   );
 }

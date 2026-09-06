@@ -1,5 +1,86 @@
 # Production UI review runners
 
+## Custom course drafts and sample preview
+
+Launch a fresh Chrome profile on debugging port 9231 using the instructions below,
+with the production server on port 3017, then run:
+
+```powershell
+node scripts/ui-review/course-session.cjs 9231
+```
+
+This checks 24 layout states at 320, 390, 1024, and 1440px. It verifies the blank
+initial form, course input limits, CSC201 / Data Structures in the overview and
+navigation, draft preservation through Score review and back, and the New marking
+session reset. It also verifies that editing the explicit demo or changing an
+input tab creates a custom draft, while Load demo class restores free sample
+preview even when live analysis is unavailable. Custom Analyse is never activated;
+the runner intercepts `/api/run` and fails if any sample preview attempts it.
+
+The checks assert control bounds, absence of extra blank scroll space, stationary
+top navigation, and zero runtime exceptions. Results and 12 captures are written
+to `course-session.json` and `screenshots/course-*.png` under the ignored review
+directory. This runner closes its browser. The keyboard runner also explicitly
+reloads the sample after its form-editing checks before entering free preview.
+
+## Score review scroll boundaries
+
+With the production server running, launch a fresh Chrome profile on debugging
+port 9229 using the browser launch instructions below, then run:
+
+```powershell
+node scripts/ui-review/scores-scroll.cjs 9229
+```
+
+This checks 18 combinations of desktop/mobile widths and full, expanded,
+filtered, empty, and restored response lists. It verifies that the page ends at
+its content, the final table row remains reachable, and the top navigation stays
+stationary. Results and a capture of the page bottom are written to the review
+output directory. These geometry checks catch hidden table labels escaping the
+table's scroll area, which DOM-only tests cannot measure.
+
+## Dashboard template verification
+
+The current interface uses Inter for body text, Manrope for headings, and
+`#14121F` for the primary color and logo. In addition to the matrix and keyboard
+checks below, run the template-specific acceptance checks against the production
+server with a fresh Chrome profile on port 9225:
+
+```powershell
+node --import tsx scripts/ui-review/template.cjs 9225
+```
+
+This checks all twelve routes at 320px in Light and Dark, plus Sessions, Outcome,
+and the standalone student diagnostic at 390, 768, 1024, and 1440px. It adds
+desktop/mobile Setup captures, for 50 layout cases and 20 screenshots. It checks
+loaded font faces, heading/body font roles, exact primary and logo colors,
+horizontal overflow, form bounds, console/runtime errors, and diagnostic
+submission followed by reload. Results are saved as `template-review.json` with
+`template-*.png` screenshots under the ignored review output directory.
+
+The default template run is strict: every console error and runtime exception
+fails the review. For an intentionally offline browser launched with
+`--host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost"`,
+opt in explicitly before running:
+
+```powershell
+$env:UI_REVIEW_OFFLINE = '1'
+node --import tsx scripts/ui-review/template.cjs 9225
+Remove-Item Env:UI_REVIEW_OFFLINE
+```
+
+Offline mode only separates browser network errors whose valid absolute HTTP(S)
+URL is cross-origin and whose message contains `ERR_NAME_NOT_RESOLVED`. Those
+full records remain in `consoleMessages` and `expectedBlockedNetwork`; their
+count is printed and included in `totals`, and `metadata.mode` records the mode.
+Same-origin failures, invalid or missing URLs, application console errors, and
+runtime exceptions still fail. This checks the local demo interface and student
+response persistence while external DNS is blocked; it does not verify hosted
+authentication or live AI services. The flag does not block network access itself.
+
+Run heavyweight builds and interaction tests sequentially on constrained machines
+so slow simulated typing does not exceed the test timeout.
+
 These tracked Node scripts regenerate the Task 8 browser evidence after `next build`. Generated JSON, browser profiles, downloads, HTML, and PNG files stay under the ignored `.next/ui-review` directory so a build can erase outputs without erasing the procedure.
 
 ## Prerequisites

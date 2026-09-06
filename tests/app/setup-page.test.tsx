@@ -63,11 +63,9 @@ afterEach(() => {
 });
 
 function renderSetup() {
-  return render(
-    <SessionProvider>
-      <SetupPage />
-    </SessionProvider>,
-  );
+  const result = render(<SessionProvider><SetupForm liveEnabled /></SessionProvider>);
+  fireEvent.click(screen.getByRole("button", { name: "Load demo class" }));
+  return result;
 }
 
 it("keeps sample preview local instead of scheduling a paid live request", () => {
@@ -76,14 +74,15 @@ it("keeps sample preview local instead of scheduling a paid live request", () =>
     return <p data-testid="run-mode">{pendingRun ? "live" : processed ? "ready" : "sample"}</p>;
   }
   render(<SessionProvider><SetupPage /><Probe /></SessionProvider>);
-  fireEvent.click(screen.getByRole("button", { name: "Preview sample analysis" }));
+  fireEvent.click(screen.getByRole("button", { name: "Load demo class" }));
+  fireEvent.click(screen.getByRole("button", { name: /Analyse class answers|Preview sample analysis/ }));
   expect(screen.getByTestId("run-mode")).toHaveTextContent("sample");
 });
 
 it("requires whole positive criterion marks before starting", () => {
   renderSetup();
   fireEvent.change(screen.getByRole("spinbutton", { name: "Marks for criterion 1" }), { target: { value: "1.5" } });
-  expect(screen.getByRole("button", { name: "Preview sample analysis" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /Analyse class answers|Preview sample analysis/ })).toBeDisabled();
   expect(screen.getByText(/whole numbers from 1 to 1,000/)).toBeVisible();
 });
 
@@ -93,33 +92,27 @@ it("labels configured live analysis truthfully and sends the entered answers", (
     return <p data-testid="live-count">{pendingRun?.input.answers.length ?? 0}</p>;
   }
   render(<SessionProvider><SetupForm liveEnabled /><Probe /></SessionProvider>);
+  fireEvent.click(screen.getByRole("button", { name: "Load demo class" }));
+  fireEvent.change(screen.getByRole("textbox", { name: /^Course code/ }), { target: { value: "CSC201" } });
   expect(screen.getByText(/answer text and marking scheme are sent to Gemini/)).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Analyse class answers" }));
   expect(screen.getByTestId("live-count")).toHaveTextContent("40");
 });
 
 it("presents one truthful primary action and optional advanced guidance", () => {
-  const { container } = render(
-    <SessionProvider>
-      <SetupPage />
-    </SessionProvider>,
-  );
+  const { container } = renderSetup();
   expect(
     screen.getByRole("heading", { level: 1, name: "Set up this marking session" }),
   ).toBeVisible();
   expect(
-    screen.getByRole("button", { name: "Preview sample analysis" }),
+    screen.getByRole("button", { name: /Analyse class answers|Preview sample analysis/ }),
   ).toBeEnabled();
   expect(screen.getByText("Advanced marking guidance")).toBeVisible();
   expect(container.querySelectorAll('button[data-variant="primary"]')).toHaveLength(1);
 });
 
 it("keeps criterion descriptions shrinkable beside marks and remove controls", () => {
-  render(
-    <SessionProvider>
-      <SetupPage />
-    </SessionProvider>,
-  );
+  renderSetup();
 
   for (const description of screen.getAllByRole("textbox", {
     name: /Criterion \d+ description/,
@@ -129,25 +122,30 @@ it("keeps criterion descriptions shrinkable beside marks and remove controls", (
 });
 
 it("keeps criterion mark fields at a bounded width", () => {
-  render(
-    <SessionProvider>
-      <SetupPage />
-    </SessionProvider>,
-  );
+  renderSetup();
 
   for (const marks of screen.getAllByRole("spinbutton", {
     name: /Marks for criterion \d+/,
   })) {
-    expect(marks).toHaveClass("!w-[74px]", "shrink-0");
+    const gridColumns = [...(marks.closest("li")?.classList ?? [])]
+      .find((className) => className.startsWith("grid-cols-["));
+    const marksTrack = gridColumns?.slice("grid-cols-[".length, -1).split("_").at(-2);
+    expect(marksTrack).toMatch(/^\d+px$/);
+    // Leave room for four digits, control padding, and the native number
+    // spinner while keeping the description's remaining space flexible.
+    const width = Number.parseFloat(marksTrack ?? "");
+    expect(width).toBeGreaterThanOrEqual(96);
+    expect(width).toBeLessThanOrEqual(112);
+    expect(marks).toHaveClass("min-w-0", "!w-full");
   }
 });
 
-it.each(["Subject", "Level"])(
+it.each(["Course code", "Course title", "Subject", "Level"])(
   "disables preview when %s contains no nonblank value",
   async (fieldName) => {
     const user = userEvent.setup();
     renderSetup();
-    const preview = screen.getByRole("button", { name: "Preview sample analysis" });
+    const preview = screen.getByRole("button", { name: /Analyse class answers|Preview sample analysis/ });
     const field = screen.getByRole("textbox", { name: new RegExp(`^${fieldName}`) });
 
     expect(preview).toBeEnabled();
@@ -162,7 +160,7 @@ it("exposes every visible required Setup field while keeping prediction optional
   const user = userEvent.setup();
   const { container } = renderSetup();
 
-  for (const name of ["Subject", "Level", "Question text", "Model answer or scheme", "Answers"]) {
+  for (const name of ["Course code", "Course title", "Subject", "Level", "Question text", "Model answer or scheme", "Answers"]) {
     const field = screen.getByRole("textbox", { name: new RegExp(`^${name}.*required`, "i") });
     expect(field).toBeRequired();
   }
@@ -221,12 +219,12 @@ it("does not count hidden pasted answers while the unsupported Photos mode is ac
   const user = userEvent.setup();
   renderSetup();
 
-  expect(screen.getByRole("button", { name: "Preview sample analysis" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: /Analyse class answers|Preview sample analysis/ })).toBeEnabled();
   expect(screen.getByText("40 detected")).toBeVisible();
 
   await user.click(screen.getByRole("tab", { name: /Photos/ }));
 
-  expect(screen.getByRole("button", { name: "Preview sample analysis" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /Analyse class answers|Preview sample analysis/ })).toBeDisabled();
   expect(screen.queryByText("40 detected")).not.toBeInTheDocument();
 });
 
@@ -251,7 +249,7 @@ it("keeps an accepted CSV natively valid across mode changes until Setup is clea
   const { container } = renderSetup();
   await user.click(screen.getByRole("tab", { name: "CSV upload" }));
   const fileInput = container.querySelector<HTMLInputElement>("#answers-csv");
-  const preview = screen.getByRole("button", { name: "Preview sample analysis" });
+  const preview = screen.getByRole("button", { name: /Analyse class answers|Preview sample analysis/ });
   const accepted = new File(
     ["student,answer\nS1,First response\nS2,Second response"],
     "accepted-answers.csv",
@@ -281,7 +279,7 @@ it("keeps an accepted CSV natively valid across mode changes until Setup is clea
   expect(fileInput?.checkValidity()).toBe(true);
   expect(preview).toBeEnabled();
 
-  await user.click(screen.getByRole("button", { name: "Clear" }));
+  await user.click(screen.getByRole("button", { name: "New marking session" }));
 
   expect(fileInput).toHaveValue("");
   expect(fileInput).toBeRequired();
@@ -293,7 +291,7 @@ it("keeps an accepted CSV natively valid across mode changes until Setup is clea
   expect(preview).toBeDisabled();
 });
 
-it.each(["Clear", "Load demo class"])(
+it.each(["New marking session", "Load demo class"])(
   "ignores a pending CSV read completed after %s resets Setup",
   async (resetAction) => {
     installDeferredFileReader();
@@ -320,7 +318,7 @@ it.each(["Clear", "Load demo class"])(
     expect(screen.queryByText("stale-answers.csv")).not.toBeInTheDocument();
     expect(fileInput).toHaveValue("");
     expect(fileInput).toHaveAttribute("required");
-    expect(screen.getByRole("button", { name: "Preview sample analysis" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Analyse class answers|Preview sample analysis/ })).toBeDisabled();
   },
 );
 
@@ -355,7 +353,7 @@ it("keeps the newest completed CSV when an older read finishes last", async () =
   expect(screen.getByRole("status")).toHaveTextContent("second-answers.csv");
   expect(screen.getByRole("status")).toHaveTextContent("2 rows");
   expect(screen.queryByText("first-answers.csv")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Preview sample analysis" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: /Analyse class answers|Preview sample analysis/ })).toBeEnabled();
 });
 
 it("keeps a rejected replacement authoritative when an older CSV finishes", async () => {
@@ -383,7 +381,7 @@ it("keeps a rejected replacement authoritative when an older CSV finishes", asyn
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
   expect(fileInput).toHaveValue("");
   expect(fileInput).toHaveAttribute("required");
-  expect(screen.getByRole("button", { name: "Preview sample analysis" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /Analyse class answers|Preview sample analysis/ })).toBeDisabled();
 });
 
 it("invalidates a failed read and permits a same-path retry", async () => {
@@ -450,7 +448,7 @@ it("explains an invalid CSV without introducing a competing primary action and r
   const alert = screen.getByRole("alert");
   expect(alert).toHaveAccessibleName("CSV upload failed");
   expect(alert).toHaveTextContent("Export your sheet as CSV and try again.");
-  expect(screen.getByRole("button", { name: "Preview sample analysis" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /Analyse class answers|Preview sample analysis/ })).toBeDisabled();
   expect(container.querySelectorAll('[data-variant="primary"]')).toHaveLength(1);
   const recovery = screen.getByRole("button", { name: "Choose another CSV" });
   expect(recovery).toHaveAttribute("data-variant", "secondary");
@@ -465,5 +463,5 @@ it("explains an invalid CSV without introducing a competing primary action and r
 
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(await screen.findByText("answers.csv")).toBeVisible();
-  expect(screen.getByRole("button", { name: "Preview sample analysis" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: /Analyse class answers|Preview sample analysis/ })).toBeEnabled();
 });

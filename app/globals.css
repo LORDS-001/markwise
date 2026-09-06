@@ -1,144 +1,102 @@
 @import "tailwindcss";
 
-/* ============================================================
-   Markwise design tokens
-
-   Light and dark palettes are selected by the root `data-theme`
-   attribute, with matching native `color-scheme` rendering.
-
-   Typography and structure follow the Sluice reference: two type
-   roles carry the page (large display at tight negative tracking,
-   tiny mono caps at wide positive tracking), separation comes from
-   1px hairlines rather than elevation, and containers use large
-   soft radii.
-
-   Colour comes from the brand mark. Navy is structural — text and
-   primary actions. Cyan is the accent, darkened for anything
-   carrying text so it clears 4.5:1; the bright logo cyan is kept
-   for graphics, where the floor is 3:1.
-   ============================================================ */
-
+/* Reference dashboard: charcoal structure, soft lavender panels, calm spacing.
+   Inter carries body text and controls; Manrope carries headings and metrics. */
 :root,
 [data-theme="light"] {
   color-scheme: light;
-
-  /* brand mark */
-  --logo-navy: #0f1e3d;
-  --logo-cyan: #17a3ba;
-
-  /* surfaces — near-white ground, white cards, hairline separation */
-  --ground: #e9eef1;
-  --shell: #f7f8f6;
+  --logo-navy: #14121f;
+  --logo-cyan: #14121f;
+  --ground: #e5e4eb;
+  --shell: #faf9fd;
   --surface: #ffffff;
-  --surface-2: #f1f4f5;
-  --surface-3: #e5eaed;
-  --border: #dce2e6;
-  --border-strong: #c7d0d7;
-  --control-border: #79858e;
-
-  /* text */
-  --ink: #0f1e3d;
-  --ink-2: #59667a;
-  --ink-3: #5d697b;
-
-  /* primary action — the mark's navy */
-  --primary: #0f1e3d;
-  --primary-hover: #1d3159;
+  --surface-2: #f5f3fa;
+  --surface-3: #eae7f2;
+  --border: #e9e6f0;
+  --border-strong: #d0cbdc;
+  --control-border: #827c90;
+  --ink: #14121f;
+  --ink-2: #565163;
+  --ink-3: #625e70;
+  --primary: #14121f;
+  --primary-hover: #2a253b;
+  --primary-line: #14121f;
   --on-primary: #ffffff;
-
-  /* accent — the mark's cyan, darkened for text */
-  --brand: #0b768a;
-  --brand-hover: #09697c;
-  --brand-soft: #e4f3f6;
-  --brand-line: #b5dce4;
+  --brand: #14121f;
+  --brand-hover: #3b334e;
+  --brand-soft: #ece9fc;
+  --brand-line: #cfc7e8;
   --on-brand: #ffffff;
-
-  /* semantic */
-  --warn: #8d5906;
+  --focus: #65518c;
+  --nav: #14121f;
+  --nav-ink: #f7f6fb;
+  --nav-muted: #b8b5c7;
+  --nav-hover: #252231;
+  --nav-active: #ece9ff;
+  --nav-active-ink: #14121f;
+  --warn: #805207;
   --warn-soft: #fcf2e3;
   --warn-line: #ead7b6;
   --crit: #a52438;
   --crit-soft: #fcebee;
   --crit-line: #efc5cc;
-  --ok: #1d744e;
+  --ok: #246441;
   --on-ok: #ffffff;
-  --ok-soft: #e5f3ed;
-  --ok-line: #b3d8c6;
-
-  /* cluster categorical ramp */
-  --c1: #0e8ca3;
-  --c2: #3a5ba8;
-  --c3: #b0621f;
-  --on-c1: #07101f;
-  --on-c2: #ffffff;
-  --on-c3: #ffffff;
-  --c4: #7b4a93;
-  --on-c4: #ffffff;
-  --c5: #4f7a34;
-  --on-c5: #ffffff;
-  --c6: #a8324f;
-  --on-c6: #ffffff;
-  --c0: #93a0b0;
-  --on-c0: #07101f;
-
-  /* radii */
-  --r-card: 14px;
-  --r-input: 10px;
-  --r-shell: 28px;
+  --ok-soft: #eaf6ed;
+  --ok-line: #bdddc6;
+  /* Distinct pastel categories, each with a dark accessible label. */
+  --c1: #c6bde9;
+  --c2: #b9e3c1;
+  --c3: #f1d1ac;
+  --c4: #cac6da;
+  --c5: #e9bbcb;
+  --c6: #bdd8ec;
+  --c0: #d5d1de;
+  --on-c0: #14121f;
+  --on-c1: #14121f;
+  --on-c2: #14121f;
+  --on-c3: #14121f;
+  --on-c4: #14121f;
+  --on-c5: #14121f;
+  --on-c6: #14121f;
+  --r-card: 24px;
+  --r-input: 12px;
+  --r-shell: 32px;
   --r-pill: 999px;
-
-  /* elevation is used once, for the mobile drawer */
-  --shadow-panel: 0 20px 60px rgb(15 30 61 / 0.16);
+  --shadow-panel: 0 24px 80px rgb(20 18 31 / 0.2);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --logo-navy: #f4f7fb;
-  --logo-cyan: #32b4c9;
-  --ground: #07101f;
-  --shell: #0b1525;
-  --surface: #111d2f;
-  --surface-2: #17243a;
-  --surface-3: #1d2c44;
-  --border: #25364d;
-  --border-strong: #354a64;
-  --control-border: #66778e;
-  --ink: #f4f7fb;
-  --ink-2: #b1bed0;
-  --ink-3: #8798af;
-  --primary: #17a3ba;
-  --primary-hover: #32b4c9;
-  --on-primary: #061018;
-  --brand: #49bfd0;
-  --brand-hover: #66cedc;
-  --brand-soft: #102f3a;
-  --brand-line: #205363;
-  --on-brand: #061018;
-  --warn: #f1b75a;
-  --warn-soft: #352812;
-  --warn-line: #5a4320;
-  --crit: #ff8293;
-  --crit-soft: #371923;
-  --crit-line: #642b3a;
-  --ok: #69d2a3;
-  --on-ok: #061018;
-  --ok-soft: #112f27;
-  --ok-line: #285845;
-  --c1: #35b8cb;
-  --c2: #809df2;
-  --c3: #e49a58;
-  --on-c1: #061018;
-  --on-c2: #061018;
-  --on-c3: #061018;
-  --c4: #c493d8;
-  --on-c4: #061018;
-  --c5: #87b96d;
-  --on-c5: #061018;
-  --c6: #e57491;
-  --on-c6: #061018;
-  --c0: #8b99ac;
-  --on-c0: #061018;
-  --shadow-panel: 0 24px 72px rgb(0 0 0 / 0.45);
+  --ground: #14121f;
+  --shell: #1c1926;
+  --surface: #24212e;
+  --surface-2: #2b2736;
+  --surface-3: #353041;
+  --border: #3b3549;
+  --border-strong: #5b526b;
+  --control-border: #888196;
+  --ink: #f6f4fb;
+  --ink-2: #c9c4d6;
+  --ink-3: #b7b2c7;
+  --primary-line: #9d96ab;
+  --brand: #e7e1ff;
+  --brand-hover: #f3efff;
+  --brand-soft: #342c47;
+  --brand-line: #625477;
+  --on-brand: #14121f;
+  --focus: #c6b6ec;
+  --warn: #f1c274;
+  --warn-soft: #3b2c1b;
+  --warn-line: #72542e;
+  --crit: #ff9cab;
+  --crit-soft: #3e2330;
+  --crit-line: #774252;
+  --ok: #a7ddb7;
+  --on-ok: #14121f;
+  --ok-soft: #22392b;
+  --ok-line: #466c51;
+  --shadow-panel: 0 24px 80px rgb(0 0 0 / 0.45);
 }
 
 @theme inline {
@@ -150,21 +108,23 @@
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-control-border: var(--control-border);
-
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
-
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-on-primary: var(--on-primary);
-
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
   --color-brand-soft: var(--brand-soft);
   --color-brand-line: var(--brand-line);
   --color-on-brand: var(--on-brand);
-
+  --color-nav: var(--nav);
+  --color-nav-ink: var(--nav-ink);
+  --color-nav-muted: var(--nav-muted);
+  --color-nav-hover: var(--nav-hover);
+  --color-nav-active: var(--nav-active);
+  --color-nav-active-ink: var(--nav-active-ink);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
   --color-warn-line: var(--warn-line);
@@ -175,7 +135,6 @@
   --color-on-ok: var(--on-ok);
   --color-ok-soft: var(--ok-soft);
   --color-ok-line: var(--ok-line);
-
   --color-on-c0: var(--on-c0);
   --color-on-c1: var(--on-c1);
   --color-on-c2: var(--on-c2);
@@ -183,10 +142,9 @@
   --color-on-c4: var(--on-c4);
   --color-on-c5: var(--on-c5);
   --color-on-c6: var(--on-c6);
-
-  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
-
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --radius-sm: 8px;
   --radius-md: var(--r-input);
   --radius-lg: var(--r-card);
@@ -194,96 +152,64 @@
 }
 
 @layer base {
-  * {
-    border-color: var(--border);
-  }
-
+  * { border-color: var(--border); }
   html {
     -webkit-text-size-adjust: 100%;
+    scroll-padding-top: 6rem;
+    scroll-padding-bottom: 1rem;
   }
-
   body {
     background: var(--ground);
     color: var(--ink);
-    font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
     font-size: 14px;
     line-height: 1.6;
-    letter-spacing: -0.006em;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-
-  h1,
-  h2,
-  h3 {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.025em;
     text-wrap: balance;
   }
-
-  :focus-visible {
-    outline: 2px solid var(--brand);
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
-
-  ::selection {
-    background: var(--brand-soft);
-    color: var(--ink);
-  }
-
-  .scroll-thin {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-strong) transparent;
-  }
-  .scroll-thin::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  .scroll-thin::-webkit-scrollbar-thumb {
-    background: var(--border-strong);
-    border-radius: 999px;
-  }
-  .scroll-thin::-webkit-scrollbar-track {
-    background: transparent;
-  }
+  button, input, select, textarea { font: inherit; }
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]) { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  ::selection { background: var(--brand-soft); color: var(--ink); }
+  .bg-nav { --focus: #d8cbed; }
+  .scroll-thin { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+  .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
+  .scroll-thin::-webkit-scrollbar-track { background: transparent; }
 }
 
 @layer utilities {
-  /* Display role: tight negative tracking, the counterweight to the
-     wide-tracked mono caps. */
   .font-display {
-    letter-spacing: -0.032em;
-    font-feature-settings: "ss01";
+    font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.03em;
   }
-
-  /* Label role: small, mono, wide. Deliberately far from the display
-     role so the two never compete. */
   .label-caps {
-    font-family: var(--font-plex-mono), ui-monospace, monospace;
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: 0.16em;
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
-    line-height: 1.4;
+    line-height: 1.5;
   }
+  .tnum { font-variant-numeric: tabular-nums; }
+  .rule { border-color: var(--border); border-width: 0; border-top-width: 1px; }
+}
 
-  .tnum {
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* Hairline rule, the site's primary separator. */
-  .rule {
-    border-color: var(--border);
-    border-width: 0;
-    border-top-width: 1px;
-  }
+/* Avoid native mobile autozoom when focusing text fields. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

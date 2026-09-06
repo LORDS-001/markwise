@@ -114,7 +114,7 @@ export default function OutcomePage() {
 
   if (!processed) {
     return (
-      <Page eyebrow="Step 8 of 8" title="Outcome">
+      <Page eyebrow="Step 6 of 8" title="Outcome">
         <Card>
           <EmptyState
             title="Nothing has been measured yet"
@@ -133,7 +133,7 @@ export default function OutcomePage() {
 
   return (
     <Page
-      eyebrow="Step 8 of 8"
+      eyebrow="Step 6 of 8"
       title="Did it land?"
       lead="What the class believed before the reteach, and what the diagnostic found after."
     >
@@ -199,7 +199,7 @@ export default function OutcomePage() {
                 />
 
                 <div className="px-5 py-5 flex flex-col gap-4">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <span className="label-caps text-ink-3 w-12 shrink-0">Before</span>
                     <div className="h-3 flex-1 rounded-full bg-surface-3 overflow-hidden">
                       <div
@@ -207,12 +207,12 @@ export default function OutcomePage() {
                         style={{ width: "100%", height: "100%" }}
                       />
                     </div>
-                    <span className="text-[13px] tnum text-ink-2 w-24 text-right">
+                    <span className="w-20 shrink-0 text-right text-[13px] text-ink-2 tnum sm:w-24">
                       {change.before} students
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <span className="label-caps text-ink-3 w-12 shrink-0">After</span>
                     <div className="h-3 flex-1 rounded-full bg-surface-3 overflow-hidden">
                       <div
@@ -223,13 +223,13 @@ export default function OutcomePage() {
                         }}
                       />
                     </div>
-                    <span className="text-[13px] tnum text-ink-2 w-24 text-right">
+                    <span className="w-20 shrink-0 text-right text-[13px] text-ink-2 tnum sm:w-24">
                       {after === null ? "—" : `${change.stillHolds} of ${decided}`}
                     </span>
                   </div>
 
                   {change.pending > 0 || change.unclear > 0 ? (
-                    <p className="text-[12.5px] text-ink-3">
+                    <p className="text-[13px] text-ink-3">
                       {change.pending > 0
                         ? `${change.pending} ${change.pending === 1 ? "student has" : "students have"} not answered yet. `
                         : ""}
@@ -317,17 +317,17 @@ function Stat({
   tone?: "ok" | "warn";
 }) {
   return (
-    <div className="bg-surface px-4 py-3.5">
+    <div className="min-w-0 bg-surface px-3 py-5 sm:px-5">
       <dt className="label-caps text-ink-3">{label}</dt>
       <dd
         className={
-          "font-display text-[22px] font-semibold tnum leading-tight mt-0.5 " +
+          "mt-2 font-display text-[24px] font-bold leading-tight tnum " +
           (tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : "")
         }
       >
         {value}
       </dd>
-      <dd className="text-[12px] text-ink-3">{sub}</dd>
+      <dd className="mt-1 text-[12px] text-ink-3">{sub}</dd>
     </div>
   );
 }

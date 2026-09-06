@@ -100,7 +100,10 @@ function atomicClient(
 }
 
 describe("persistRun", () => {
-  it("persists the complete run in one atomic RPC", async () => {
+  it.each([
+    ["EEE 301", "Circuit Theory"],
+    ["CSC201", "Data Structures"],
+  ])("persists the complete %s run in one atomic RPC", async (courseCode, courseTitle) => {
     const { client, calls } = atomicClient();
 
     await persistRun({
@@ -109,16 +112,16 @@ describe("persistRun", () => {
       input: INPUT,
       result: RESULT,
       prediction: "They will omit reactance",
-      courseCode: "EEE 301",
-      courseTitle: "Circuit Theory",
+      courseCode,
+      courseTitle,
     });
 
     expect(calls).toHaveLength(1);
     expect(calls[0].name).toBe("persist_run_atomic");
     expect(calls[0].args).toMatchObject({
       p_prediction: "They will omit reactance",
-      p_course_code: "EEE 301",
-      p_course_title: "Circuit Theory",
+      p_course_code: courseCode,
+      p_course_title: courseTitle,
     });
     expect(calls[0].args).not.toHaveProperty("owner_id");
     expect(calls[0].args.p_answers).toHaveLength(3);
@@ -275,10 +278,13 @@ const ANSWER_ROW = {
 };
 
 describe("loadRun", () => {
-  it("restores diagnostic tokens and course identity", async () => {
+  it.each([
+    ["EEE 301", "Circuit Theory"],
+    ["CSC201", "Data Structures"],
+  ])("restores diagnostic tokens and the saved %s course identity", async (code, title) => {
     const loaded = await loadRun(
       loadClient({
-        sessions: { data: SESSION_ROW, error: null },
+        sessions: { data: { ...SESSION_ROW, courses: { code, title } }, error: null },
         clusters: { data: [CLUSTER_ROW], error: null },
         answers: { data: [ANSWER_ROW], error: null },
         reteach_packs: { data: [], error: null },
@@ -287,7 +293,7 @@ describe("loadRun", () => {
     );
 
     expect(loaded?.result.answers[0].diagnosticToken).toBe("student-secret");
-    expect(loaded?.course).toEqual({ code: "EEE 301", title: "Circuit Theory" });
+    expect(loaded?.course).toEqual({ code, title });
   });
 
   it("rejects query errors instead of fabricating an empty run", async () => {

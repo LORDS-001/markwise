@@ -90,7 +90,7 @@ export default function ReteachPackPage() {
 
   if (!processed) {
     return (
-      <Page eyebrow="Step 5 of 7" title="Reteach pack">
+      <Page eyebrow="Step 5 of 8" title="Reteach pack">
         <Card>
           <EmptyState
             icon={<BookOpen size={26} strokeWidth={1.6} />}
@@ -333,7 +333,7 @@ export default function ReteachPackPage() {
                       >
                         {i + 1}
                       </span>
-                      <p className="text-[15.5px] leading-relaxed font-medium max-w-[68ch]">
+                      <p className="text-[16px] leading-relaxed font-medium max-w-[68ch]">
                         {d.prompt}
                       </p>
                     </div>

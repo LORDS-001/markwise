@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, Clock3, FolderOpen, RefreshCw } from "lucide-react";
+import { ArrowRight, Clock3, FolderOpen, Plus, RefreshCw } from "lucide-react";
+import { createEmptySetupDraft } from "@/lib/setup-draft";
 import {
   listSessionsAction,
   loadSessionAction,
@@ -20,7 +21,7 @@ type ListState =
 
 export default function SessionsPage() {
   const router = useRouter();
-  const { applyRun, flushChanges } = useSession();
+  const { applyRun, flushChanges, setSetupDraft } = useSession();
   const [list, setList] = useState<ListState>({ status: "loading" });
   const [opening, setOpening] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
@@ -88,6 +89,12 @@ export default function SessionsPage() {
       eyebrow="Saved work"
       title="Saved sessions"
       lead="Return to a completed class analysis and continue reviewing it."
+      actions={
+        <Link href="/" className={buttonClass("secondary", "sm")} onClick={() => setSetupDraft(createEmptySetupDraft())}>
+          <Plus size={15} aria-hidden />
+          New marking session
+        </Link>
+      }
     >
       {openError ? (
         <div className="rounded-[12px] border border-crit-line bg-crit-soft px-4 py-3 text-[13px] text-crit" role="alert">
@@ -96,7 +103,7 @@ export default function SessionsPage() {
             <Button
               variant="danger"
               size="sm"
-              className="mt-3"
+              className="mt-3 h-auto max-w-full whitespace-normal py-2.5 text-left"
               onClick={() => void open(discardTarget, true)}
             >
               Open saved copy and discard local edits

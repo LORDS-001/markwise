@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   BookOpen,
   Check,
-  CircleHelp,
   Download,
   Eye,
   FileText,
@@ -28,7 +27,7 @@ export const STEPS = [
     href: "/processing",
     label: "Processing",
     icon: Waves,
-    blurb: "Prepare sample analysis",
+    blurb: "Analyse answers",
   },
   { href: "/reveal", label: "Reveal", icon: Eye, blurb: "Your guess vs. actual" },
   { href: "/map", label: "Misconception map", icon: Network, blurb: "Clusters by spread" },
@@ -92,43 +91,52 @@ export function AppNavigation({
 }) {
   const pathname = usePathname();
   const stepState = useStepState();
-  const { courseCode, courseTitle } = useSession();
+  const { courseCode, courseTitle, isDemo, setupDraft } = useSession();
+  const isSetup = pathname === "/";
+  const visibleCourseCode = isSetup ? setupDraft.courseCode.trim() : courseCode;
+  const visibleCourseTitle = isSetup ? setupDraft.courseTitle.trim() : courseTitle;
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <Link
-        href="/"
-        onClick={onNavigate}
-        className="flex h-16 shrink-0 items-center gap-2.5 border-b border-border px-4"
-      >
-        <span className="min-w-0">
-          <MarkwiseLogo className="max-w-full" />
-          <span className="mt-0.5 block truncate text-[11px] leading-tight text-ink-3">
-            {[courseCode, courseTitle].filter(Boolean).join(" · ")}
-          </span>
-        </span>
-      </Link>
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-nav text-nav-ink">
+      <div className="shrink-0 px-5 pb-5 pt-7">
+        <Link
+          href="/"
+          onClick={onNavigate}
+          className="inline-flex max-w-full rounded-2xl bg-[#f7f6fb] px-3.5 py-3"
+          aria-label="Markwise home"
+        >
+          <MarkwiseLogo className="max-w-full" markClassName="h-7 w-auto" />
+        </Link>
+        <div className="mt-6 min-w-0 px-1">
+          <p className="text-[13px] font-semibold leading-5 text-nav-ink [overflow-wrap:anywhere]">
+            {visibleCourseCode || (isSetup ? "New marking session" : "Your workspace")}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-nav-muted [overflow-wrap:anywhere]">
+            {visibleCourseTitle || (isSetup ? "Add your course details" : isDemo ? "Demo class" : "Assessment workspace")}
+          </p>
+        </div>
+      </div>
 
-      <div className="px-3 pt-3">
+      <div className="shrink-0 px-3.5">
         <Link
           href="/sessions"
           onClick={onNavigate}
           aria-current={pathname.startsWith("/sessions") ? "page" : undefined}
           className={cn(
-            "flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-[13px] font-semibold transition-colors",
+            "flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-colors",
             pathname.startsWith("/sessions")
-              ? "bg-brand-soft text-brand"
-              : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+              ? "bg-nav-active text-nav-active-ink"
+              : "text-nav-ink hover:bg-nav-hover",
           )}
         >
-          <History size={16} strokeWidth={1.9} aria-hidden />
+          <History size={18} strokeWidth={1.7} className="shrink-0" aria-hidden />
           Saved sessions
         </Link>
       </div>
 
-      <nav className="scroll-thin flex-1 overflow-y-auto px-3 py-3" aria-label="Session steps">
-        <p className="label-caps px-2 pb-2 text-ink-3">This session</p>
-        <ul className="flex flex-col gap-1">
+      <nav className="scroll-thin min-h-0 flex-1 overflow-y-auto px-3.5 pb-5 pt-6" aria-label="Session steps">
+        <p className="label-caps px-3 pb-3 text-nav-muted">This session</p>
+        <ul className="flex flex-col gap-1.5">
           {STEPS.map((step) => {
             const active = resolveStep(pathname) === step.href;
             const state = stepState(step.href);
@@ -141,34 +149,27 @@ export function AppNavigation({
                   onClick={onNavigate}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "group relative flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 transition-colors",
+                    "group relative flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-2.5 transition-colors",
                     active
-                      ? "bg-brand-soft text-brand"
-                      : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+                      ? "bg-nav-active text-nav-active-ink"
+                      : "text-nav-ink hover:bg-nav-hover",
                   )}
                 >
-                  <Icon size={16} strokeWidth={1.9} className="shrink-0" aria-hidden />
+                  <Icon size={18} strokeWidth={1.7} className="shrink-0" aria-hidden />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-semibold leading-tight">
+                    <span className="block text-[13px] font-medium leading-5">
                       {step.label}
                     </span>
-                    <span
-                      className={cn(
-                        "mt-0.5 block truncate text-[11px] leading-tight",
-                        active ? "text-brand/75" : "text-ink-3",
-                      )}
-                    >
-                      {step.blurb}
-                    </span>
+                    <span className="sr-only">{step.blurb}</span>
                   </span>
 
                   {state.count && state.count > 0 ? (
                     <span
                       className={cn(
-                        "tnum shrink-0 rounded-full border px-1.5 py-0.5 text-[11px] font-semibold",
+                        "tnum shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
                         state.warn
-                          ? "border-warn-line bg-warn-soft text-warn"
-                          : "border-border bg-surface-2 text-ink-2",
+                          ? "bg-warn-soft text-warn"
+                          : "bg-nav-active text-nav-active-ink",
                       )}
                       title={`${state.count} still to review`}
                     >
@@ -178,7 +179,7 @@ export function AppNavigation({
                     <Check
                       size={14}
                       strokeWidth={2.4}
-                      className="shrink-0 text-ok"
+                      className={cn("shrink-0", active ? "text-nav-active-ink" : "text-nav-muted")}
                       aria-label="done"
                     />
                   ) : null}
@@ -189,23 +190,13 @@ export function AppNavigation({
         </ul>
       </nav>
 
-      <div className="flex shrink-0 flex-col gap-1 border-t border-border px-3 py-3">
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          title="Help is not available yet"
-          className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-[13px] font-medium text-ink-3"
-        >
-          <CircleHelp size={16} strokeWidth={1.9} aria-hidden />
-          Help &amp; shortcuts
-        </button>
+      <div className="flex shrink-0 flex-col border-t border-nav-hover px-3.5 py-5">
         <button
           type="button"
           onClick={(event) => onOpenSettings(event.currentTarget)}
-          className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-[13px] font-medium text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
+          className="flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium text-nav-ink transition-colors hover:bg-nav-hover"
         >
-          <Settings size={16} strokeWidth={1.9} aria-hidden />
+          <Settings size={18} strokeWidth={1.7} aria-hidden />
           Settings
         </button>
       </div>
@@ -225,7 +216,7 @@ export function AccountChip() {
 
   return (
     <span
-      className="relative grid h-8 w-8 place-items-center rounded-full border border-border bg-surface-2 text-[11px] font-bold text-ink-2"
+      className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-surface-2 text-xs font-semibold text-ink"
       title={accountTitle}
     >
       {initials ?? <User size={15} strokeWidth={2} aria-hidden />}

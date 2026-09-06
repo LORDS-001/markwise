@@ -100,7 +100,13 @@ function streamingResponse(lines: string[], chunkSize = Number.MAX_SAFE_INTEGER)
 
 const line = (event: unknown) => `${JSON.stringify(event)}\n`;
 
-function StartsRun({ children }: { children: ReactNode }) {
+function StartsRun({
+  children,
+  course,
+}: {
+  children: ReactNode;
+  course?: { code: string; title: string };
+}) {
   const { startRun } = useSession();
   const started = useRef(false);
 
@@ -120,21 +126,27 @@ function StartsRun({ children }: { children: ReactNode }) {
         ],
       },
       prediction: "They'll forget reactance.",
+      courseCode: course?.code,
+      courseTitle: course?.title,
     });
-  }, [startRun]);
+  }, [course, startRun]);
 
   return children;
 }
 
 /** Reads session state out so assertions can see what the run produced. */
 function SessionProbe() {
-  const { answers, clusters, isDemo, totalAnswers } = useSession();
+  const { answers, clusters, isDemo, totalAnswers, courseCode, courseTitle, pendingRun } = useSession();
   return (
     <div>
       <span data-testid="is-demo">{isDemo ? "demo" : "real"}</span>
       <span data-testid="total">{totalAnswers}</span>
       <span data-testid="clusters">{clusters.map((c) => c.label).join("|")}</span>
       <span data-testid="students">{answers.map((a) => a.studentId).join("|")}</span>
+      <span data-testid="course">{`${courseCode}|${courseTitle}`}</span>
+      <span data-testid="pending-course">
+        {pendingRun ? `${pendingRun.courseCode}|${pendingRun.courseTitle}` : "none"}
+      </span>
     </div>
   );
 }
@@ -180,6 +192,47 @@ it("posts the batch to the run endpoint", async () => {
   const body = JSON.parse(init.body);
   expect(body.input.answers).toHaveLength(2);
   expect(body.prediction).toBe("They'll forget reactance.");
+});
+
+it("keeps a custom course through pending analysis, the saved result, and browser recovery", async () => {
+  let finishRequest!: (response: Response) => void;
+  fetchMock.mockReturnValue(new Promise<Response>((resolve) => { finishRequest = resolve; }));
+  const first = render(
+    <SessionProvider>
+      <StartsRun course={{ code: "CSC201", title: "Data Structures" }}>
+        <ProcessingPage />
+        <SessionProbe />
+      </StartsRun>
+    </SessionProvider>,
+  );
+
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  expect(screen.getByTestId("course")).toHaveTextContent("CSC201|Data Structures");
+  expect(screen.getByTestId("pending-course")).toHaveTextContent("CSC201|Data Structures");
+  const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+  expect(requestBody).toMatchObject({ courseCode: "CSC201", courseTitle: "Data Structures" });
+
+  finishRequest(streamingResponse([
+    line({ type: "result", sessionId: "saved-computing-run", result: RESULT }),
+  ]));
+  await waitFor(() => expect(screen.getByTestId("is-demo")).toHaveTextContent("real"));
+  expect(screen.getByTestId("pending-course")).toHaveTextContent("none");
+  expect(screen.getByTestId("course")).toHaveTextContent("CSC201|Data Structures");
+  await waitFor(() => {
+    const snapshot = JSON.parse(window.sessionStorage.getItem("markwise:run:local") ?? "null");
+    expect(snapshot).toMatchObject({
+      sessionId: "saved-computing-run",
+      courseCode: "CSC201",
+      courseTitle: "Data Structures",
+    });
+  });
+  first.unmount();
+
+  render(<SessionProvider><SessionProbe /></SessionProvider>);
+  await waitFor(() => expect(screen.getByTestId("is-demo")).toHaveTextContent("real"));
+  expect(screen.getByTestId("course")).toHaveTextContent("CSC201|Data Structures");
+  expect(screen.getByTestId("pending-course")).toHaveTextContent("none");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
 it("lands the result in session state and leaves demo mode", async () => {

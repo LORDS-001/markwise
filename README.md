@@ -17,9 +17,17 @@ fall out of the same pass as a byproduct, and stay secondary to the diagnosis.
 The lecturer workflow, saved-session history, student diagnostic, model
 pipeline, and Supabase persistence are implemented.
 
-With no `GEMINI_API_KEY` the app runs on the seeded demo class alone, so the
-deployed demo remains available without credentials. With Gemini and secure
-Supabase persistence configured, Run the pipeline marks a real batch: extraction, embedding, agglomerative clustering,
+The interface uses a dark navigation rail, pale panels, and rounded cards.
+Inter is the body font, Manrope is the heading font, and the primary color and
+logo are `#14121F`. Fonts are self-hosted through Next.js. Light, Dark, and
+device appearance settings share the same typography and monochrome logo.
+See [browser verification](scripts/ui-review/README.md) for the responsive,
+keyboard, font, and color checks.
+
+Setup opens a blank course draft. Without live-service configuration, you can
+prepare a draft or explicitly load the sample class; custom analysis stays
+disabled. With Gemini and secure Supabase persistence configured, **Analyse
+class answers** marks a real batch: extraction, embedding, agglomerative clustering,
 labelling, and prerequisite damage ranking, with live stage progress.
 
 Reteach packs are generated per cluster on request, and each affected student
@@ -34,6 +42,26 @@ because people did not turn up.
 
 Handwritten-script OCR is still not supported — typed and CSV input are the
 guaranteed path.
+
+## Mark another course
+
+1. Open Setup and enter the course code and title, such as **CSC201** and
+   **Data Structures**, followed by its subject and level.
+2. Add the question, marking scheme, criteria, and at least two student answers
+   using Paste or CSV upload.
+3. Select **Analyse class answers**. The entered course identity follows the
+   run into review, saved sessions, and score exports.
+4. Select **New marking session** to prepare another course. Saved sessions
+   also provides this action alongside the existing history.
+
+The draft remains separate from the active reviewed session and survives
+navigation between pages. Completed or reopened sessions restore their own
+course details into Setup. Drafts reset when the account changes.
+
+**Load demo class** explicitly fills the EEE301 sample. **Preview sample
+analysis** uses the bundled results and never starts a paid request, even on a
+configured installation. Editing sample inputs creates a custom draft; if live
+analysis is unavailable, its analysis button stays disabled with an explanation.
 
 ## Screens
 

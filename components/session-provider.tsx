@@ -8,7 +8,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 import {
   ANSWERS,
@@ -27,6 +29,12 @@ import type {
   StudentAnswer,
 } from "@/lib/types";
 import type { PipelineInput, PipelineResult } from "@/lib/pipeline/types";
+import {
+  createEmptySetupDraft,
+  createSetupDraftFromRun,
+  DEMO_MARKING_SCHEME,
+  type SetupDraft,
+} from "@/lib/setup-draft";
 
 export interface PendingRun {
   input: PipelineInput;
@@ -39,8 +47,7 @@ export type RunContext = Omit<PipelineInput, "answers">;
 
 const DEMO_CONTEXT: RunContext = {
   question: SESSION.question,
-  scheme:
-    "Full marks require the reactance computed from X_L = 2πfL, the impedance combined in quadrature as Z = √(R² + X_L²), the current from I = V/Z, the phase angle from φ = arctan(X_L/R) stated as the angle between supply voltage and current, and correct units throughout.",
+  scheme: DEMO_MARKING_SCHEME,
   criteria: CRITERIA,
   subject: SESSION.subject,
   level: SESSION.level,
@@ -52,6 +59,8 @@ interface CourseIdentity {
 }
 
 interface SessionState {
+  setupDraft: SetupDraft;
+  setSetupDraft: Dispatch<SetStateAction<SetupDraft>>;
   answers: StudentAnswer[];
   clusters: Cluster[];
   prediction: string;
@@ -170,6 +179,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [snapshotSaveState, setSnapshotSaveState] =
     useState<"clean" | "pending" | "failed">("clean");
+  const [setupDraft, setSetupDraftState] = useState<SetupDraft>(createEmptySetupDraft);
+
+  const setupDraftRef = useRef(setupDraft);
+  const setupDraftRevisionRef = useRef(0);
+  const draftRecoveryAllowedRef = useRef(true);
+  const pendingDraftRef = useRef<{ input: PipelineInput; revision: number } | null>(null);
+  const courseRef = useRef<CourseIdentity>({ code: courseCode, title: courseTitle });
+  const predictionRef = useRef(prediction);
 
   const answersRef = useRef(answers);
   const clustersRef = useRef(clusters);
@@ -183,6 +200,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const initialSavePromiseRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const clusterAliasesRef = useRef(new Map<string, string>());
   const stateGenerationRef = useRef(0);
+
+  const replaceSetupDraft = useCallback((next: SetupDraft) => {
+    setupDraftRef.current = next;
+    setupDraftRevisionRef.current += 1;
+    setSetupDraftState(next);
+  }, []);
+
+  const setSetupDraft = useCallback<Dispatch<SetStateAction<SetupDraft>>>((next) => {
+    const value = typeof next === "function" ? next(setupDraftRef.current) : next;
+    if (Object.is(value, setupDraftRef.current)) return;
+    draftRecoveryAllowedRef.current = false;
+    replaceSetupDraft(value);
+  }, [replaceSetupDraft]);
 
   const resolveClusterId = useCallback((id: string) => {
     let current = id;
@@ -239,8 +269,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     replaceSessionId(null);
     setContext(DEMO_CONTEXT);
     setPrediction(SESSION.prediction ?? "");
+    predictionRef.current = SESSION.prediction ?? "";
     setCourseCode(SESSION.courseCode);
     setCourseTitle(SESSION.courseTitle);
+    courseRef.current = { code: SESSION.courseCode, title: SESSION.courseTitle };
+    replaceSetupDraft(createEmptySetupDraft());
+    draftRecoveryAllowedRef.current = true;
+    pendingDraftRef.current = null;
     setPendingRun(null);
     setProcessed(true);
     setConfirmed(false);
@@ -249,12 +284,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSaveError(null);
     setSnapshotSaveState("clean");
     failedWritesRef.current = false;
-  }, [replaceAnswers, replaceClusters, replacePacks, replaceSessionId]);
+  }, [replaceAnswers, replaceClusters, replacePacks, replaceSessionId, replaceSetupDraft]);
 
   useEffect(() => {
     if (!browserClient) return;
     let cancelled = false;
     let currentAccount: string | null = null;
+    let receivedAuthEvent = false;
     const applyAccount = (id: string | null) => {
       if (cancelled) return;
       if (currentAccount && currentAccount !== id) resetToDemo();
@@ -264,9 +300,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     void browserClient.auth
       .getUser()
-      .then(({ data }) => applyAccount(data.user?.id ?? null))
-      .catch(() => applyAccount(null));
+      .then(({ data }) => {
+        if (!receivedAuthEvent) applyAccount(data.user?.id ?? null);
+      })
+      .catch(() => {
+        if (!receivedAuthEvent) applyAccount(null);
+      });
     const { data: subscription } = browserClient.auth.onAuthStateChange((_event, next) => {
+      receivedAuthEvent = true;
       applyAccount(next?.user.id ?? null);
     });
     return () => {
@@ -305,8 +346,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       replaceSessionId(run.sessionId);
       setContext(run.context);
       setPrediction(run.prediction);
+      predictionRef.current = run.prediction;
       setCourseCode(run.courseCode);
       setCourseTitle(run.courseTitle);
+      courseRef.current = { code: run.courseCode, title: run.courseTitle };
+      if (draftRecoveryAllowedRef.current) {
+        replaceSetupDraft(createSetupDraftFromRun(
+          {
+            ...run.context,
+            answers: run.answers.map((answer) => ({ studentRef: answer.studentId, text: answer.answer })),
+          },
+          courseRef.current,
+          run.prediction,
+        ));
+        draftRecoveryAllowedRef.current = false;
+      }
       setIsDemo(false);
       isDemoRef.current = false;
       setProcessed(true);
@@ -331,7 +385,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // The seeded demo remains available when browser storage is blocked.
       }
     }
-  }, [storageOwnerKey, replaceAnswers, replaceClusters, replacePacks, replaceSessionId]);
+  }, [storageOwnerKey, replaceAnswers, replaceClusters, replacePacks, replaceSessionId, replaceSetupDraft]);
 
   const enqueueMirror = useCallback(
     (
@@ -646,8 +700,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (initialSaveInFlightRef.current) return;
     setPendingRun(run);
     setPrediction(run.prediction);
+    predictionRef.current = run.prediction;
     setCourseCode(run.courseCode?.trim() ?? "");
     setCourseTitle(run.courseTitle?.trim() ?? "");
+    courseRef.current = { code: run.courseCode?.trim() ?? "", title: run.courseTitle?.trim() ?? "" };
+    pendingDraftRef.current = { input: run.input, revision: setupDraftRevisionRef.current };
+    draftRecoveryAllowedRef.current = false;
     setProcessed(false);
     setConfirmed(false);
   }, []);
@@ -670,8 +728,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (course) {
         setCourseCode(course.code);
         setCourseTitle(course.title);
+        courseRef.current = course;
       }
-      if (runPrediction !== undefined) setPrediction(runPrediction);
+      if (runPrediction !== undefined) {
+        setPrediction(runPrediction);
+        predictionRef.current = runPrediction;
+      }
+      const pendingDraft = pendingDraftRef.current;
+      const completingPendingRun = pendingDraft?.input === runContext;
+      if (!completingPendingRun || pendingDraft?.revision === setupDraftRevisionRef.current) {
+        replaceSetupDraft(createSetupDraftFromRun(
+          {
+            ...runContext,
+            answers: result.answers.map((answer) => ({ studentRef: answer.studentId, text: answer.answer })),
+          },
+          courseRef.current,
+          predictionRef.current,
+        ));
+      }
+      draftRecoveryAllowedRef.current = false;
+      pendingDraftRef.current = null;
       setIsDemo(false);
       isDemoRef.current = false;
       setProcessed(true);
@@ -687,7 +763,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         failedWritesRef.current = true;
       }
     },
-    [replaceAnswers, replaceClusters, replacePacks, replaceSessionId],
+    [replaceAnswers, replaceClusters, replacePacks, replaceSessionId, replaceSetupDraft],
   );
 
   const previewDemo = useCallback(() => {
@@ -700,6 +776,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setContext(DEMO_CONTEXT);
     setCourseCode(SESSION.courseCode);
     setCourseTitle(SESSION.courseTitle);
+    courseRef.current = { code: SESSION.courseCode, title: SESSION.courseTitle };
+    pendingDraftRef.current = null;
     setPendingRun(null);
     setProcessed(false);
     setConfirmed(false);
@@ -837,6 +915,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const updatePrediction = useCallback((value: string) => {
     if (initialSaveInFlightRef.current) return;
     setPrediction(value);
+    predictionRef.current = value;
   }, []);
   const reviewedCount = useMemo(
     () => answers.filter((answer) => answer.status !== "unreviewed").length,
@@ -863,6 +942,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<SessionState>(
     () => ({
+      setupDraft,
+      setSetupDraft,
       answers,
       clusters,
       prediction,
@@ -907,6 +988,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setReteachPack,
     }),
     [
+      setupDraft,
+      setSetupDraft,
       answers,
       clusters,
       prediction,

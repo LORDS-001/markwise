@@ -7,9 +7,14 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type ReactNode,
+  type SetStateAction,
 } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowUpRight,
+  BookOpen,
+  Check,
   ClipboardList,
   FileSpreadsheet,
   ImageIcon,
@@ -17,8 +22,8 @@ import {
   Plus,
   RotateCcw,
   Sparkles,
-  Trash2,
   Upload,
+  Users,
   X,
 } from "lucide-react";
 import { Disclosure } from "@/components/disclosure";
@@ -30,6 +35,7 @@ import {
   CardHead,
   Field,
   Input,
+  Progress,
   Textarea,
   cn,
 } from "@/components/ui";
@@ -39,7 +45,7 @@ import {
   answersFromPaste,
 } from "@/lib/pipeline/parse-answers";
 import type { RawAnswer } from "@/lib/pipeline/types";
-import { ANSWERS, CRITERIA, SESSION } from "@/lib/mock";
+import { createDemoSetupDraft, createEmptySetupDraft, type SetupDraft } from "@/lib/setup-draft";
 
 type InputMode = "paste" | "csv" | "photo";
 
@@ -49,28 +55,40 @@ const ANSWER_INPUT_MODES = [
   { id: "photo", label: "Photos", icon: ImageIcon },
 ] as const;
 
-const DEMO_PASTE = ANSWERS.map((a) => `${a.studentId} | ${a.answer}`).join("\n");
-
 export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boolean }) {
   const router = useRouter();
-  const { prediction, setPrediction, startRun, previewDemo } = useSession();
+  const {
+    setupDraft, setSetupDraft, startRun, previewDemo,
+    setPrediction: setRunPrediction, isDemo: activeRunIsDemo, flushChanges,
+  } = useSession();
+  const {
+    courseCode, courseTitle, question, scheme, criteria, subject, level,
+    mode, paste, csvName, csvAnswers, prediction, isDemo: sampleDraft,
+  } = setupDraft;
 
-  const [question, setQuestion] = useState(SESSION.question);
-  const [scheme, setScheme] = useState(
-    "Full marks require the reactance computed from X_L = 2πfL, the impedance combined in quadrature as Z = √(R² + X_L²), the current from I = V/Z, the phase angle from φ = arctan(X_L/R) stated as the angle between supply voltage and current, and correct units throughout.",
-  );
-  const [criteria, setCriteria] = useState(
-    CRITERIA.map((c) => ({ ...c })),
-  );
-  const [subject, setSubject] = useState(SESSION.subject);
-  const [level, setLevel] = useState(SESSION.level);
-  const [mode, setMode] = useState<InputMode>("paste");
-  const [paste, setPaste] = useState(DEMO_PASTE);
-  const [csvName, setCsvName] = useState<string | null>(null);
-  // The parsed rows, not just a count. Counting lines and then discarding the
-  // file meant the pipeline had nothing to read when the run started.
-  const [csvAnswers, setCsvAnswers] = useState<RawAnswer[]>([]);
+  function setField<K extends keyof SetupDraft>(key: K, value: SetStateAction<SetupDraft[K]>) {
+    setSetupDraft((current) => ({
+      ...current,
+      [key]: typeof value === "function"
+        ? (value as (previous: SetupDraft[K]) => SetupDraft[K])(current[key])
+        : value,
+      isDemo: false,
+    }));
+  }
+
+  const setQuestion = (value: string) => setField("question", value);
+  const setScheme = (value: string) => setField("scheme", value);
+  const setCriteria = (value: SetStateAction<SetupDraft["criteria"]>) => setField("criteria", value);
+  const setSubject = (value: string) => setField("subject", value);
+  const setLevel = (value: string) => setField("level", value);
+  const setMode = (value: InputMode) => setField("mode", value);
+  const setPaste = (value: string) => setField("paste", value);
+  const setPrediction = (value: string) => setField("prediction", value);
+  const setCsvName = (value: string | null) => setField("csvName", value);
+  const setCsvAnswers = (value: RawAnswer[]) => setField("csvAnswers", value);
   const [csvError, setCsvError] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
   const csvRows = csvAnswers.length;
   const fileRef = useRef<HTMLInputElement>(null);
   const csvReadGenerationRef = useRef(0);
@@ -91,6 +109,8 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
     (c) => Number.isInteger(c.marks) && c.marks > 0 && c.marks <= 1000,
   );
   const ready =
+    courseCode.trim().length > 0 && courseCode.trim().length <= 100 &&
+    courseTitle.trim().length > 0 && courseTitle.trim().length <= 300 &&
     subject.trim().length > 0 &&
     level.trim().length > 0 &&
     question.trim().length > 0 &&
@@ -99,6 +119,16 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
     validMarks &&
     maxScore > 0 &&
     answerCount > 1;
+
+  const readinessChecks = [
+    { label: "Course code and title", complete: !!courseCode.trim() && !!courseTitle.trim() },
+    { label: "Subject and level", complete: !!subject.trim() && !!level.trim() },
+    { label: "Question added", complete: !!question.trim() },
+    { label: "Marking scheme added", complete: !!scheme.trim() },
+    { label: "Valid marking criteria", complete: namedCriteria > 0 && validMarks && maxScore > 0 },
+    { label: "At least two answers", complete: answerCount > 1 },
+  ];
+  const completedChecks = readinessChecks.filter((item) => item.complete).length;
 
   const invalidateCsvRead = useCallback(() => {
     csvReadGenerationRef.current += 1;
@@ -121,34 +151,17 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
 
   function loadDemo() {
     invalidateCsvRead();
-    setQuestion(SESSION.question);
-    setScheme(
-      "Full marks require the reactance computed from X_L = 2πfL, the impedance combined in quadrature as Z = √(R² + X_L²), the current from I = V/Z, the phase angle from φ = arctan(X_L/R) stated as the angle between supply voltage and current, and correct units throughout.",
-    );
-    setCriteria(CRITERIA.map((c) => ({ ...c })));
-    setSubject(SESSION.subject);
-    setLevel(SESSION.level);
-    setMode("paste");
-    setPaste(DEMO_PASTE);
-    setPrediction(SESSION.prediction ?? "");
-    setCsvName(null);
-    setCsvAnswers([]);
+    setSetupDraft(createDemoSetupDraft());
     setCsvError(null);
+    setRunError(null);
     clearCsvFileSelection();
   }
 
   function clearAll() {
     invalidateCsvRead();
-    setQuestion("");
-    setScheme("");
-    setCriteria([{ id: "c-1", label: "", marks: 1 }]);
-    setSubject("");
-    setLevel("");
-    setPaste("");
-    setPrediction("");
-    setCsvName(null);
-    setCsvAnswers([]);
+    setSetupDraft(createEmptySetupDraft());
     setCsvError(null);
+    setRunError(null);
     clearCsvFileSelection();
   }
 
@@ -223,9 +236,17 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
     answerTabRefs.current[nextIndex]?.focus();
   }
 
-  function run() {
-    if (!ready) return;
-    if (!liveEnabled) {
+  async function run() {
+    if (!ready || starting || (!sampleDraft && !liveEnabled)) return;
+    setRunError(null);
+    setStarting(true);
+    try {
+    if (!activeRunIsDemo && !(await flushChanges())) {
+      setRunError("Your current session has unsaved edits. Save those changes before starting another session.");
+      return;
+    }
+    if (sampleDraft) {
+      setRunPrediction(prediction);
       previewDemo();
       router.push("/processing");
       return;
@@ -247,24 +268,30 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
         answers,
       },
       prediction,
-      courseCode: SESSION.courseCode,
-      courseTitle: SESSION.courseTitle,
+      courseCode: courseCode.trim(),
+      courseTitle: courseTitle.trim(),
     });
     router.push("/processing");
+    } catch {
+      setRunError("The session could not be started. Your draft is still here; please try again.");
+    } finally {
+      setStarting(false);
+    }
   }
 
   return (
     <Page
-      eyebrow="Step 1 of 7"
+      eyebrow="Step 1 of 8"
       title="Set up this marking session"
       lead="Add the assessment context, marking scheme, and student responses. Required fields are marked."
+      asidePosition="left"
       actions={
         <>
-          <Button variant="ghost" size="sm" onClick={clearAll}>
-            <Trash2 size={15} strokeWidth={1.9} aria-hidden />
-            Clear
+          <Button variant="ghost" size="sm" onClick={clearAll} disabled={starting}>
+            <Plus size={15} strokeWidth={1.9} aria-hidden />
+            New marking session
           </Button>
-          <Button variant="secondary" size="sm" onClick={loadDemo}>
+          <Button variant="secondary" size="sm" onClick={loadDemo} disabled={starting}>
             <RotateCcw size={15} strokeWidth={1.9} aria-hidden />
             Load demo class
           </Button>
@@ -272,42 +299,92 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
       }
       aside={
         <>
-          <Card>
-            <CardHead title={liveEnabled ? "Ready to analyse" : "Ready to preview"} hint="Check the required inputs." />
-            <div className="flex flex-col gap-5 px-5 py-5">
-              <dl className="flex flex-col gap-3 text-[13.5px]">
-                <Row label="Answers detected" value={answerCount ? `${answerCount}` : "—"} ok={answerCount > 1} />
-                <Row label="Marking criteria" value={`${criteria.length}`} ok={criteria.length > 0} />
-                <Row label="Marks available" value={`${maxScore}`} ok={maxScore > 0} />
-                <Row
-                  label="Prediction"
-                  value={prediction.trim() ? "Entered" : "Skipped"}
-                  ok={prediction.trim().length > 0}
-                  muted={!prediction.trim()}
-                />
-              </dl>
-              <div>
-                <Button className="w-full" size="lg" disabled={!ready} onClick={run}>
-                  <Sparkles size={17} strokeWidth={1.9} aria-hidden />
-                  {liveEnabled ? "Analyse class answers" : "Preview sample analysis"}
-                </Button>
-                {!ready ? (
-                  <p className="mt-2 text-center text-[12px] leading-snug text-ink-3">
-                    {validMarks ? "Add a subject, level, question, marking scheme, and at least two answers." : "Criterion marks must be whole numbers from 1 to 1,000."}
-                  </p>
-                ) : (
-                  <p className="mt-2 text-center text-[12px] leading-snug text-ink-3">
-                    {liveEnabled ? "Your answer text and marking scheme are sent to Gemini for analysis. Results are saved to your account." : "This prototype opens sample results. Nothing is submitted."}
-                  </p>
-                )}
+          <Card className="overflow-hidden border-brand-line bg-brand-soft">
+            <div className="relative px-5 pb-6 pt-5 sm:px-6">
+              <div className="flex items-center justify-between gap-3">
+                <span className="label-caps text-brand">Your marking workspace</span>
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] border border-brand-line bg-surface/60 text-brand">
+                  <BookOpen size={20} strokeWidth={1.6} aria-hidden />
+                </span>
               </div>
+              <p className="mt-7 text-[13px] font-medium text-ink-2 [overflow-wrap:anywhere]">{courseCode.trim() || "New course"}</p>
+              <h2 className="mt-1 font-display text-[26px] font-bold leading-tight tracking-[-0.035em] text-ink [overflow-wrap:anywhere]">
+                {courseTitle.trim() || "Your marking session"}
+              </h2>
+              <p className="mt-3 min-h-5 text-[13px] leading-relaxed text-ink-2 break-words">
+                {level.trim() || "Add the assessment level to get started."}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-brand-line bg-surface/50 px-5 py-4 sm:px-6">
+              <span className="inline-flex items-center gap-2 text-[12px] font-medium text-ink">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
+                {sampleDraft ? "Sample workspace" : "Course draft"}
+              </span>
+              <span className="text-[12px] text-ink-2">One question per session</span>
             </div>
           </Card>
 
-          <Card className="bg-brand-soft border-brand-line">
-            <div className="px-5 py-4 flex gap-3">
+          <dl className="grid grid-cols-2 gap-3">
+            <OverviewMetric label="Answers detected" value={`${answerCount}`} icon={<Users size={17} strokeWidth={1.7} aria-hidden />} accent />
+            <OverviewMetric label="Marking criteria" value={`${namedCriteria}`} icon={<ClipboardList size={17} strokeWidth={1.7} aria-hidden />} />
+            <OverviewMetric label="Marks available" value={`${maxScore}`} icon={<Check size={17} strokeWidth={1.8} aria-hidden />} />
+            <OverviewMetric label="Prediction" value={prediction.trim() ? "Entered" : "Skipped"} icon={<Sparkles size={17} strokeWidth={1.7} aria-hidden />} compact />
+          </dl>
+
+          <Card>
+            <CardHead title={sampleDraft ? "Ready to preview" : "Ready to analyse"} hint="Check the required inputs." />
+            <div className="flex flex-col gap-5 px-4 py-5 sm:px-5">
+              <div>
+                <div className="mb-2.5 flex items-center justify-between gap-3 text-[12px]">
+                  <span className="font-medium text-ink-2">Session readiness</span>
+                  <span className="tnum font-semibold text-ink">{completedChecks} of {readinessChecks.length}</span>
+                </div>
+                <Progress value={(completedChecks / readinessChecks.length) * 100} label="Session readiness" />
+              </div>
+              <ul className="flex flex-col gap-3">
+                {readinessChecks.map((item) => (
+                  <li key={item.label} className="flex items-center gap-2.5 text-[13px] text-ink-2">
+                    <span
+                      className={cn(
+                        "grid h-5 w-5 shrink-0 place-items-center rounded-full border",
+                        item.complete ? "border-ok-line bg-ok-soft text-ok" : "border-border-strong bg-surface",
+                      )}
+                    >
+                      {item.complete ? <Check size={12} strokeWidth={2.4} aria-hidden /> : null}
+                      <span className="sr-only">{item.complete ? "Complete:" : "Needed:"}</span>
+                    </span>
+                    {item.label}
+                  </li>
+                ))}
+              </ul>
+              <div>
+                <Button className="w-full !px-3" size="lg" disabled={!ready || starting || (!sampleDraft && !liveEnabled)} onClick={() => void run()}>
+                  {starting ? "Preparing session…" : sampleDraft ? "Preview sample analysis" : "Analyse class answers"}
+                  <ArrowUpRight size={17} strokeWidth={1.9} className="shrink-0" aria-hidden />
+                </Button>
+                {!ready ? (
+                  <p className="mt-2 text-center text-[12px] leading-snug text-ink-3">
+                    {validMarks ? "Add the course details, subject, level, question, marking scheme, and at least two answers." : "Criterion marks must be whole numbers from 1 to 1,000."}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-center text-[12px] leading-snug text-ink-3">
+                    {sampleDraft ? "This opens the EEE 301 sample results. No answers are sent for analysis." : liveEnabled ? "Your answer text and marking scheme are sent to Gemini for analysis. Results are saved to your account." : "Your draft is ready, but live analysis must be enabled before it can be marked."}
+                  </p>
+                )}
+              </div>
+              {!sampleDraft && !liveEnabled ? (
+                <p className="text-[13px] leading-relaxed text-ink-2">
+                  Live analysis is not available in this installation yet. You can prepare your course here or load the demo to explore sample results. Your entries will not be replaced with demo results.
+                </p>
+              ) : null}
+              {runError ? <p role="alert" className="text-[13px] text-crit">{runError}</p> : null}
+            </div>
+          </Card>
+
+          {sampleDraft ? <Card className="bg-surface/60">
+            <div className="px-5 py-5 flex gap-3">
               <Info size={17} strokeWidth={1.9} className="text-brand shrink-0 mt-0.5" aria-hidden />
-              <div className="text-[13px] text-ink">
+              <div className="text-[13px] leading-relaxed text-ink">
                 <p className="font-semibold mb-1">This demo class is pseudonymised</p>
                 <p className="text-ink-2">
                   This sample uses 40 pseudonymised volunteer answers. Names are replaced with
@@ -315,7 +392,7 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
                 </p>
               </div>
             </div>
-          </Card>
+          </Card> : null}
         </>
       }
     >
@@ -323,16 +400,22 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
       <Card>
         <CardHead
           title="Assessment context"
-          hint="Set the subject and level for this marking session."
+          hint="Identify the course, then set the subject and level for this marking session."
         />
-        <div className="grid gap-5 px-5 py-5 sm:grid-cols-2">
+        <div className="grid gap-5 px-4 py-5 sm:grid-cols-2 sm:px-6 sm:py-6">
+          <Field label="Course code" required htmlFor="course-code" hint="Used to identify this session and its exports.">
+            <Input id="course-code" required maxLength={100} value={courseCode} onChange={(e) => setField("courseCode", e.target.value)} placeholder="e.g. CSC201" />
+          </Field>
+          <Field label="Course title" required htmlFor="course-title">
+            <Input id="course-title" required maxLength={300} value={courseTitle} onChange={(e) => setField("courseTitle", e.target.value)} placeholder="e.g. Data Structures" />
+          </Field>
           <Field label="Subject" required htmlFor="subject" hint="Used to judge which later topics a belief will break.">
             <Input
               id="subject"
               required
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Electrical Engineering — AC circuit analysis"
+              placeholder="e.g. Computer Science — data structures"
             />
           </Field>
           <Field label="Level" required htmlFor="level" hint="Sets the expected depth of the answer.">
@@ -341,7 +424,7 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
               required
               value={level}
               onChange={(e) => setLevel(e.target.value)}
-              placeholder="300 level (Year 3)"
+              placeholder="e.g. 200 level (Year 2)"
             />
           </Field>
         </div>
@@ -353,7 +436,7 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
           title="The question"
           hint="One question per session. Paste it exactly as the students saw it."
         />
-        <div className="px-5 py-5">
+        <div className="px-4 py-5 sm:px-6 sm:py-6">
           <Field label="Question text" required htmlFor="question">
             <Textarea
               id="question"
@@ -361,7 +444,7 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
               rows={4}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="A series RL circuit with R = 30 Ω and L = 0.10 H is connected across a 240 V, 50 Hz supply…"
+              placeholder="Enter the question exactly as students received it…"
             />
           </Field>
         </div>
@@ -374,7 +457,7 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
           hint="Every provisional score is awarded against these named criteria, never as a bare number."
           action={<Badge tone="brand">{maxScore} marks</Badge>}
         />
-        <div className="px-5 py-5 flex flex-col gap-5">
+        <div className="flex flex-col gap-6 px-4 py-5 sm:px-6 sm:py-6">
           <Field label="Model answer or scheme" required htmlFor="scheme">
             <Textarea
               id="scheme"
@@ -387,8 +470,8 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
           </Field>
 
           <div className="flex flex-col gap-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[13.5px] font-semibold">Criteria</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[13px] font-semibold">Criteria</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -404,23 +487,24 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
               </Button>
             </div>
 
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-3">
               {criteria.map((c, i) => (
-                <li key={c.id} className="flex items-center gap-2">
-                  <span className="label-caps text-ink-3 w-5 shrink-0 tnum">
+                <li key={c.id} className="grid grid-cols-[20px_minmax(0,1fr)_96px_36px] items-center gap-2 rounded-[16px] bg-surface-2 p-2.5 sm:bg-transparent sm:p-0">
+                  <span className="label-caps text-ink-3 tnum">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <Input
                     aria-label={`Criterion ${i + 1} description`}
                     value={c.label}
                     placeholder="e.g. Impedance combined in quadrature"
-                    className="min-w-0 flex-1"
+                    className="col-span-3 min-w-0 flex-1 sm:col-span-1"
                     onChange={(e) =>
                       setCriteria((prev) =>
                         prev.map((x) => (x.id === c.id ? { ...x, label: e.target.value } : x)),
                       )
                     }
                   />
+                  <span className="col-span-2 pl-1 text-[12px] text-ink-2 sm:hidden" aria-hidden>Marks</span>
                   <Input
                     aria-label={`Marks for criterion ${i + 1}`}
                     type="number"
@@ -437,13 +521,13 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
                         ),
                       )
                     }
-                    className="!w-[74px] shrink-0 tnum text-center"
+                    className="min-w-0 !w-full tnum text-center"
                   />
                   <button
                     onClick={() => setCriteria((prev) => prev.filter((x) => x.id !== c.id))}
                     disabled={criteria.length === 1}
                     aria-label={`Remove criterion ${i + 1}`}
-                    className="grid place-items-center w-9 h-9 shrink-0 rounded-[10px] text-ink-3 hover:text-crit hover:bg-crit-soft disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                    className="grid place-items-center w-9 h-9 shrink-0 rounded-[12px] text-ink-3 hover:text-crit hover:bg-crit-soft disabled:opacity-30 disabled:pointer-events-none transition-colors"
                   >
                     <X size={16} strokeWidth={2} />
                   </button>
@@ -479,7 +563,7 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
         <div
           role="tablist"
           aria-label="Answer input method"
-          className="flex gap-1 px-5 pt-4 border-b border-border"
+          className="mx-4 mt-4 grid grid-cols-3 gap-1 rounded-[16px] bg-surface-2 p-1 sm:mx-6 sm:mt-5"
         >
           {ANSWER_INPUT_MODES.map((t, index) => {
             const active = mode === t.id;
@@ -499,23 +583,23 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
                 onClick={() => setMode(t.id)}
                 onKeyDown={(event) => moveAnswerTab(event, index)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 px-3 py-2 text-[13.5px] font-medium border-b-2 -mb-px transition-colors",
+                  "flex min-w-0 flex-wrap items-center justify-center gap-1.5 rounded-[12px] px-1.5 py-2.5 text-[12px] font-medium transition-colors sm:px-3 sm:text-[13px]",
                   active
-                    ? "border-brand text-brand"
-                    : "border-transparent text-ink-2 hover:text-ink",
+                    ? "bg-surface text-ink shadow-[0_1px_4px_rgba(20,18,31,0.06)]"
+                    : "text-ink-2 hover:bg-surface/60 hover:text-ink",
                 )}
               >
-                <Icon size={15} strokeWidth={1.9} aria-hidden />
-                {t.label}
+                <Icon size={15} strokeWidth={1.9} className="shrink-0" aria-hidden />
+                <span>{t.label}</span>
                 {t.id === "photo" ? (
-                  <span className="label-caps text-ink-3 ml-0.5">soon</span>
+                  <span className="rounded-full bg-surface-3 px-1.5 py-0.5 text-[9px] text-ink-2">soon</span>
                 ) : null}
               </button>
             );
           })}
         </div>
 
-        <div className="px-5 py-5">
+        <div className="px-4 py-5 sm:px-6 sm:py-6">
           <div
             id="answer-panel-paste"
             role="tabpanel"
@@ -535,8 +619,8 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
                 rows={9}
                 value={paste}
                 onChange={(e) => setPaste(e.target.value)}
-                className="font-mono text-[13px]"
-                placeholder={"EEE/022/0103 | Z = R = 30 Ω so I = 240/30 = 8 A…"}
+                className="text-[13px]"
+                placeholder={"STUDENT001 | The student's answer…\nSTUDENT002 | Another student's answer…"}
               />
             </Field>
           </div>
@@ -552,7 +636,7 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  className="flex flex-col items-center gap-2 border-2 border-dashed border-control-border rounded-[16px] px-6 py-10 text-center hover:border-brand hover:bg-brand-soft/40 transition-colors"
+                  className="flex flex-col items-center gap-2 border border-dashed border-control-border bg-surface-2 rounded-[20px] px-4 py-10 text-center hover:border-brand hover:bg-brand-soft transition-colors sm:px-6"
                 >
                   <Upload size={22} strokeWidth={1.7} className="text-ink-3" aria-hidden />
                   <span className="text-[14px] font-medium">Choose a CSV file</span>
@@ -571,9 +655,9 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
                   onChange={(e) => onFile(e.target.files?.[0])}
                 />
                 {csvName ? (
-                  <div className="flex items-center gap-2 text-[13.5px]" role="status">
-                    <FileSpreadsheet size={16} strokeWidth={1.9} className="text-brand" aria-hidden />
-                    <span className="font-medium truncate">{csvName}</span>
+                  <div className="flex min-w-0 items-center gap-2 text-[13px]" role="status">
+                    <FileSpreadsheet size={16} strokeWidth={1.9} className="shrink-0 text-brand" aria-hidden />
+                    <span className="min-w-0 flex-1 font-medium truncate">{csvName}</span>
                     <Badge tone="ok">{csvRows} rows</Badge>
                   </div>
                 ) : null}
@@ -611,7 +695,7 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
             aria-labelledby="answer-tab-photo"
             hidden={mode !== "photo"}
           >
-            <div className="flex flex-col items-center gap-2 border border-dashed border-border-strong rounded-[16px] px-6 py-10 text-center">
+            <div className="flex flex-col items-center gap-2 border border-dashed border-border-strong rounded-[20px] bg-surface-2 px-4 py-10 text-center sm:px-6">
               <ImageIcon size={22} strokeWidth={1.7} className="text-ink-3" aria-hidden />
               <p className="text-[14px] font-medium">Handwritten scripts aren&apos;t supported yet</p>
               <p className="text-[13px] text-ink-2 max-w-[46ch]">
@@ -628,14 +712,14 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
 
       {/* --- Prediction ------------------------------------------------ */}
       <Card className="border-brand-line bg-brand-soft/40">
-        <div className="flex flex-col gap-3 px-5 py-5">
+        <div className="flex flex-col gap-3 px-4 py-5 sm:px-6 sm:py-6">
           <div className="flex items-center gap-2">
             <span className="label-caps text-brand">Before you run it</span>
             <Badge tone="brand">Optional</Badge>
           </div>
           <label
             htmlFor="prediction"
-            className="font-display text-[21px] sm:text-[24px] font-semibold leading-tight"
+            className="font-display text-[20px] sm:text-[22px] font-bold leading-tight tracking-[-0.025em]"
           >
             What do you think most of them got wrong?
           </label>
@@ -657,24 +741,31 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
   );
 }
 
-function Row({
+function OverviewMetric({
   label,
   value,
-  ok,
-  muted,
+  icon,
+  accent,
+  compact,
 }: {
   label: string;
   value: string;
-  ok?: boolean;
-  muted?: boolean;
+  icon: ReactNode;
+  accent?: boolean;
+  compact?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="text-ink-2">{label}</dt>
+    <div className={cn("min-w-0 rounded-[22px] border p-4", accent ? "border-brand-line bg-brand-soft" : "border-border bg-surface")}>
+      <dt className="text-[12px] leading-snug text-ink-2">
+        <span className={cn("mb-4 grid h-9 w-9 place-items-center rounded-[12px] text-ink", accent ? "bg-surface/60" : "bg-surface-2")}>
+          {icon}
+        </span>
+        {label}
+      </dt>
       <dd
         className={cn(
-          "font-semibold tnum",
-          muted ? "text-ink-3" : ok ? "text-ink" : "text-ink-3",
+          "mt-1.5 break-words font-display font-bold leading-tight tracking-[-0.035em] text-ink tnum",
+          compact ? "text-[20px]" : "text-[28px]",
         )}
       >
         {value}

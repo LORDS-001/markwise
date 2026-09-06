@@ -69,7 +69,7 @@ export default function MapPage() {
 
   return (
     <Page
-      eyebrow="Step 4 of 7"
+      eyebrow="Step 4 of 8"
       title="Misconception map"
       lead={
         <>
@@ -172,7 +172,7 @@ export default function MapPage() {
             <h2 className="mt-2 text-[14px] font-bold text-ink">
               Map hidden at this cluster count
             </h2>
-            <p className="mx-auto mt-1 max-w-[48ch] text-[12.5px] text-ink-2">
+            <p className="mx-auto mt-1 max-w-[48ch] text-[13px] text-ink-2">
               Use the complete ranked list below to review every misconception clearly.
             </p>
           </div>
@@ -238,7 +238,7 @@ export default function MapPage() {
                       </span>
                     </span>
 
-                    <span className="flex items-center gap-4 shrink-0 pl-10 sm:pl-0">
+                    <span className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_16px] items-center gap-2 sm:flex sm:w-auto sm:shrink-0 sm:gap-4">
                       <span className="text-right">
                         <span className="block tnum text-[15px] font-semibold">
                           {pct.toFixed(0)}%
@@ -247,13 +247,13 @@ export default function MapPage() {
                           {c.memberIds.length} students
                         </span>
                       </span>
-                      <span className="text-right w-[76px]">
+                      <span className="text-right sm:w-[76px]">
                         <span className="block tnum text-[15px] font-semibold text-ink-2">
                           {averageLoss.toFixed(1)}
                         </span>
                         <span className="block text-[12px] text-ink-3">avg loss</span>
                       </span>
-                      <span className="text-right w-[58px]">
+                      <span className="text-right sm:w-[58px]">
                         <span
                           className={cn(
                             "block tnum text-[15px] font-semibold",
@@ -275,7 +275,7 @@ export default function MapPage() {
           <div className="px-5 py-9 text-center sm:px-6">
             <Network size={20} className="mx-auto text-ink-3" aria-hidden />
             <h2 className="mt-2 text-[14px] font-bold text-ink">No misconceptions to map</h2>
-            <p className="mx-auto mt-1 max-w-[48ch] text-[12.5px] text-ink-2">
+            <p className="mx-auto mt-1 max-w-[48ch] text-[13px] text-ink-2">
               The sample class has no active misconception clusters to review.
             </p>
             <Link href="/" className={buttonClass("primary", "sm") + " mt-4"}>
@@ -287,12 +287,12 @@ export default function MapPage() {
 
       {/* ---------------- Supporting bubble map ---------------- */}
       {canRenderBubbleMap(ranked.length) ? (
-        <Card className="overflow-hidden">
+        <Card className="hidden overflow-hidden sm:block">
           <div className="px-5 sm:px-6 py-3.5 border-b border-border flex items-center justify-between gap-3">
             <span className="label-caps text-ink-3">
               Supporting map · bubble size indicates students affected · ranked by {sortMode}
             </span>
-            <span className="text-[12.5px] text-ink-3 hidden sm:block">
+            <span className="text-[13px] text-ink-3 hidden sm:block">
               Select a bubble to open it
             </span>
           </div>
@@ -333,9 +333,8 @@ export default function MapPage() {
                       <circle
                         r={placement.radius + 5}
                         fill="none"
-                        stroke={toneColor(c.tone)}
-                        strokeWidth={1.5}
-                        strokeOpacity={0.4}
+                        stroke="var(--focus)"
+                        strokeWidth={2}
                       />
                     ) : null}
                     <circle
@@ -349,7 +348,7 @@ export default function MapPage() {
                     <text
                       textAnchor="middle"
                       y={percentageSize * 0.35}
-                      fill={toneColor(c.tone)}
+                      fill="var(--ink)"
                       className="font-display"
                       style={{ fontSize: percentageSize, fontWeight: 600 }}
                     >
@@ -375,7 +374,7 @@ export default function MapPage() {
         <Card className="border-warn-line bg-warn-soft">
           <div className="px-5 sm:px-6 py-4 flex gap-3">
             <TriangleAlert size={18} strokeWidth={1.9} className="text-warn shrink-0 mt-0.5" aria-hidden />
-            <div className="text-[13.5px]">
+            <div className="text-[14px]">
               <p className="font-semibold mb-1">
                 Sorting by damage changes which cluster you should teach first.
               </p>

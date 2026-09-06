@@ -259,6 +259,24 @@ describe("accepting a usable batch", () => {
     maxScore: 2,
   };
 
+  it("forwards a custom course identity to persistence without substituting demo metadata", async () => {
+    runPipeline.mockResolvedValue(RESULT);
+
+    const response = await post({
+      input: VALID_INPUT,
+      courseCode: "  CSC201  ",
+      courseTitle: "  Data Structures  ",
+    });
+    expect(response.status).toBe(200);
+    const events = (await response.text()).trim().split("\n").map((item) => JSON.parse(item));
+    expect(events.at(-1)).toMatchObject({ type: "result", sessionId: "session-1" });
+    expect(persistRun).toHaveBeenCalledWith(expect.objectContaining({
+      ownerId: "user-1",
+      courseCode: "CSC201",
+      courseTitle: "Data Structures",
+    }));
+  });
+
   it("streams NDJSON and passes the trimmed input through", async () => {
     runPipeline.mockResolvedValue(RESULT);
 

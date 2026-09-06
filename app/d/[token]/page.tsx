@@ -272,7 +272,7 @@ export default function StudentDiagnosticPage() {
             <h1 className="font-display text-[20px] font-semibold">
               This link doesn&apos;t open anything
             </h1>
-            <p className="mt-2 text-[13.5px] text-ink-2 max-w-[46ch] mx-auto">
+            <p className="mt-2 text-[14px] text-ink-2 max-w-[46ch] mx-auto">
               It may have been mistyped, or the session it belonged to may have
               been removed. Ask whoever sent it for a new one.
             </p>
@@ -284,10 +284,10 @@ export default function StudentDiagnosticPage() {
 
   return (
     <Frame>
-      <div className="flex flex-col gap-4">
-        <header>
+      <div className="flex min-w-0 flex-col gap-5">
+        <header className="px-1">
           <span className="label-caps text-brand">A quick check</span>
-          <h1 className="font-display text-[24px] sm:text-[28px] font-semibold leading-tight mt-1">
+          <h1 className="mt-2 break-words font-display text-[24px] font-bold leading-tight sm:text-[30px]">
             {diagnostic.clusterLabel}
           </h1>
           {diagnostic.clusterWhy ? (
@@ -306,10 +306,10 @@ export default function StudentDiagnosticPage() {
             <div className="px-5 py-4 flex flex-col gap-4">
               {diagnostic.lesson.map((section, i) => (
                 <section key={i}>
-                  <h2 className="text-[14px] font-semibold mb-1">
+                  <h2 className="mb-2 text-[16px] font-bold">
                     {section.heading}
                   </h2>
-                  <p className="text-[13.5px] leading-relaxed text-ink-2">
+                  <p className="text-[14px] leading-relaxed text-ink-2">
                     {section.body}
                   </p>
                 </section>
@@ -320,7 +320,7 @@ export default function StudentDiagnosticPage() {
 
         {diagnostic.questions.length === 0 ? (
           <Card>
-            <p className="px-5 py-6 text-[13.5px] text-ink-2">
+            <p className="px-5 py-6 text-[14px] text-ink-2">
               There are no questions attached to this check yet.
             </p>
           </Card>
@@ -401,7 +401,7 @@ export default function StudentDiagnosticPage() {
                   )}
                 </Button>
                 {!answered ? (
-                  <p className="text-[12.5px] text-ink-3 mt-2">
+                  <p className="text-[13px] text-ink-3 mt-2">
                     Answer both questions first.
                   </p>
                 ) : null}
@@ -412,7 +412,7 @@ export default function StudentDiagnosticPage() {
                     answers were recorded, and saying it twice reads as though
                     something happened twice. */}
                 {notice ? null : (
-                  <p className="text-[13.5px] text-ink-2" role="status">
+                  <p className="text-[14px] text-ink-2" role="status">
                     Thanks — your answers were recorded.
                   </p>
                 )}
@@ -454,14 +454,20 @@ export default function StudentDiagnosticPage() {
 /** No shell: a student is not inside the lecturer's session. */
 function Frame({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-dvh bg-surface-2 px-4 py-8 sm:py-12">
-      <div className="mx-auto w-full max-w-[46rem] flex flex-col gap-6">
-        <MarkwiseLogo className="h-6 w-auto" />
-        {children}
-        <p className="text-[12px] text-ink-3">
-          Only your own answer is shown here. Nothing you write is shared with
-          other students.
-        </p>
+    <main className="min-h-dvh bg-shell">
+      <div className="mx-auto flex w-full max-w-[48rem] min-w-0 flex-col">
+        <div className="flex items-center border-b border-border px-5 py-5 sm:px-8 sm:py-6">
+          <div className="inline-flex rounded-[16px] bg-white px-4 py-3">
+            <MarkwiseLogo className="h-7 w-auto" />
+          </div>
+        </div>
+        <div className="flex min-w-0 flex-col gap-6 px-3 py-5 sm:px-7 sm:py-7">
+          {children}
+          <p className="px-1 text-[12px] leading-relaxed text-ink-3">
+            Only your own answer is shown here. Nothing you write is shared with
+            other students.
+          </p>
+        </div>
       </div>
     </main>
   );

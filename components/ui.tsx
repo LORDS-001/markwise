@@ -21,7 +21,7 @@ export type Variant = "primary" | "secondary" | "ghost" | "danger" | "quiet";
 export type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-primary text-on-primary hover:bg-primary-hover border border-transparent",
+  primary: "bg-primary text-on-primary hover:bg-primary-hover border border-[var(--primary-line)]",
   secondary: "bg-surface text-ink border border-border hover:border-border-strong hover:bg-surface-2",
   ghost: "bg-transparent text-ink-2 border border-transparent hover:bg-surface-2 hover:text-ink",
   danger: "bg-surface text-crit border border-crit-line hover:bg-crit-soft",
@@ -29,15 +29,15 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const SIZES: Record<Size, string> = {
-  sm: "h-8 px-3.5 text-[13px] gap-1.5 rounded-[10px]",
-  md: "h-9 px-4.5 text-[13.5px] gap-2 rounded-[10px]",
-  lg: "h-10 px-6 text-[14.5px] gap-2 rounded-[10px]",
+  sm: "min-h-9 px-3.5 py-2 text-[13px] gap-1.5 rounded-[12px]",
+  md: "min-h-10 px-4.5 py-2.5 text-[14px] gap-2 rounded-[12px]",
+  lg: "min-h-11 px-5 py-3 text-[14px] gap-2 rounded-[14px]",
 };
 
 export function buttonClass(variant: Variant = "primary", size: Size = "md", extra?: string) {
   return cn(
-    "inline-flex items-center justify-center font-medium transition-colors select-none",
-    "disabled:opacity-45 disabled:pointer-events-none whitespace-nowrap",
+    "inline-flex max-w-full min-w-0 items-center justify-center text-center font-medium leading-snug transition-colors select-none [&>svg]:shrink-0",
+    "disabled:opacity-45 disabled:pointer-events-none whitespace-normal",
     VARIANTS[variant],
     SIZES[size],
     extra,
@@ -67,10 +67,16 @@ export function Card({
   children,
   ...rest
 }: { className?: string; children: ReactNode } & React.HTMLAttributes<HTMLDivElement>) {
+  const customBackground = className?.split(/\s+/).some((name) => name.startsWith("bg-"));
+  const customBorder = className?.split(/\s+/).some((name) =>
+    /^border-(?:brand|warn|crit|ok)-line$|^border-border-strong$/.test(name),
+  );
   return (
     <div
       className={cn(
-        "bg-surface border border-border rounded-[var(--r-card)]",
+        "min-w-0 border rounded-[var(--r-card)]",
+        !customBackground && "bg-surface",
+        !customBorder && "border-border",
         className,
       )}
       {...rest}
@@ -94,15 +100,15 @@ export function CardHead({
   return (
     <div
       className={cn(
-        "flex items-start justify-between gap-4 px-5 py-4 border-b border-border",
+        "flex flex-wrap items-start justify-between gap-3 px-5 py-5 border-b border-border sm:px-6",
         className,
       )}
     >
-      <div className="min-w-0">
-        <h2 className="font-display text-[16px] font-bold leading-tight">{title}</h2>
-        {hint ? <p className="text-[12.5px] text-ink-2 mt-1 leading-snug">{hint}</p> : null}
+      <div className="min-w-0 flex-[1_1_12rem]">
+        <h2 className="font-display text-[18px] font-bold leading-snug">{title}</h2>
+        {hint ? <p className="text-[13px] text-ink-2 mt-1.5 leading-relaxed">{hint}</p> : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? <div className="min-w-0 max-w-full shrink-0">{action}</div> : null}
     </div>
   );
 }
@@ -131,7 +137,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-[11px] font-semibold leading-[1.5] whitespace-nowrap",
+        "inline-flex max-w-full items-center gap-1.5 border rounded-full px-2.5 py-1 text-[12px] font-medium leading-[1.4] whitespace-normal [&>svg]:shrink-0",
         TONES[tone],
         className,
       )}
@@ -157,21 +163,19 @@ export function Stat({
   tone?: "brand" | "warn" | "plain";
 }) {
   return (
-    <div className="bg-surface border border-border rounded-[var(--r-card)] px-4 py-3.5 min-w-0">
-      <div className="flex items-center gap-1.5 text-ink-3">
-        {icon}
-        <span className="label-caps">{label}</span>
-      </div>
+    <div className={cn("min-w-0 rounded-[var(--r-card)] border border-border p-5", tone === "brand" ? "bg-brand-soft" : "bg-surface")}>
+      {icon ? <div className="mb-4 grid h-9 w-9 place-items-center rounded-[12px] bg-surface-2 text-ink" aria-hidden>{icon}</div> : null}
+      <div className="text-[13px] font-medium leading-snug text-ink-2">{label}</div>
       <div
         className={cn(
-          "font-display text-[24px] font-extrabold leading-tight mt-1.5 tnum truncate",
+          "font-display mt-2 break-words text-[26px] font-bold leading-tight tnum sm:text-[28px]",
           tone === "brand" && "text-brand",
           tone === "warn" && "text-warn",
         )}
       >
         {value}
       </div>
-      {sub ? <div className="text-[12.5px] text-ink-2 mt-0.5 truncate">{sub}</div> : null}
+      {sub ? <div className="mt-1 text-[12px] leading-relaxed text-ink-2">{sub}</div> : null}
     </div>
   );
 }
@@ -251,7 +255,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex bg-surface-2 border border-border rounded-full p-1 gap-1"
+      className="inline-flex max-w-full flex-wrap bg-surface-2 border border-border rounded-[16px] p-1 gap-1"
     >
       {options.map((o, index) => {
         const active = o.value === value;
@@ -265,7 +269,7 @@ export function Segmented<T extends string>({
             onClick={() => onChange(o.value)}
             onKeyDown={(event) => moveSelection(event, index)}
             className={cn(
-              "px-3.5 h-7 text-[12.5px] font-semibold rounded-full transition-colors",
+              "min-h-9 px-3 py-1.5 text-[13px] font-medium rounded-[12px] transition-colors",
               active
                 ? "bg-surface text-ink border border-brand"
                 : "text-ink-2 hover:text-ink border border-transparent",
@@ -299,7 +303,7 @@ export function Field({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3">
-        <label htmlFor={htmlFor} className="text-[13px] font-bold text-ink">
+        <label htmlFor={htmlFor} className="text-[13px] font-semibold text-ink">
           {label}
           {required ? <span className="text-crit ml-1" aria-hidden>*</span> : null}
           {required ? (
@@ -318,7 +322,7 @@ export function Field({
 }
 
 const inputBase =
-  "w-full bg-surface border border-control-border rounded-[var(--r-input)] px-3.5 py-2.5 text-[14px] text-ink " +
+  "w-full min-w-0 bg-surface border border-control-border rounded-[var(--r-input)] px-3.5 py-3 text-[14px] text-ink " +
   "placeholder:text-ink-3 transition-colors hover:border-brand focus:border-brand focus:outline-none " +
   "focus:ring-2 focus:ring-[var(--brand-line)]";
 
@@ -351,7 +355,7 @@ export function EmptyState({
     <div className="flex flex-col items-center text-center gap-2 py-12 px-6">
       {icon ? <div className="text-ink-3">{icon}</div> : null}
       <h3 className="font-display text-[17px] font-bold">{title}</h3>
-      {body ? <p className="text-[13.5px] text-ink-2 max-w-[46ch]">{body}</p> : null}
+      {body ? <p className="text-[14px] text-ink-2 max-w-[46ch]">{body}</p> : null}
       {action ? <div className="pt-2">{action}</div> : null}
     </div>
   );
@@ -368,7 +372,7 @@ export function ConfidenceMeter({ value }: { value: number }) {
           style={{ width: `${pct}%` }}
         />
       </span>
-      <span className={cn("tnum text-[12.5px]", low ? "text-warn font-semibold" : "text-ink-2")}>
+      <span className={cn("tnum text-[13px]", low ? "text-warn font-semibold" : "text-ink-2")}>
         {pct}%
       </span>
     </span>

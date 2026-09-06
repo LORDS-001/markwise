@@ -21,7 +21,7 @@ const OPTIONS: {
   {
     value: "dark",
     label: "Dark",
-    description: "Use deep navy surfaces with cyan accents.",
+    description: "Use soft charcoal surfaces and muted lavender accents.",
     icon: Moon,
   },
   {
@@ -49,14 +49,14 @@ export function SettingsDialog({
       onClose={onClose}
       side="right"
       labelledBy="settings-title"
-      panelClassName="max-w-none sm:max-w-[400px]"
+      panelClassName="max-w-none sm:max-w-[440px] sm:rounded-l-[28px]"
       returnFocusRef={returnFocusRef}
     >
       <div className="flex min-h-full flex-col">
-        <header className="flex h-16 items-center justify-between border-b border-border px-5">
+        <header className="flex min-h-24 items-center justify-between gap-4 border-b border-border px-6 py-5">
           <div>
-            <p className="label-caps text-brand">Preferences</p>
-            <h2 id="settings-title" className="font-display text-[18px] font-bold">
+            <p className="label-caps text-ink-3">Preferences</p>
+            <h2 id="settings-title" className="mt-1 font-display text-2xl font-bold tracking-tight">
               Settings
             </h2>
           </div>
@@ -65,18 +65,18 @@ export function SettingsDialog({
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="min-h-9 min-w-9 px-0"
+            className="min-h-11 min-w-11 rounded-full px-0"
             aria-label="Close settings"
           >
             <X size={18} aria-hidden />
           </Button>
         </header>
-        <fieldset className="p-5">
-          <legend className="text-[14px] font-bold text-ink">Appearance</legend>
-          <p className="mt-1 text-[12.5px] text-ink-2">
+        <fieldset className="m-6 min-w-0">
+          <legend className="font-display text-base font-bold text-ink">Appearance</legend>
+          <p className="mt-2 text-sm leading-6 text-ink-2">
             Choose how Markwise looks on this device.
           </p>
-          <div className="mt-4 grid gap-2">
+          <div className="mt-5 grid gap-3">
             {OPTIONS.map((option) => {
               const Icon = option.icon;
               const selected = option.value === preference;
@@ -84,7 +84,7 @@ export function SettingsDialog({
                 <label
                   key={option.value}
                   className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-[12px] border p-3.5",
+                    "flex cursor-pointer items-start gap-3 rounded-[20px] border p-4 transition-colors focus-within:ring-2 focus-within:ring-brand-line focus-within:ring-offset-2 focus-within:ring-offset-surface",
                     selected
                       ? "border-brand-line bg-brand-soft"
                       : "border-border bg-surface hover:bg-surface-2",
@@ -97,14 +97,14 @@ export function SettingsDialog({
                     checked={selected}
                     onChange={() => setPreference(option.value)}
                     aria-label={option.label}
-                    className="mt-1 accent-[var(--brand)]"
+                    className="mt-1 h-4 w-4 shrink-0 accent-[var(--brand)]"
                   />
                   <Icon size={18} className="mt-0.5 shrink-0 text-brand" aria-hidden />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-semibold text-ink">
+                    <span className="block text-sm font-semibold text-ink">
                       {option.label}
                     </span>
-                    <span className="mt-0.5 block text-[12px] leading-snug text-ink-2">
+                    <span className="mt-1 block text-[13px] leading-5 text-ink-2">
                       {option.description}
                     </span>
                   </span>
