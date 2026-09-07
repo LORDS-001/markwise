@@ -62,7 +62,7 @@ it("names the loading account region while the session resolves", () => {
   expect(screen.getByRole("region", { name: "Account connection" })).toBeVisible();
 });
 
-it("names the linked region and states the preview sync limit exactly", async () => {
+it("names the linked region and explains saved-batch recovery", async () => {
   getBrowserClient.mockReturnValue(
     createClient({ session: { user: { id: "linked-1", email: "lecturer@example.edu" } } }),
   );
@@ -70,7 +70,7 @@ it("names the linked region and states the preview sync limit exactly", async ()
   const region = screen.getByRole("region", { name: "Account connection" });
   await waitFor(() =>
     expect(region).toHaveTextContent(
-      "Signed in as lecturer@example.edu. Batch results are not synced in this preview.",
+      "Signed in as lecturer@example.edu. Open Saved sessions to recover saved batches. The sample class is not saved.",
     ),
   );
 });

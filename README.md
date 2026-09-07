@@ -1,37 +1,101 @@
 # Markwise
 
-Mark the scripts. See what the class got wrong.
+See what your class misunderstood. Fix it. Measure the change.
 
-A marking assistant for lecturers. Upload a batch of answers to one question;
-Markwise extracts the false belief behind each mistake, clusters those beliefs,
-and ranks the misconceptions actually spreading through the class. Provisional
-scores fall out of the same pass as a byproduct.
+A learning-intelligence tool for lecturers. Upload a batch of answers to one
+question; Markwise extracts the false belief behind each mistake, clusters
+those beliefs, ranks the misconceptions actually spreading through the class,
+writes a targeted reteach lesson, sends each affected student a diagnostic
+built against their own misconception, and then reports whether the belief
+survived.
+
+The loop is the product: **before → intervention → after**. Provisional scores
+fall out of the same pass as a byproduct, and stay secondary to the diagnosis.
 
 ## Status
 
-All eight screens, the model pipeline, and Supabase persistence are wired.
+The lecturer workflow, saved-session history, student diagnostic, model
+pipeline, and Supabase persistence are implemented.
 
-With no `GEMINI_API_KEY` the app runs on the seeded demo class alone, so the
-deployed demo cannot be taken down by a missing variable. With a key, Run the
-pipeline marks a real batch: extraction, embedding, agglomerative clustering,
+The interface uses a dark navigation rail, pale panels, and rounded cards.
+Inter is the body font, Manrope is the heading font, and the primary color and
+logo are `#14121F`. Fonts are self-hosted through Next.js. Light, Dark, and
+device appearance settings share the same typography and monochrome logo.
+See [browser verification](scripts/ui-review/README.md) for the responsive,
+keyboard, font, and color checks.
+
+Setup opens a blank course draft. Without live-service configuration, you can
+prepare a draft or explicitly load the sample class; custom analysis stays
+disabled. With Gemini and secure Supabase persistence configured, **Analyse
+class answers** marks a real batch: extraction, embedding, agglomerative clustering,
 labelling, and prerequisite damage ranking, with live stage progress.
 
-Reteach packs are generated per cluster on request. Handwritten-script OCR is
-still not supported — typed and CSV input are the guaranteed path.
+Reteach packs are generated per cluster on request, and each affected student
+gets an unguessable link to a diagnostic built from that pack. The outcome
+screen reports how many still hold the belief afterwards.
+
+That figure is deliberately conservative: students who did not answer count as
+pending rather than corrected, an answer too thin to judge counts as unclear,
+and the share still holding the belief is measured against answers that were
+actually decided. Dividing by absentees would show a misconception collapsing
+because people did not turn up.
+
+Handwritten-script OCR is still not supported — typed and CSV input are the
+guaranteed path.
+
+## Mark another course
+
+1. Open Setup and enter the course code and title, such as **CSC201** and
+   **Data Structures**, followed by its subject and level.
+2. Add the question, marking scheme, criteria, and at least two student answers
+   using Paste or CSV upload.
+3. Select **Analyse class answers**. The entered course identity follows the
+   run into review, saved sessions, and score exports.
+4. Select **New marking session** to prepare another course. Saved sessions
+   also provides this action alongside the existing history.
+
+The draft remains separate from the active reviewed session and survives
+navigation between pages. Completed or reopened sessions restore their own
+course details into Setup. Drafts reset when the account changes.
+
+**Load demo class** explicitly fills the EEE301 sample. **Preview sample
+analysis** uses the bundled results and never starts a paid request, even on a
+configured installation. Editing sample inputs creates a custom draft; if live
+analysis is unavailable, its analysis button stays disabled with an explanation.
 
 ## Screens
 
 | Route              | Screen                                            |
 | ------------------ | ------------------------------------------------- |
 | `/`                | Setup — question, scheme, answers, prediction      |
-| `/processing`      | Staged run with real stage names                   |
+| `/processing`      | Live run with real stage names                     |
 | `/reveal`          | Prediction beside the actual top cluster           |
-| `/map`             | Bubble map, sortable by spread or damage           |
+| `/map`             | Bubble map, positioned by embedding proximity      |
 | `/clusters/[id]`   | Evidence, roster, rename / merge / split / reject  |
 | `/reteach`         | Cluster picker                                     |
 | `/reteach/[id]`    | Micro-lesson and two-question diagnostic           |
+| `/outcome`         | Before and after — did the reteach land?           |
 | `/scores`          | Dense review table, inline edit, export gate       |
 | `/export`          | Format, preview, confirm, download                 |
+| `/sessions`        | Recover a saved batch from the current account    |
+| `/d/[token]`       | A student's own diagnostic. Not part of the shell  |
+
+## The student's page
+
+`/d/<token>` is the only route a student ever sees, and it shows one thing:
+their own misconception, the lesson written against it, and the two questions
+that test it. No navigation, no session, nobody else's work.
+
+Student lookup is scoped to an unguessable token and returns question prompts,
+the lesson, and that student's recorded result. Expected answers stay on the
+server. Only the server's service-role client can record an attempt or write
+a verdict; the public database roles cannot grade themselves.
+
+Both responses and the trusted rubric are saved in one transaction before
+grading. A grader outage leaves the attempt available for a marking retry,
+using the original text rather than asking the student to submit again.
+Saved outcomes are read from the database. The credential-free sample uses
+browser storage and does not call Gemini or claim automatic grading.
 
 ## Stack
 
@@ -76,8 +140,13 @@ class alone, so a missing env var can never take the deployed demo down.
 To connect it:
 
 1. Create a project at supabase.com, then copy `.env.example` to `.env.local`
-   and fill in the URL and anon key from Project settings → API.
-2. Run the migrations in `supabase/migrations/` in order, in the SQL editor.
+   and fill in the URL and anon key from Project settings → API. Add
+   `SUPABASE_SERVICE_ROLE_KEY` for server-authoritative grading and AI budgets.
+   Keep this key server-side; never use a `NEXT_PUBLIC_` prefix for it.
+2. Run every migration in `supabase/migrations/` in order, in the SQL editor.
+   Existing installations through `0005` need `0006`, `0007`, and `0008`:
+   these secure diagnostics, make run saves atomic, and enforce AI budgets.
+   For a new empty project, `supabase/setup.sql` contains the full sequence.
 3. Enable anonymous sign-ins: Authentication → Sign In / Up → Anonymous.
 
 Once the app is live, schedule `public.prune_abandoned_anonymous_users()` —
@@ -89,6 +158,35 @@ It only removes anonymous users with no sessions attached.
 Add `GEMINI_API_KEY` to `.env.local` (aistudio.google.com/apikey). Without it
 the app stays on the demo class and the run endpoint returns 503 rather than
 failing halfway.
+
+Live web operations also require the Supabase URL, anon key, service-role key,
+all migrations, and a verified account session. Anonymous Supabase accounts
+qualify, so this does not add a signup form. Missing security configuration
+disables paid web calls while leaving the sample class available.
+
+The run endpoint accepts 2–100 answers, at most 10,000 characters per answer,
+whole positive criterion marks, and at most 1 MiB for the request. It bounds processing time and reports
+degraded clustering explicitly. Student identifiers are replaced with
+correlation labels in model prompts; answer text itself is sent to Gemini.
+
+Daily limits are enforced atomically in Postgres, across server processes:
+3 runs and 12 reteach generations per account, and 2 grading attempts per
+student token. Service-wide limits are 60 runs, 240 reteach generations, and
+600 diagnostic grading attempts per UTC day. Change the constants in a new
+migration when intentionally changing these budgets. `GEMINI_RPM` separately
+paces provider requests within each process. The run has a 270-second deadline,
+with batch admission checked against configured RPM before consuming AI quota.
+The default 15 RPM admits the 40-answer class; batches of 50 or more require
+splitting or a higher RPM supported by your provider quota. Label and damage
+assessment share one model call per cluster. A slow provider can still exceed
+the deadline and reports a recoverable error.
+
+Setup shows a local sample preview when secure live configuration is absent.
+Configured deployments label the live action explicitly and explain what is
+sent to Gemini. If saving a completed analysis fails, **Retry save** stores the
+existing result without another model run. Pending or failed edits remain
+marked unsaved across refresh; saved-session recovery offers an explicit way
+to discard local edits and reopen the database copy.
 
 `npm run pipeline` runs the whole thing as a bare console script with no UI,
 which is how the extraction prompt and the distance threshold get tuned:
@@ -108,3 +206,21 @@ threshold — descriptions will not cluster no matter what the threshold is.
 
 The seeded class is 40 answers to one EEE 301 question. Names are replaced with
 initials and student numbers are invented.
+
+## Verification
+
+```bash
+npm run test:run
+npm run typecheck
+npm run lint
+npm run build
+```
+
+The suite includes an in-memory PostgreSQL harness for migrations, permissions,
+atomic batch saves, diagnostic attempts, and quotas. It does not connect to a
+Supabase project. The harness substitutes an array for the unused pgvector
+storage column; pgvector itself and hosted Supabase/PostgREST behavior need
+deployment checks. Function permission tests include
+[Supabase's default role grants](https://supabase.com/docs/guides/database/functions#function-privileges).
+Vitest uses one worker thread to avoid Windows fork-startup failures and
+memory contention in the UI tests.

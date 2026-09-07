@@ -84,13 +84,65 @@ describe("normaliseExtraction", () => {
 
   it("clears the signature and span for a correct answer", () => {
     const result = normaliseExtraction(
-      raw({ is_correct: true, criteria_met: ["c-react", "c-quad", "c-units"] }),
+      raw({
+        is_correct: true,
+        error_signature: "",
+        criteria_met: ["c-react", "c-quad", "c-units"],
+      }),
       ANSWER,
       CRITERIA,
     );
     expect(result.errorSignature).toBeNull();
     expect(result.evidenceSpan).toBeNull();
     expect(result.provisionalScore).toBe(6);
+  });
+
+  it("requires review when a supposedly correct answer also has a false belief", () => {
+    const result = normaliseExtraction(
+      raw({ is_correct: true, criteria_met: ["c-react", "c-quad", "c-units"] }),
+      ANSWER,
+      CRITERIA,
+    );
+
+    expect(result.isCorrect).toBe(false);
+    expect(result.confidence).toBeLessThan(0.7);
+  });
+
+  it("requires review when is_correct contradicts awarded criteria", () => {
+    const result = normaliseExtraction(
+      raw({ is_correct: true, criteria_met: ["c-react"], confidence: 0.99 }),
+      ANSWER,
+      CRITERIA,
+    );
+
+    expect(result.isCorrect).toBe(false);
+    expect(result.confidence).toBeLessThan(0.7);
+  });
+
+  it("requires review when full criteria contradict an incorrect verdict", () => {
+    const result = normaliseExtraction(
+      raw({
+        is_correct: false,
+        criteria_met: ["c-react", "c-quad", "c-units"],
+        confidence: 0.99,
+      }),
+      ANSWER,
+      CRITERIA,
+    );
+
+    expect(result.isCorrect).toBe(false);
+    expect(result.confidence).toBeLessThan(0.7);
+  });
+
+  it("rejects a signature that is not a specific belief", () => {
+    const result = normaliseExtraction(
+      raw({ error_signature: "used the wrong formula", confidence: 0.9 }),
+      ANSWER,
+      CRITERIA,
+    );
+
+    expect(result.errorSignature).toBeNull();
+    expect(result.confidence).toBeLessThan(0.7);
   });
 
   it("treats an empty signature as undiagnosed rather than as a belief", () => {

@@ -7,7 +7,7 @@ const css = readFileSync("app/globals.css", "utf8");
 type ThemeName = "light" | "dark";
 const clusterTones = [0, 1, 2, 3, 4, 5, 6] satisfies Cluster["tone"][];
 
-function themeTokens(theme: ThemeName) {
+function themeTokens(theme: ThemeName): Record<string, string> {
   const selector =
     theme === "light"
       ? /:root,\s*\[data-theme="light"\]\s*\{([\s\S]*?)\n\}/
@@ -15,11 +15,13 @@ function themeTokens(theme: ThemeName) {
   const block = css.match(selector)?.[1];
   expect(block, `${theme} token block`).toBeDefined();
 
-  return Object.fromEntries(
+  const ownTokens = Object.fromEntries(
     [...block!.matchAll(/--([\w-]+):\s*(#[\da-f]{6})\s*;/gi)].map(
       ([, name, value]) => [name, value],
     ),
   );
+  // Dark mode inherits unchanged brand/category tokens from :root, like CSS.
+  return theme === "dark" ? { ...themeTokens("light"), ...ownTokens } : ownTokens;
 }
 
 function luminance(hex: string) {

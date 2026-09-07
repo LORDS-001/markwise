@@ -1,12 +1,17 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import ScoresPage from "@/app/scores/page";
 import { SessionProvider, useSession } from "@/components/session-provider";
 import { ANSWERS } from "@/lib/mock";
 import { installMatchMedia } from "../match-media";
 
 const TEST_TIMEOUT = 40_000;
+
+afterEach(() => {
+  // Loaded runs survive remounts in sessionStorage; each workspace test starts fresh.
+  window.sessionStorage.clear();
+});
 
 function renderScores({ completionProbe = false } = {}) {
   return render(
@@ -62,6 +67,50 @@ function installScrollIntoViewMock() {
     },
   };
 }
+
+it("shows the loaded assessment maximum in the mean score and keeps it through edits", () => {
+  function LoadTwentyMarkAssessment() {
+    const { applyRun, context } = useSession();
+    return (
+      <button
+        type="button"
+        onClick={() => applyRun(
+          {
+            answers: ANSWERS.slice(0, 2).map((answer, index) => ({
+              ...answer,
+              maxScore: 20,
+              provisionalScore: index === 0 ? 12 : 16,
+              clusterId: null,
+              criteriaMet: [],
+              criteriaMissed: [],
+            })),
+            clusters: [],
+            reteachPacks: {},
+            maxScore: 20,
+          },
+          null,
+          { ...context, criteria: [{ id: "total", label: "Reasoning", marks: 20 }] },
+        )}
+      >
+        Load a twenty-mark assessment
+      </button>
+    );
+  }
+
+  render(
+    <SessionProvider>
+      <ScoresPage />
+      <LoadTwentyMarkAssessment />
+    </SessionProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Load a twenty-mark assessment" }));
+  expect(screen.getByText("Mean score").nextElementSibling).toHaveTextContent("14.0 / 20");
+
+  const table = screen.getByRole("table", { name: "Student score review" });
+  const score = within(table).getByRole("spinbutton", { name: `Score for ${ANSWERS[0].initials}` });
+  fireEvent.change(score, { target: { value: "18" } });
+  expect(screen.getByText("Mean score").nextElementSibling).toHaveTextContent("17.0 / 20");
+}, TEST_TIMEOUT);
 
 it(
   "labels the review workspace, every score input, and the bounded review table",

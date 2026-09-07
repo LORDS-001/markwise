@@ -13,7 +13,6 @@ import { claudeJson } from "@/lib/pipeline/claude";
 import {
   isPipelineConfigured,
   missingPipelineKeys,
-  workspaceHint,
 } from "@/lib/pipeline/config";
 import {
   extractionAnswer,

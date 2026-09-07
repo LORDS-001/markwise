@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit --incremental false",
     "pipeline": "tsx --env-file-if-exists=.env.local scripts/pipeline/run.ts",
     "pipeline:tune": "tsx --env-file-if-exists=.env.local scripts/pipeline/tune.ts",
-    "pipeline:diagnose": "tsx --env-file-if-exists=.env.local scripts/pipeline/diagnose.ts"
+    "pipeline:diagnose": "tsx --env-file-if-exists=.env.local scripts/pipeline/diagnose.ts",
+    "pipeline:demo-positions": "tsx --env-file-if-exists=.env.local scripts/pipeline/demo-positions.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
@@ -30,6 +31,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",

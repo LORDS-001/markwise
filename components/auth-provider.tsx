@@ -59,7 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) {
         setUserId(null);
         setEmail(null);
-        setStatus("anonymous");
+        setPendingEmail(null);
+        setStatus("demo");
         return;
       }
       setUserId(user.id);
@@ -86,10 +87,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Most often this means anonymous sign-in is off in the dashboard.
         // Fall back to demo data rather than blocking the whole app.
         setStatus("demo");
+        setError("We couldn't connect your account. Reload to try again; the sample class is still available.");
         return;
       }
       apply(created.user ?? null);
-    })();
+    })().catch(() => {
+      if (cancelled) return;
+      setUserId(null);
+      setEmail(null);
+      setStatus("demo");
+      setError("We couldn't connect your account. Reload to try again; the sample class is still available.");
+    });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       apply(session?.user ?? null);
@@ -111,18 +119,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setLinking(true);
       setError(null);
-      const { error: updateError } = await supabase.auth.updateUser(
-        { email: next },
-        { emailRedirectTo: `${window.location.origin}/export` },
-      );
-      setLinking(false);
-
-      if (updateError) {
-        setError(updateError.message);
+      try {
+        const { error: updateError } = await supabase.auth.updateUser(
+          { email: next },
+          { emailRedirectTo: `${window.location.origin}/export` },
+        );
+        if (updateError) {
+          setError(updateError.message);
+          return false;
+        }
+        setPendingEmail(next);
+        return true;
+      } catch {
+        setError("The account connection failed. Check your network and try again.");
         return false;
+      } finally {
+        setLinking(false);
       }
-      setPendingEmail(next);
-      return true;
     },
     [supabase],
   );

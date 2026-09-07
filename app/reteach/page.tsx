@@ -26,7 +26,7 @@ export default function ReteachIndexPage() {
 
   return (
     <Page
-      eyebrow="Step 5 of 7"
+      eyebrow="Step 5 of 8"
       title="Choose a misconception to reteach"
       lead="Open a sample teaching pack for one of the prioritised patterns."
     >

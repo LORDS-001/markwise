@@ -99,3 +99,26 @@ it("propagates updateUser errors without setting a pending email", async () => {
   expect(screen.getByLabelText("Linking")).toHaveTextContent("false");
   expect(screen.getByLabelText("Result")).toHaveTextContent("false");
 });
+
+it("recovers from a rejected session lookup with an actionable account error", async () => {
+  const client = createClient();
+  client.auth.getSession.mockRejectedValue(new Error("Network unavailable"));
+  getBrowserClient.mockReturnValue(client);
+  renderProbe();
+  expect(await screen.findByText("demo", { selector: 'output[aria-label="Status"]' })).toBeVisible();
+  expect(screen.getByLabelText("Error")).toHaveTextContent(/connect|connection|account/i);
+});
+
+it("releases the linking state after a network rejection", async () => {
+  const user = userEvent.setup();
+  const client = createClient();
+  client.auth.updateUser.mockRejectedValue(new Error("Network unavailable"));
+  getBrowserClient.mockReturnValue(client);
+  renderProbe();
+  await screen.findByText("anonymous", { selector: 'output[aria-label="Status"]' });
+  await user.click(screen.getByRole("button", { name: "Connect" }));
+  expect(await screen.findByText("false", { selector: 'output[aria-label="Result"]' })).toBeVisible();
+  expect(screen.getByLabelText("Linking")).toHaveTextContent("false");
+  expect(screen.getByLabelText("Error")).toHaveTextContent(/connect|connection|network/i);
+  expect(screen.getByLabelText("Pending email")).toBeEmptyDOMElement();
+});

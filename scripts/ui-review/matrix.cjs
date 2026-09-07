@@ -322,6 +322,17 @@ async function runMatrix(options = {}) {
   const debugPort = Number(options.debugPort || process.argv[3] || 9222);
   const outputName = options.outputName || process.argv[4] || `${browser}-matrix.json`;
   const origin = options.origin || process.env.UI_REVIEW_ORIGIN || DEFAULT_ORIGIN;
+  const offline = options.offline ?? process.env.UI_REVIEW_OFFLINE === "1";
+  const expectedBlockedNetwork = (message) => {
+    if (!offline || message.source !== "network" || message.type !== "error" ||
+        !message.text?.includes("net::ERR_NAME_NOT_RESOLVED")) return false;
+    try {
+      const url = new URL(message.url);
+      return ["http:", "https:"].includes(url.protocol) && url.origin !== new URL(origin).origin;
+    } catch {
+      return false;
+    }
+  };
   const captureScreenshots = options.captureScreenshots ?? browser.toLowerCase().includes("chrome");
   const cdp = await openPage(debugPort);
   const cases = [];
@@ -337,7 +348,9 @@ async function runMatrix(options = {}) {
     event.exceptionDetails?.exception?.description || event.exceptionDetails?.text || "Runtime exception",
   ));
   cdp.on("Log.entryAdded", (event) => {
-    if (["error", "warning"].includes(event.entry?.level)) consoleMessages.push({ type: event.entry.level, text: event.entry.text });
+    if (["error", "warning"].includes(event.entry?.level)) consoleMessages.push({
+      type: event.entry.level, text: event.entry.text, source: event.entry.source, url: event.entry.url,
+    });
   });
 
   let screenshotIndex = 0;
@@ -391,7 +404,8 @@ async function runMatrix(options = {}) {
             assert(contrast.ratio !== null && contrast.ratio + 1e-8 >= contrast.minimum, `contrast --${contrast.foreground} on --${contrast.background}: ${contrast.ratio?.toFixed(2)} < ${contrast.minimum}`, failures);
           }
           assert(runtimeErrors.length === 0, `runtime errors: ${runtimeErrors.join(" | ")}`, failures);
-          assert(consoleMessages.length === 0, `console warnings/errors: ${consoleMessages.map((item) => item.text).join(" | ")}`, failures);
+          const unexpectedConsole = consoleMessages.filter((item) => !expectedBlockedNetwork(item));
+          assert(unexpectedConsole.length === 0, `console warnings/errors: ${unexpectedConsole.map((item) => item.text).join(" | ")}`, failures);
 
           const combination = { route, viewport, appearance };
           let screenshot;
@@ -413,6 +427,7 @@ async function runMatrix(options = {}) {
             appearance,
             state,
             consoleMessages: [...consoleMessages],
+            expectedBlockedNetwork: consoleMessages.filter(expectedBlockedNetwork),
             runtimeErrors: [...runtimeErrors],
             screenshot,
           });
@@ -429,11 +444,13 @@ async function runMatrix(options = {}) {
       generatedAt: new Date().toISOString(),
       browser,
       origin,
+      mode: offline ? "offline" : "strict",
       totals: {
         cases: cases.length,
         passed: cases.filter((item) => item.pass).length,
         failed: cases.filter((item) => !item.pass).length,
         screenshots: screenshotManifest.length,
+        expectedBlockedNetwork: cases.reduce((sum, item) => sum + item.expectedBlockedNetwork.length, 0),
       },
       reducedMotion,
       contactSheet,

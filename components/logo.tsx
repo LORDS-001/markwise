@@ -1,13 +1,12 @@
 /**
  * Markwise mark — a vector redraw of the brand logo.
  *
- * The letter M is built from two navy strokes; its second diagonal is
- * deliberately left open and completed by the cyan check, so the mark reads
+ * The letter M is built from two strokes; its second diagonal is
+ * deliberately left open and completed by the check, so the mark reads
  * as both an M and a tick. The three bars beneath are the class distribution.
  *
- * Colours are fixed brand values rather than theme tokens: a logo keeps its
- * identity on either ground. `navy` lightens in dark mode only enough to stay
- * legible, which is why it is exposed as a prop.
+ * Both parts use the same #14121F brand color in every appearance. Present
+ * the logo on a light background to preserve its identity and contrast.
  */
 export function MarkwiseMark({
   className,
@@ -71,7 +70,7 @@ export function MarkwiseLogo({
   return (
     <span className={`inline-flex items-center gap-2.5 ${className ?? ""}`}>
       <MarkwiseMark className={markClassName} title="Markwise" />
-      <span className="font-sans text-[19px] font-semibold tracking-[-0.02em] text-[var(--logo-navy)] leading-none">
+      <span className="font-display text-[20px] font-bold tracking-[-0.03em] text-[var(--logo-navy)] leading-none">
         Markwise
       </span>
     </span>

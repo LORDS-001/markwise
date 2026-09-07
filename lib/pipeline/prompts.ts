@@ -74,8 +74,10 @@ export function extractionSystemPrompt(): string {
 
 /**
  * The half of the extraction prompt that is identical for every answer in a
- * batch: the question, the scheme, the criteria. Sent as the cached prefix, so
- * forty answers pay for it once.
+ * batch: the question, the scheme, the criteria.
+ *
+ * Sent as the cached prefix, so forty answers pay for the scheme once rather
+ * than forty times — which is most of the input cost of a run.
  */
 export function extractionContext(input: PipelineInput): string {
   const total = input.criteria.reduce((sum, c) => sum + c.marks, 0);
@@ -95,9 +97,18 @@ ${criteriaBlock(input.criteria)}
 TOTAL MARKS AVAILABLE: ${total}`;
 }
 
-/** The half that changes: one student's answer. Never cached. */
-export function extractionAnswer(answer: RawAnswer): string {
-  return `STUDENT ANSWER (id ${answer.studentRef}):
+/**
+ * The half that changes: one student's answer. Never cached.
+ *
+ * The answer is identified by a correlation reference — "submission-4" — and
+ * never by the student's own reference. The model needs a handle to talk about
+ * the answer with; it does not need to know whose it is.
+ */
+export function extractionAnswer(
+  answer: RawAnswer,
+  correlationReference = "submission",
+): string {
+  return `STUDENT ANSWER (reference ${correlationReference}):
 ---
 ${answer.text}
 ---
@@ -105,23 +116,24 @@ ${answer.text}
 Diagnose this answer and award its criteria.`;
 }
 
-
 /* ------------------------------------------------------------------ */
-/*  Step 4 — cluster labelling                                         */
+/*  Steps 4 and 5 — cluster labelling and prerequisite damage          */
 /* ------------------------------------------------------------------ */
 
-export function labelPrompt(
-  input: PipelineInput,
-  signatures: string[],
-): string {
+/**
+ * The stable half of the cluster assessment: everything except the signatures.
+ *
+ * Labelling and damage ranking are one call because they share all of this
+ * context, and splitting them doubled the per-cluster request count against a
+ * route budget measured in request starts.
+ */
+export function clusterAssessmentContext(input: PipelineInput): string {
   return `SUBJECT: ${input.subject}
 LEVEL: ${input.level}
 QUESTION: ${input.question}
 
-${signatures.length} students made mistakes that were grouped together because their
-underlying beliefs are semantically close. Here are the individual diagnoses:
-
-${signatures.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+You will be given the individual diagnoses of several students whose mistakes
+were grouped together because their underlying beliefs are semantically close.
 
 Write ONE canonical misconception that captures what these students share.
 
@@ -136,35 +148,29 @@ Rules:
 Also write one sentence on WHY a student would plausibly arrive at this belief
 — the reasoning that makes it feel correct from the inside. This is what the
 lecturer will teach against, so it must be sympathetic and specific, not a
-restatement of the error.`;
+restatement of the error.
+
+After choosing that canonical misconception, assess its prerequisite damage.
+
+Rules for downstream damage:
+- Name between 1 and 4 real later topics in this subject and level —
+  "resonance in RLC circuits", not "later calculations".
+- Order them by how soon the student encounters them.
+- severity is 1 to 5: 1 is contained to this question; 5 blocks a foundational
+  chain the rest of the course rests on.
+- Judge severity by what the belief BLOCKS, never by how many students hold it.
+  Spread is counted separately, and rating by popularity here would double-count
+  it and make the damage sort meaningless.`;
 }
 
+/** The half that changes: the signatures of one cluster's members. */
+export function clusterAssessmentSignatures(signatures: string[]): string {
+  return `${signatures.length} students were grouped together. Their individual diagnoses:
 
-/* ------------------------------------------------------------------ */
-/*  Step 5 — prerequisite damage ranking                               */
-/* ------------------------------------------------------------------ */
+${signatures.map((s, i) => `${i + 1}. ${s}`).join("\n")}
 
-export function damagePrompt(input: PipelineInput, label: string): string {
-  return `SUBJECT: ${input.subject}
-LEVEL: ${input.level}
-QUESTION THIS AROSE FROM: ${input.question}
-
-MISCONCEPTION: ${label}
-
-A student carries this belief forward. Name the specific later topics in this
-subject that it will break, and rate how badly.
-
-Rules:
-- Between 1 and 4 topics, each a real named topic in this syllabus at this
-  level — "resonance in RLC circuits", not "later calculations".
-- Order them by how soon the student hits them.
-- severity is 1 to 5, where 1 means the belief stops at this question and 5
-  means it poisons a foundational chain the rest of the course rests on.
-- Judge severity by what the belief BLOCKS, not by how many students hold it.
-  Spread is counted separately; rating by popularity here would double-count it
-  and make the damage sort meaningless.`;
+Name the misconception they share and assess its prerequisite damage.`;
 }
-
 
 /* ------------------------------------------------------------------ */
 /*  Step 6 — reteach pack                                              */
@@ -187,11 +193,14 @@ ACTUAL STUDENT WORK SHOWING IT:
 ${evidence.map((e, i) => `${i + 1}. "${e}"`).join("\n")}
 
 Write a five-minute micro-lesson a lecturer can deliver at the start of the next
-class, as 3 or 4 sections. The sections must, in order:
+class, as exactly 5 sections. The sections must, in order:
 1. Name the false belief out loud, so students recognise it as theirs.
 2. Show why it is intuitive — grant that it is a reasonable thing to think.
-3. Show exactly where it breaks, using this question's own numbers.
-4. State the correct principle in one memorable line.
+3. Give an ANALOGY from outside this subject that makes the correct idea
+   obvious. It must break where the belief breaks, not merely decorate.
+4. Work through a WORKED EXAMPLE using this question's own numbers, line by
+   line, showing the step where the belief leads the student astray.
+5. State the correct principle in one memorable line.
 
 Each section: a short heading, and a body of 2-4 sentences the lecturer could
 read aloud. No bullet points inside the body. No preamble about the lesson.
@@ -205,3 +214,79 @@ For each diagnostic, state what a student who still holds the misconception
 would answer, and what a corrected student would answer.`;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Step 8 — grading the diagnostic                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Judges a student's free-text answers against the misconception itself.
+ *
+ * Both questions go in one call. Forty students marking two questions each is
+ * eighty calls if graded singly, and the pair share all their context anyway.
+ *
+ * The rubric is not "is this right" — it is "does this answer still show the
+ * belief". Those come apart: a student can reach a wrong number while
+ * reasoning correctly about the belief, and a student can guess the right
+ * number while still holding it. The before/after figure in PRD v2 §12
+ * measures the belief, so that is what gets judged.
+ */
+export function diagnosticGradingContext(
+  misconception: string,
+  questions: {
+    prompt: string;
+    holderAnswers: string;
+    correctedAnswers: string;
+  }[],
+): string {
+  const blocks = questions
+    .map((q, i) => {
+      return `QUESTION ${i + 1}: ${q.prompt}
+
+A student who STILL HOLDS the misconception answers along these lines:
+${q.holderAnswers}
+
+A student who has CORRECTED it answers along these lines:
+${q.correctedAnswers}`;
+    })
+    .join("\n\n---\n\n");
+
+  return `MISCONCEPTION BEING TESTED: ${misconception}
+
+${blocks}
+
+For each question, decide whether the student's answer still shows the
+misconception.
+
+- "holds" — the answer reflects the false belief, whatever else is right about it.
+- "corrected" — the answer reflects the corrected understanding, even if the
+  arithmetic or the wording is poor. You are marking the belief, not the sum.
+- "unclear" — the answer is blank, off-topic, or too thin to tell. Use this
+  honestly and often. A guess recorded as "corrected" becomes improvement the
+  lecturer never actually achieved, in the one number this whole exercise
+  produces.
+
+Give a one-sentence reason for each, quoting the phrase that decided it.
+Return one verdict per question, in the order the questions are numbered.`;
+}
+
+/**
+ * The half that changes: one student's answers.
+ *
+ * The whole cohort is graded against the same misconception and the same two
+ * questions, so everything above this is identical for every student in the
+ * class and is sent as the cached prefix.
+ */
+export function diagnosticGradingResponses(responses: string[]): string {
+  const blocks = responses
+    .map(
+      (response, i) => `ANSWER TO QUESTION ${i + 1}:
+"""
+${response.trim().length > 0 ? response : "(no answer given)"}
+"""`,
+    )
+    .join("\n\n");
+
+  return `THIS STUDENT ANSWERED:
+
+${blocks}`;
+}

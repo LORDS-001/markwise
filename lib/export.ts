@@ -1,5 +1,4 @@
-import type { Cluster, StudentAnswer } from "./types";
-import { criterionLabel } from "./mock";
+import type { Cluster, Criterion, StudentAnswer } from "./types";
 
 export interface ExportRow {
   studentId: string;
@@ -19,8 +18,21 @@ const STATUS_LABEL: Record<string, string> = {
   flagged: "Flagged",
 };
 
-export function buildRows(answers: StudentAnswer[], clusters: Cluster[]): ExportRow[] {
+/**
+ * Flattens a run into the rows both export formats share.
+ *
+ * `criteria` is this run's own scheme. Resolving ids against the seeded demo
+ * scheme instead printed the raw id for every lecturer who wrote their own
+ * criteria — which reads on a registry spreadsheet as an unexplained
+ * deduction, in the one artefact that leaves the building.
+ */
+export function buildRows(
+  answers: StudentAnswer[],
+  clusters: Cluster[],
+  criteria: Criterion[] = [],
+): ExportRow[] {
   const byId = new Map(clusters.map((c) => [c.id, c]));
+  const labelOf = new Map(criteria.map((c) => [c.id, c.label]));
   return answers.map((a) => ({
     studentId: a.studentId,
     initials: a.initials,
@@ -30,7 +42,9 @@ export function buildRows(answers: StudentAnswer[], clusters: Cluster[]): Export
     misconception: a.clusterId
       ? (byId.get(a.clusterId)?.label ?? "Unassigned")
       : "None — answer correct",
-    criteriaMissed: a.criteriaMissed.map(criterionLabel).join("; "),
+    criteriaMissed: a.criteriaMissed
+      .map((id) => labelOf.get(id) ?? id)
+      .join("; "),
     status: STATUS_LABEL[a.status] ?? a.status,
   }));
 }
@@ -54,20 +68,30 @@ export function classStats(rows: ExportRow[]): ClassStats {
         : (scores[scores.length / 2 - 1] + scores[scores.length / 2]) / 2;
   const passRate = (rows.filter((r) => r.percentage >= 40).length / n) * 100;
 
-  const bands = [
-    { band: "0–2", lo: 0, hi: 2 },
-    { band: "3–4", lo: 3, hi: 4 },
-    { band: "5–6", lo: 5, hi: 6 },
-    { band: "7–8", lo: 7, hi: 8 },
-    { band: "9–10", lo: 9, hi: 10 },
-  ];
+  // Bands are derived from the paper's own maximum rather than fixed to 0-10.
+  // Fixed bands silently dropped every score above ten, so a 20-mark paper
+  // exported a distribution that did not add up to the size of the class.
+  const max = Math.max(1, ...rows.map((r) => r.max));
+  const BAND_COUNT = 5;
+  const bands = Array.from({ length: BAND_COUNT }, (_, i) => {
+    const lo = Math.round((max * i) / BAND_COUNT) + (i === 0 ? 0 : 1);
+    const hi = Math.round((max * (i + 1)) / BAND_COUNT);
+    return { band: lo === hi ? `${lo}` : `${lo}–${hi}`, lo, hi };
+  });
+
   return {
     mean,
     median,
     passRate,
-    distribution: bands.map((b) => ({
+    distribution: bands.map((b, i) => ({
       band: b.band,
-      count: rows.filter((r) => r.score >= b.lo && r.score <= b.hi).length,
+      // The top band absorbs anything at or above its floor, so a score can
+      // never fall outside every band and vanish from the summary.
+      count: rows.filter((r) =>
+        i === bands.length - 1
+          ? r.score >= b.lo
+          : r.score >= b.lo && r.score <= b.hi,
+      ).length,
     })),
   };
 }

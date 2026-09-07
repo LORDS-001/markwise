@@ -1,12 +1,16 @@
 import { z } from "zod";
 
 /**
- * Response shapes for the four generative stages.
+ * Response shapes for the generative stages.
  *
  * Zod rather than hand-written JSON Schema: the same declaration constrains
  * what Claude may return, validates what came back, and types it — so a
  * malformed response fails at the boundary instead of halfway through
  * assembling a lecturer's marking.
+ *
+ * These describe the shape only. Whether the content can be trusted is a
+ * separate question, settled in normaliseExtraction and its neighbours: the
+ * model proposing a score does not make the score right.
  */
 
 export const ExtractionSchema = z.object({
@@ -26,14 +30,18 @@ export const ExtractionSchema = z.object({
   score_rationale: z.string(),
 });
 
-export const LabelSchema = z.object({
+/**
+ * Labelling and damage ranking in one shape, because they are one call.
+ *
+ * They share all their context, and splitting them doubled the per-cluster
+ * request count for no gain — which mattered against the route's request
+ * budget, not just the bill.
+ */
+export const ClusterAssessmentSchema = z.object({
   label: z
     .string()
     .describe("One canonical misconception, under 90 characters."),
   why: z.string().describe("One sentence on why students plausibly hold it."),
-});
-
-export const DamageSchema = z.object({
   downstream: z
     .array(z.string())
     .describe("1 to 4 named later topics this belief will break."),
@@ -60,7 +68,25 @@ export const ReteachSchema = z.object({
   ),
 });
 
+/**
+ * One verdict per diagnostic question, in the order they were asked.
+ *
+ * The enum is enforced at the boundary rather than mapped afterwards, so a
+ * fourth verdict the model invented is a parse failure instead of something
+ * that quietly becomes "corrected" and inflates the improvement figure.
+ */
+export const GradingSchema = z.object({
+  verdicts: z.array(
+    z.object({
+      verdict: z.enum(["holds", "corrected", "unclear"]),
+      rationale: z
+        .string()
+        .describe("One sentence, quoting the phrase that decided it."),
+    }),
+  ),
+});
+
 export type ExtractionResponse = z.infer<typeof ExtractionSchema>;
-export type LabelResponse = z.infer<typeof LabelSchema>;
-export type DamageResponse = z.infer<typeof DamageSchema>;
+export type ClusterAssessmentResponse = z.infer<typeof ClusterAssessmentSchema>;
 export type ReteachResponse = z.infer<typeof ReteachSchema>;
+export type GradingResponse = z.infer<typeof GradingSchema>;

@@ -426,6 +426,12 @@ async function runKeyboard(options = {}) {
     await group("Setup workflow", async (context) => {
       await setViewport(cdp, 1440, 1000);
       await navigate(cdp, `${origin}/`);
+      await tabTo(cdp, context, named(/^New marking session$/), "New marking session", NAVIGATION_TAB_OPTIONS);
+      await activate(cdp, context);
+      await assertEval(cdp, context, "New marking session starts with blank course fields", "document.querySelector('#course-code').value === '' && document.querySelector('#course-title').value === '' && document.querySelector('#question').value === ''");
+      await tabTo(cdp, context, named(/^Load demo class$/), "Load demo class");
+      await activate(cdp, context);
+      await assertEval(cdp, context, "explicit demo loads the sample course", "document.querySelector('#course-code').value === 'EEE 301' && document.querySelector('#paste').value.length > 0");
       await tabTo(cdp, context, named(/^Subject/), "Subject field", NAVIGATION_TAB_OPTIONS);
       await replaceText(cdp, context, "Circuit analysis");
       await tabTo(cdp, context, named(/^Level/), "Level field");
@@ -447,7 +453,12 @@ async function runKeyboard(options = {}) {
       await assertEval(cdp, context, "Setup roving tabs return to Paste", "document.activeElement.id === 'answer-tab-paste' && document.activeElement.getAttribute('tabindex') === '0'");
       await tabTo(cdp, context, named(/What do you think/), "prediction field");
       await replaceText(cdp, context, "Students add reactance directly.");
-      await tabTo(cdp, context, named(/Preview sample analysis/), "Setup primary");
+      await assertEval(cdp, context, "editing the demo creates a custom draft", "!![...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Analyse class answers') && ![...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Preview sample analysis')");
+      // Reload the explicit sample after exercising custom edits. Activating
+      // the custom primary would request live marking on configured installs.
+      await tabTo(cdp, context, named(/^Load demo class$/), "Reload demo for free preview", { shift: true });
+      await activate(cdp, context);
+      await tabTo(cdp, context, named(/^Preview sample analysis$/), "Setup primary");
       await activate(cdp, context);
       await waitPath(cdp, "/processing");
       await assertEval(cdp, context, "Setup primary starts active processing", "location.pathname === '/processing' && /Preparing the sample analysis/.test(document.querySelector('h1')?.textContent)");

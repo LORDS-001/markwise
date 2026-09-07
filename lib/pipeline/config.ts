@@ -1,4 +1,4 @@
-import { anthropicApiKey, anthropicWorkspaceId } from "./claude";
+import { anthropicApiKey } from "./claude";
 import { geminiApiKey } from "./gemini";
 
 /**
@@ -11,17 +11,6 @@ export function missingPipelineKeys(): string[] {
   if (!anthropicApiKey()) missing.push("ANTHROPIC_API_KEY");
   if (!geminiApiKey()) missing.push("GEMINI_API_KEY");
   return missing;
-}
-
-/**
- * An identity-linked key needs a workspace id on every request. Whether a key
- * is identity-linked is not visible from the key itself, so this cannot be
- * checked up front — it is reported when the API rejects the call.
- */
-export function workspaceHint(error: unknown): string | null {
-  const message = error instanceof Error ? error.message : String(error);
-  if (!message.includes("anthropic-workspace-id")) return null;
-  return "This Anthropic key is identity-linked, so it needs ANTHROPIC_WORKSPACE_ID in .env.local. Find it in the Console under Settings, Workspaces.";
 }
 
 export function isPipelineConfigured(): boolean {

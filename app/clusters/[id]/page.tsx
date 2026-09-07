@@ -257,10 +257,10 @@ export default function ClusterDetailPage() {
 
                   <div className="min-w-0 flex-1">
                     <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="font-mono text-[12.5px] text-ink-2">
+                      <span className="font-sans tnum text-[13px] text-ink-2">
                         {member.studentId}
                       </span>
-                      <span className="text-[12.5px] text-ink-3">{member.initials}</span>
+                      <span className="text-[13px] text-ink-3">{member.initials}</span>
                       <Badge
                         tone={
                           member.provisionalScore >= 7
@@ -337,7 +337,7 @@ export default function ClusterDetailPage() {
                 >
                   {member.initials.replace(/\./g, "")}
                 </span>
-                <span className="truncate font-mono text-[12.5px] text-ink-2">
+                <span className="truncate font-sans tnum text-[13px] text-ink-2">
                   {member.studentId.split("/").slice(-1)}
                 </span>
               </li>
@@ -356,7 +356,7 @@ export default function ClusterDetailPage() {
           {cluster.downstream.length > 0 ? (
             <ul className="flex flex-col gap-2.5 px-5 py-4">
               {cluster.downstream.map((topic) => (
-                <li key={topic} className="flex items-start gap-2.5 text-[13.5px]">
+                <li key={topic} className="flex items-start gap-2.5 text-[14px]">
                   <TriangleAlert
                     size={15}
                     strokeWidth={2}
@@ -368,11 +368,11 @@ export default function ClusterDetailPage() {
               ))}
             </ul>
           ) : (
-            <p className="px-5 py-4 text-[13.5px] text-ink-2">
+            <p className="px-5 py-4 text-[14px] text-ink-2">
               No downstream topics identified for this group.
             </p>
           )}
-          <div className="border-t border-border px-5 py-3 text-[12.5px] text-ink-3">
+          <div className="border-t border-border px-5 py-3 text-[13px] text-ink-3">
             Damage score {cluster.severity * members.length} = severity {cluster.severity} ×{" "}
             {members.length} students
           </div>
@@ -465,7 +465,7 @@ export default function ClusterDetailPage() {
               {others.map((other) => (
                 <label
                   key={other.id}
-                  className="flex cursor-pointer items-center gap-2.5 rounded-[10px] px-2 py-1.5 text-[13.5px] hover:bg-surface-2"
+                  className="flex cursor-pointer items-center gap-2.5 rounded-[10px] px-2 py-1.5 text-[14px] hover:bg-surface-2"
                 >
                   <input
                     type="radio"

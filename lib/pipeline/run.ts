@@ -1,22 +1,26 @@
 import type { Cluster, StudentAnswer } from "@/lib/types";
-import { embedTexts } from "./gemini";
-import { claudeJson } from "./claude";
-import { CONCURRENCY, mapWithConcurrency } from "./concurrency";
-import { DamageSchema, ExtractionSchema, LabelSchema } from "./schemas";
-import type { ExtractionResponse } from "./schemas";
 import {
-  damagePrompt,
+  CONCURRENCY,
+  EMBEDDING_BATCH_SIZE,
+  embedTexts,
+  mapWithConcurrency,
+} from "./gemini";
+import { claudeJson } from "./claude";
+import {
+  clusterAssessmentContext,
+  clusterAssessmentSignatures,
   extractionAnswer,
   extractionContext,
   extractionSystemPrompt,
-  labelPrompt,
 } from "./prompts";
+import { ClusterAssessmentSchema, ExtractionSchema } from "./schemas";
 import {
   DISTANCE_THRESHOLD,
   MIN_CLUSTER_SIZE,
   agglomerativeCluster,
 } from "./cluster";
 import { initialsFor } from "./parse-answers";
+import { centroid, projectToPlane } from "./project";
 import type {
   Extraction,
   PipelineInput,
@@ -29,6 +33,17 @@ import type {
 /*  Step 1 — error signature extraction                                */
 /* ------------------------------------------------------------------ */
 
+interface RawExtraction {
+  is_correct: boolean;
+  error_signature: string;
+  confidence: number;
+  evidence_span: string;
+  provisional_score: number;
+  criteria_met: string[];
+  criteria_missed: string[];
+  score_rationale: string;
+}
+
 /**
  * Normalises one model response into a trustworthy Extraction.
  *
@@ -38,14 +53,20 @@ import type {
  * thing a lecturer would catch and lose confidence over.
  */
 export function normaliseExtraction(
-  raw: ExtractionResponse,
+  raw: RawExtraction,
   answer: RawAnswer,
   criteria: { id: string; marks: number }[],
 ): Extraction {
   const validIds = new Set(criteria.map((c) => c.id));
   const maxScore = criteria.reduce((sum, c) => sum + c.marks, 0);
 
-  const met = (raw.criteria_met ?? []).filter((id) => validIds.has(id));
+  const met = Array.from(
+    new Set(
+      (Array.isArray(raw.criteria_met) ? raw.criteria_met : []).filter(
+        (id): id is string => typeof id === "string" && validIds.has(id),
+      ),
+    ),
+  );
   const metSet = new Set(met);
   // Anything valid that was not met is missed, whatever the model listed. This
   // guarantees met and missed partition the criteria exactly once each.
@@ -55,18 +76,31 @@ export function normaliseExtraction(
     .filter((c) => metSet.has(c.id))
     .reduce((sum, c) => sum + c.marks, 0);
 
-  const signature = (raw.error_signature ?? "").trim();
-  const isCorrect = Boolean(raw.is_correct);
+  const proposedSignature =
+    typeof raw.error_signature === "string" ? raw.error_signature.trim() : "";
+  const validSignature =
+    proposedSignature.length <= 500 && /^believes\s+\S/i.test(proposedSignature);
+  const signature = validSignature ? proposedSignature : "";
+  const fullAward = criteria.length > 0 && met.length === criteria.length;
+  const proposedCorrect = raw.is_correct === true;
+  const signatureContradiction =
+    proposedCorrect && fullAward && proposedSignature.length > 0;
+  const contradictory = proposedCorrect !== fullAward || signatureContradiction;
+  const isCorrect = proposedCorrect && fullAward && !signatureContradiction;
 
   // The span must be genuinely verbatim — the UI highlights it inside the
   // answer, so a paraphrase would highlight nothing and look broken.
-  const span = (raw.evidence_span ?? "").trim();
+  const span =
+    typeof raw.evidence_span === "string" ? raw.evidence_span.trim() : "";
   const evidenceSpan =
     span.length > 0 && answer.text.includes(span) ? span : null;
 
-  const confidence = Number.isFinite(raw.confidence)
+  let confidence = Number.isFinite(raw.confidence)
     ? Math.min(1, Math.max(0, raw.confidence))
     : 0;
+  if (contradictory || (!isCorrect && proposedSignature.length > 0 && !validSignature)) {
+    confidence = Math.min(confidence, 0.69);
+  }
 
   return {
     studentRef: answer.studentRef,
@@ -78,27 +112,36 @@ export function normaliseExtraction(
     maxScore,
     criteriaMet: met,
     criteriaMissed: missed,
-    scoreRationale: (raw.score_rationale ?? "").trim(),
+    scoreRationale:
+      typeof raw.score_rationale === "string" ? raw.score_rationale.trim() : "",
   };
 }
 
 async function extractOne(
   input: PipelineInput,
   answer: RawAnswer,
-  stable: string,
+  correlationReference: string,
   onError: (message: string) => void,
+  signal?: AbortSignal,
 ): Promise<Extraction> {
   const maxScore = input.criteria.reduce((sum, c) => sum + c.marks, 0);
 
   try {
     const raw = await claudeJson({
-      stable,
-      variable: extractionAnswer(answer),
+      // Byte-identical for every answer in the batch, so it is a cache hit
+      // from the second answer onwards. The student's answer goes last: a
+      // prefix match means anything placed before it would break the cache.
+      stable: `${extractionSystemPrompt()}\n\n${extractionContext(input)}`,
+      variable: extractionAnswer(answer, correlationReference),
       schema: ExtractionSchema,
+      // Extraction is the highest-volume stage and the most constrained by
+      // the scheme it is handed, so it buys the least from deep reasoning.
       effort: "low",
+      signal,
     });
     return normaliseExtraction(raw, answer, input.criteria);
   } catch (error) {
+    if (signal?.aborted) throw error;
     onError(error instanceof Error ? error.message : String(error));
     // One answer failing must not lose the other thirty-nine. It comes back
     // undiagnosed at zero confidence, which routes it straight to the
@@ -124,7 +167,40 @@ async function extractOne(
 /*  Orchestration                                                      */
 /* ------------------------------------------------------------------ */
 
+interface RawClusterAssessment {
+  label: string;
+  why: string;
+  downstream: string[];
+  severity: number;
+}
+
 const OTHER_CLUSTER_ID = "cl-other";
+
+/** Maximum model requests when every wrong answer forms a two-person group. */
+export function estimateMaximumPipelineRequests(answerCount: number): number {
+  if (!Number.isInteger(answerCount) || answerCount <= 0) return 0;
+  return answerCount + 1 + Math.floor(answerCount / MIN_CLUSTER_SIZE);
+}
+
+/**
+ * The same worst case, split by provider — because the two are rate-limited
+ * separately and a single total would be checked against the wrong ceiling.
+ *
+ * Claude carries one extraction per answer plus one assessment per cluster.
+ */
+export function estimateMaximumClaudeRequests(answerCount: number): number {
+  if (!Number.isInteger(answerCount) || answerCount <= 0) return 0;
+  return answerCount + Math.floor(answerCount / MIN_CLUSTER_SIZE);
+}
+
+/**
+ * Gemini now carries only the embedding call, and embedTexts batches, so this
+ * is one request for any realistic class rather than one per answer.
+ */
+export function estimateMaximumEmbeddingRequests(answerCount: number): number {
+  if (!Number.isInteger(answerCount) || answerCount <= 0) return 0;
+  return Math.ceil(answerCount / EMBEDDING_BATCH_SIZE);
+}
 
 /**
  * Runs the full pipeline — PRD §6 steps 1 through 5.
@@ -135,26 +211,35 @@ const OTHER_CLUSTER_ID = "cl-other";
 export async function runPipeline(
   input: PipelineInput,
   onProgress: ProgressHandler = () => {},
+  options: { signal?: AbortSignal } = {},
 ): Promise<PipelineResult> {
+  const { signal } = options;
+  const ensureActive = () => {
+    if (signal?.aborted) {
+      throw signal.reason instanceof Error
+        ? signal.reason
+        : new Error("The pipeline was cancelled.");
+    }
+  };
+  ensureActive();
   const maxScore = input.criteria.reduce((sum, c) => sum + c.marks, 0);
 
   /* --- Step 1: extraction ---------------------------------------- */
   onProgress({ stage: "extract", progress: 0 });
-
-  // Identical for every answer in the batch, so it is sent once as a cached
-  // prefix rather than re-billed forty times.
-  const extractionStable = `${extractionSystemPrompt()}
-
-${extractionContext(input)}`;
 
   let done = 0;
   const failures: string[] = [];
   const extractions = await mapWithConcurrency(
     input.answers,
     CONCURRENCY,
-    async (answer) => {
-      const result = await extractOne(input, answer, extractionStable, (message) =>
-        failures.push(message),
+    async (answer, index) => {
+      ensureActive();
+      const result = await extractOne(
+        input,
+        answer,
+        `submission-${index + 1}`,
+        (message) => failures.push(message),
+        signal,
       );
       done += 1;
       onProgress({
@@ -192,15 +277,27 @@ ${extractionContext(input)}`;
   /* --- Step 2: embedding ----------------------------------------- */
   onProgress({ stage: "embed", progress: 0 });
 
-  const vectors =
-    diagnosable.length > 0
-      ? await embedTexts(diagnosable.map((d) => d.extraction.errorSignature!))
-      : [];
+  let vectors: number[][] = [];
+  let embeddingWarning: string | undefined;
+  if (diagnosable.length > 0) {
+    ensureActive();
+    try {
+      vectors = await embedTexts(
+        diagnosable.map((d) => d.extraction.errorSignature!),
+        signal,
+      );
+    } catch {
+      if (signal?.aborted) ensureActive();
+      embeddingWarning =
+        "Embedding was unavailable. Answers remain unclustered in the review queue; no semantic groups were inferred.";
+    }
+  }
 
   onProgress({
     stage: "embed",
     progress: 1,
-    detail: `${vectors.length} signatures embedded`,
+    detail: embeddingWarning ?? `${vectors.length} signatures embedded`,
+    warning: embeddingWarning,
   });
 
   /* --- Step 3: clustering ---------------------------------------- */
@@ -220,31 +317,54 @@ ${extractionContext(input)}`;
     detail: `${realGroups.length} groups found`,
   });
 
-  /* --- Step 4: labelling ----------------------------------------- */
+  /* --- Steps 4 and 5: label and assess each cluster -------------- */
   onProgress({ stage: "label", progress: 0 });
 
   let labelled = 0;
-  const labels = await mapWithConcurrency(
+  const assessments = await mapWithConcurrency(
     realGroups,
     CONCURRENCY,
     async (group) => {
       const signatures = group.map(
         (i) => diagnosable[i].extraction.errorSignature!,
       );
-      let result: { label: string; why: string };
+      let result: RawClusterAssessment;
       try {
-        result = await claudeJson({
-          stable: "You name the single misconception a group of student errors share.",
-          variable: labelPrompt(input, signatures),
-          schema: LabelSchema,
+        ensureActive();
+        const raw = await claudeJson({
+          stable: clusterAssessmentContext(input),
+          variable: clusterAssessmentSignatures(signatures),
+          schema: ClusterAssessmentSchema,
+          // Naming what a group of students share, and judging what it breaks
+          // later in the syllabus, is a genuine judgement rather than a lookup
+          // against a scheme — and there are only a handful of these calls.
           effort: "medium",
+          signal,
         });
+        const label = typeof raw.label === "string" ? raw.label.trim() : "";
+        const why = typeof raw.why === "string" ? raw.why.trim() : "";
+        if (!label || !why) throw new Error("Cluster assessment was incomplete.");
+        result = {
+          label,
+          why,
+          downstream: (Array.isArray(raw.downstream) ? raw.downstream : [])
+            .filter((topic): topic is string => typeof topic === "string")
+            .map((topic) => topic.trim())
+            .filter(Boolean)
+            .slice(0, 4),
+          severity: Number.isFinite(raw.severity)
+            ? Math.min(5, Math.max(1, Math.round(raw.severity)))
+            : 1,
+        };
       } catch {
-        // Fall back to the most common member signature, so a failed call
-        // still leaves the lecturer a readable, evidence-backed cluster.
+        if (signal?.aborted) ensureActive();
+        // Use a member signature and leave damage unassessed. This stays
+        // evidence-backed without inventing a downstream claim.
         result = {
           label: signatures[0],
           why: "Automatic labelling failed for this group. The shared signature above is taken from a member answer; rename it to something you would recognise.",
+          downstream: [],
+          severity: 1,
         };
       }
       labelled += 1;
@@ -255,35 +375,13 @@ ${extractionContext(input)}`;
 
   onProgress({ stage: "label", progress: 1 });
 
-  /* --- Step 5: prerequisite damage ------------------------------- */
+  // Damage was returned by the same structured call. Preserve the distinct
+  // stage event so existing progress UI remains truthful and compatible.
   onProgress({ stage: "damage", progress: 0 });
-
-  let assessed = 0;
-  const damages = await mapWithConcurrency(labels, CONCURRENCY, async (label) => {
-    let result: { downstream: string[]; severity: number };
-    try {
-      result = await claudeJson({
-        stable: "You judge which later topics a misconception will break, and how badly.",
-        variable: damagePrompt(input, label.label),
-        schema: DamageSchema,
-        effort: "medium",
-      });
-    } catch {
-      // Severity 1 with no named topics reads honestly as "not assessed"
-      // rather than inventing a damage claim the lecturer cannot check.
-      result = { downstream: [], severity: 1 };
-    }
-    assessed += 1;
-    onProgress({ stage: "damage", progress: assessed / Math.max(1, labels.length) });
-    return {
-      downstream: (result.downstream ?? []).filter(
-        (t) => typeof t === "string" && t.trim().length > 0,
-      ),
-      severity: Math.min(5, Math.max(1, Math.round(result.severity ?? 1))),
-    };
-  });
-
   onProgress({ stage: "damage", progress: 1 });
+
+  const labels = assessments;
+  const damages = assessments;
 
   /* --- Assembly --------------------------------------------------- */
 
@@ -335,8 +433,16 @@ ${extractionContext(input)}`;
   const membersOf = (clusterId: string) =>
     answers.filter((a) => a.clusterId === clusterId).map((a) => a.id);
 
+  // Where each cluster sits relative to the others, so the map can place
+  // related misconceptions near each other rather than on an arbitrary grid.
+  const centroids = realGroups.map((group) =>
+    centroid(group.map((memberIndex) => vectors[memberIndex])),
+  );
+  const positions = projectToPlane(centroids.filter((c) => c.length > 0));
+
   const clusters: Cluster[] = realGroups.map((_, groupIndex) => {
     const id = `cl-${groupIndex + 1}`;
+    const position = positions[groupIndex];
     return {
       id,
       // Tones 1-6 are the categorical ramp; 0 is reserved for the Other bucket.
@@ -347,6 +453,8 @@ ${extractionContext(input)}`;
       severity: damages[groupIndex].severity,
       downstream: damages[groupIndex].downstream,
       isOther: false,
+      x: position?.x,
+      y: position?.y,
     };
   });
 

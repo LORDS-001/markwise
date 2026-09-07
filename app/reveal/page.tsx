@@ -60,7 +60,7 @@ export default function RevealPage() {
 
   if (!prediction.trim()) {
     return (
-      <Page eyebrow="Step 3 of 7" title="Reveal">
+      <Page eyebrow="Step 3 of 8" title="Reveal">
         <Card>
           <EmptyState
             icon={<Target size={26} strokeWidth={1.6} />}
@@ -85,7 +85,7 @@ export default function RevealPage() {
 
   if (!processed || !top) {
     return (
-      <Page eyebrow="Step 3 of 7" title="Reveal">
+      <Page eyebrow="Step 3 of 8" title="Reveal">
         <Card>
           <EmptyState
             icon={<Target size={26} strokeWidth={1.6} />}
@@ -130,7 +130,7 @@ export default function RevealPage() {
 
   return (
     <Page
-      eyebrow="Step 3 of 7 · sample results"
+      eyebrow="Step 3 of 8 · sample results"
       title="Compare your prediction"
       lead="See whether the misconception you expected appears in the sample evidence."
       actions={
@@ -140,20 +140,20 @@ export default function RevealPage() {
         </Link>
       }
     >
-      <Card>
-        <div className="grid lg:grid-cols-[1fr_auto_1fr] items-stretch">
+      <Card className="overflow-hidden">
+        <div className="grid items-stretch lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
           {/* Prediction */}
-          <section className="flex flex-col">
+          <section className="flex min-w-0 flex-col bg-surface-2/60">
             <div className="px-5 sm:px-6 py-4 border-b border-border flex items-center gap-2">
               <MessageSquareQuote size={16} strokeWidth={1.9} className="text-ink-3" aria-hidden />
               <h2 className="text-[14px] font-semibold text-ink">Your prediction</h2>
             </div>
             <div className="px-5 sm:px-6 py-6 flex-1 flex items-center">
-              <p className="font-display text-[20px] sm:text-[23px] leading-[1.35] text-ink-2 italic">
+              <p className="break-words text-[18px] leading-relaxed text-ink-2 sm:text-[20px]">
                 &ldquo;{prediction}&rdquo;
               </p>
             </div>
-            <div className="px-5 sm:px-6 py-3 border-t border-border text-[12.5px] text-ink-3">
+            <div className="px-5 sm:px-6 py-3 border-t border-border text-[13px] text-ink-3">
               Entered before previewing the sample analysis
             </div>
           </section>
@@ -167,10 +167,10 @@ export default function RevealPage() {
 
           {/* Actual */}
           <section
-            className="flex flex-col border-t border-border lg:border-l-[3px] lg:border-t-0"
+            className="flex min-w-0 flex-col border-t border-border lg:border-l-[3px] lg:border-t-0"
             style={{ borderLeftColor: toneColor(top.tone) }}
           >
-            <div className="px-5 sm:px-6 py-4 border-b border-border flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
               <div className="flex items-center gap-2">
                 <Users size={16} strokeWidth={1.9} className="text-ink-3" aria-hidden />
                 <h2 className="text-[14px] font-semibold text-ink">What the sample shows</h2>
@@ -178,22 +178,22 @@ export default function RevealPage() {
               <Badge tone="neutral">Leading sample pattern</Badge>
             </div>
             <div className="px-5 sm:px-6 py-6 flex-1 flex flex-col justify-center gap-3">
-              <p className="font-display text-[20px] sm:text-[23px] leading-[1.35] font-semibold">
+              <p className="break-words font-display text-[20px] font-bold leading-[1.35] sm:text-[24px]">
                 {top.label}
               </p>
-              <div className="flex items-baseline gap-2">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span
                   className="font-display text-[34px] font-semibold tnum leading-none"
-                  style={{ color: toneColor(top.tone) }}
+                  style={{ color: "var(--ink)" }}
                 >
                   {share.toFixed(0)}%
                 </span>
-                <span className="text-[13.5px] text-ink-2">
+                <span className="text-[14px] text-ink-2">
                   of sample answers — {top.memberIds.length} of {totalAnswers}
                 </span>
               </div>
             </div>
-            <div className="px-5 sm:px-6 py-3 border-t border-border text-[12.5px] text-ink-3">
+            <div className="px-5 sm:px-6 py-3 border-t border-border text-[13px] text-ink-3">
               Ranked by the number of sample answers affected
             </div>
           </section>
@@ -220,7 +220,7 @@ export default function RevealPage() {
             <h2 className="font-display text-[24px] sm:text-[30px] font-semibold leading-tight">
               {v.head}
             </h2>
-            <p className="text-[14.5px] text-ink-2 mt-2 max-w-[58ch]">{v.body}</p>
+            <p className="text-[14px] text-ink-2 mt-2 max-w-[58ch]">{v.body}</p>
           </div>
           <Link
             href={`/clusters/${top.id}`}
@@ -246,7 +246,7 @@ export default function RevealPage() {
       {ranked.length > 1 ? (
         <Card>
           <div className="px-5 sm:px-6 py-4 border-b border-border">
-            <h2 className="font-display text-[17px] font-semibold">
+            <h2 className="font-display text-[18px] font-semibold">
               Other patterns in the sample
             </h2>
           </div>

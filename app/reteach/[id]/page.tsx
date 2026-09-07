@@ -41,6 +41,7 @@ export default function ReteachPackPage() {
     setReteachPack,
     context,
     sessionId,
+    flushChanges,
   } = useSession();
   const [copied, setCopied] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -60,6 +61,12 @@ export default function ReteachPackPage() {
     setGenerating(true);
     setGenerateError(null);
     try {
+      if (!(await flushChanges())) {
+        setGenerateError(
+          "The latest edits have not been saved. Resolve the save error, then try again.",
+        );
+        return;
+      }
       const { generateReteachAction } = await import("@/app/actions");
       const result = await generateReteachAction({
         context,
@@ -79,11 +86,11 @@ export default function ReteachPackPage() {
     } finally {
       setGenerating(false);
     }
-  }, [cluster, members, context, sessionId, generating, setReteachPack]);
+  }, [cluster, members, context, sessionId, generating, setReteachPack, flushChanges]);
 
   if (!processed) {
     return (
-      <Page eyebrow="Step 5 of 7" title="Reteach pack">
+      <Page eyebrow="Step 5 of 8" title="Reteach pack">
         <Card>
           <EmptyState
             icon={<BookOpen size={26} strokeWidth={1.6} />}
@@ -326,7 +333,7 @@ export default function ReteachPackPage() {
                       >
                         {i + 1}
                       </span>
-                      <p className="text-[15.5px] leading-relaxed font-medium max-w-[68ch]">
+                      <p className="text-[16px] leading-relaxed font-medium max-w-[68ch]">
                         {d.prompt}
                       </p>
                     </div>

@@ -57,6 +57,8 @@ export interface StageProgress {
   progress: number;
   /** Populated as soon as the stage can say something concrete. */
   detail?: string;
+  /** A recoverable degradation the lecturer must be told about. */
+  warning?: string;
 }
 
 /** The finished run, in exactly the shape the existing screens already consume. */
