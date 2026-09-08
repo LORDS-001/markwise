@@ -372,7 +372,7 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
                   </p>
                 ) : (
                   <p className="mt-2 text-center text-[12px] leading-snug text-ink-3">
-                    {sampleDraft ? "This opens the EEE 301 sample results. No answers are sent for analysis." : liveEnabled ? "Your answer text and marking scheme are sent to Gemini for analysis. Results are saved to your account." : "Your draft is ready, but live analysis must be enabled before it can be marked."}
+                    {sampleDraft ? "This opens the EEE 301 sample results. No answers are sent for analysis." : liveEnabled ? "Your answer text and marking scheme are sent to Claude for analysis, and the error descriptions it derives are sent to Gemini for grouping. Results are saved to your account." : "Your draft is ready, but live analysis must be enabled before it can be marked."}
                   </p>
                 )}
               </div>

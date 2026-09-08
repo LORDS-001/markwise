@@ -26,7 +26,7 @@ keyboard, font, and color checks.
 
 Setup opens a blank course draft. Without live-service configuration, you can
 prepare a draft or explicitly load the sample class; custom analysis stays
-disabled. With Gemini and secure Supabase persistence configured, **Analyse
+disabled. With both model keys and secure Supabase persistence configured, **Analyse
 class answers** marks a real batch: extraction, embedding, agglomerative clustering,
 labelling, and prerequisite damage ranking, with live stage progress.
 
@@ -95,12 +95,13 @@ Both responses and the trusted rubric are saved in one transaction before
 grading. A grader outage leaves the attempt available for a marking retry,
 using the original text rather than asking the student to submit again.
 Saved outcomes are read from the database. The credential-free sample uses
-browser storage and does not call Gemini or claim automatic grading.
+browser storage and does not call either provider or claim automatic grading.
 
 ## Stack
 
 Next.js 16 (App Router) · TypeScript · Tailwind v4 · lucide-react ·
-SheetJS (.xlsx) · docx (.docx) · Gemini (extraction, labelling, pedagogy) ·
+SheetJS (.xlsx) · docx (.docx) · Claude (extraction, labelling, pedagogy,
+diagnostic grading) · Gemini (signature embeddings) ·
 Supabase (Postgres, pgvector, RLS)
 
 Clustering is agglomerative average-linkage on cosine distance, written by
@@ -155,9 +156,17 @@ It only removes anonymous users with no sessions attached.
 
 ## The pipeline
 
-Add `GEMINI_API_KEY` to `.env.local` (aistudio.google.com/apikey). Without it
-the app stays on the demo class and the run endpoint returns 503 rather than
-failing halfway.
+The pipeline runs on two providers. Claude writes the generative stages —
+extraction, cluster labelling and damage ranking, reteach packs, and diagnostic
+grading — and Gemini embeds the error signatures for clustering. The split is
+forced rather than chosen: Anthropic publishes no embedding model, and
+clustering needs vectors.
+
+Add `ANTHROPIC_API_KEY` (console.anthropic.com/settings/keys) and
+`GEMINI_API_KEY` (aistudio.google.com/apikey) to `.env.local`. Without both the
+app stays on the demo class and the run endpoint returns 503 rather than
+failing halfway. Reteach packs and diagnostic grading need only the Anthropic
+key, since neither embeds anything.
 
 Live web operations also require the Supabase URL, anon key, service-role key,
 all migrations, and a verified account session. Anonymous Supabase accounts
@@ -167,23 +176,26 @@ disables paid web calls while leaving the sample class available.
 The run endpoint accepts 2–100 answers, at most 10,000 characters per answer,
 whole positive criterion marks, and at most 1 MiB for the request. It bounds processing time and reports
 degraded clustering explicitly. Student identifiers are replaced with
-correlation labels in model prompts; answer text itself is sent to Gemini.
+correlation labels in model prompts; answer text itself is sent to Claude.
+Only the derived error signatures are sent to Gemini, never the answers.
 
 Daily limits are enforced atomically in Postgres, across server processes:
 3 runs and 12 reteach generations per account, and 2 grading attempts per
 student token. Service-wide limits are 60 runs, 240 reteach generations, and
 600 diagnostic grading attempts per UTC day. Change the constants in a new
-migration when intentionally changing these budgets. `GEMINI_RPM` separately
-paces provider requests within each process. The run has a 270-second deadline,
-with batch admission checked against configured RPM before consuming AI quota.
-The default 15 RPM admits the 40-answer class; batches of 50 or more require
-splitting or a higher RPM supported by your provider quota. Label and damage
+migration when intentionally changing these budgets. `ANTHROPIC_RPM` and
+`GEMINI_RPM` separately pace each provider within each process. The run has a
+270-second deadline, and batch admission is checked per provider against its
+own configured RPM before consuming AI quota — a combined total would be
+measured against whichever ceiling happened to be consulted. Claude carries one
+request per answer plus one per cluster at a default 40 RPM; Gemini batches
+every signature into a single embedding call. Label and damage
 assessment share one model call per cluster. A slow provider can still exceed
 the deadline and reports a recoverable error.
 
 Setup shows a local sample preview when secure live configuration is absent.
 Configured deployments label the live action explicitly and explain what is
-sent to Gemini. If saving a completed analysis fails, **Retry save** stores the
+sent to each provider. If saving a completed analysis fails, **Retry save** stores the
 existing result without another model run. Pending or failed edits remain
 marked unsaved across refresh; saved-session recovery offers an explicit way
 to discard local edits and reopen the database copy.

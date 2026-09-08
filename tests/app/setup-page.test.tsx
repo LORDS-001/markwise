@@ -94,7 +94,10 @@ it("labels configured live analysis truthfully and sends the entered answers", (
   render(<SessionProvider><SetupForm liveEnabled /><Probe /></SessionProvider>);
   fireEvent.click(screen.getByRole("button", { name: "Load demo class" }));
   fireEvent.change(screen.getByRole("textbox", { name: /^Course code/ }), { target: { value: "CSC201" } });
-  expect(screen.getByText(/answer text and marking scheme are sent to Gemini/)).toBeVisible();
+  // Names both processors, and each for what it actually receives: the answers
+  // go to Claude, only the derived descriptions go to Gemini.
+  expect(screen.getByText(/answer text and marking scheme are sent to Claude/)).toBeVisible();
+  expect(screen.getByText(/error descriptions it derives are sent to Gemini/)).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Analyse class answers" }));
   expect(screen.getByTestId("live-count")).toHaveTextContent("40");
 });
