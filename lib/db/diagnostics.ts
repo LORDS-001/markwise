@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { gradeDiagnostic } from "@/lib/pipeline/grade-diagnostic";
-import { isPipelineConfigured } from "@/lib/pipeline/config";
+import { isGenerativeConfigured } from "@/lib/pipeline/config";
 import { authorizeAiRequest } from "@/lib/server/ai-access";
 import { getAdminClient } from "@/lib/supabase/admin";
 import type { DiagnosticResponse, DiagnosticVerdict } from "@/lib/types";
@@ -109,7 +109,8 @@ async function gradeSaved(
   token: string,
   supabase: SupabaseClient,
 ): Promise<SubmitDiagnosticResult> {
-  if (!isPipelineConfigured()) {
+  // Grading judges free text against the misconception; nothing here embeds.
+  if (!isGenerativeConfigured()) {
     return {
       ok: false,
       recorded: true,

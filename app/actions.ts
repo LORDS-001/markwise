@@ -8,7 +8,10 @@ import type {
   StudentAnswer,
 } from "@/lib/types";
 import type { PipelineInput } from "@/lib/pipeline/types";
-import { isPipelineConfigured, pipelineConfigMessage } from "@/lib/pipeline/config";
+import {
+  generativeConfigMessage,
+  isGenerativeConfigured,
+} from "@/lib/pipeline/config";
 import { generateReteachPack, otherBucketPack } from "@/lib/pipeline/reteach";
 import {
   readStudentDiagnostic,
@@ -130,11 +133,13 @@ export async function generateReteachAction(params: {
       pack: otherBucketPack(trustedCluster.id, trustedCluster.memberIds.length),
     };
   }
-  if (!isPipelineConfigured()) {
+  // A reteach pack is generated entirely on Claude, so a missing embedding key
+  // is not a reason to refuse one.
+  if (!isGenerativeConfigured()) {
     return {
       ok: false,
       code: "not_configured",
-      error: `${pipelineConfigMessage()} Its reteach packs are already written.`,
+      error: `${generativeConfigMessage()} Its reteach packs are already written.`,
     };
   }
 

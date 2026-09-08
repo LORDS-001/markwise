@@ -9,15 +9,15 @@ const getAdminClient = vi.hoisted(() => vi.fn(() => admin));
 const getServerClient = vi.hoisted(() => vi.fn());
 const authorizeAiRequest = vi.hoisted(() => vi.fn());
 const gradeDiagnostic = vi.hoisted(() => vi.fn());
-const isPipelineConfigured = vi.hoisted(() => vi.fn(() => true));
+const isGenerativeConfigured = vi.hoisted(() => vi.fn(() => true));
 
 vi.mock("@/lib/supabase/admin", () => ({ getAdminClient }));
 vi.mock("@/lib/supabase/server", () => ({ getServerClient }));
 vi.mock("@/lib/server/ai-access", () => ({ authorizeAiRequest }));
 vi.mock("@/lib/pipeline/grade-diagnostic", () => ({ gradeDiagnostic }));
 vi.mock("@/lib/pipeline/config", () => ({
-  isPipelineConfigured,
-  pipelineConfigMessage: () => "The marking pipeline is not configured.",
+  isGenerativeConfigured,
+  generativeConfigMessage: () => "The marking pipeline is not configured.",
 }));
 
 const TOKEN = "valid-saved-diagnostic-token";
@@ -43,7 +43,7 @@ beforeEach(() => {
     userId: "owner-1",
   });
   gradeDiagnostic.mockReset().mockResolvedValue(GRADED);
-  isPipelineConfigured.mockReset().mockReturnValue(true);
+  isGenerativeConfigured.mockReset().mockReturnValue(true);
 });
 
 describe("saved diagnostic actions", () => {

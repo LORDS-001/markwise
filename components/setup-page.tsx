@@ -159,7 +159,11 @@ export default function SetupPage({ liveEnabled = false }: { liveEnabled?: boole
 
   function clearAll() {
     invalidateCsvRead();
-    setSetupDraft(createEmptySetupDraft());
+    // Emptying the draft must not move the user out of the tab they chose.
+    // The file input's required/aria-required pair is bound to the mode, so
+    // silently switching back to Paste drops native validation on the empty
+    // CSV field — the form would stop reporting a missing file as missing.
+    setSetupDraft({ ...createEmptySetupDraft(), mode });
     setCsvError(null);
     setRunError(null);
     clearCsvFileSelection();

@@ -221,16 +221,32 @@ describe("generateReteachAction", () => {
   });
 
   it("reports an unconfigured pipeline rather than failing opaquely", async () => {
-    delete process.env.GEMINI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
     vi.resetModules();
 
     const result = await generate({});
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("not_configured");
-      expect(result.error).toMatch(/GEMINI_API_KEY/);
+      expect(result.error).toMatch(/ANTHROPIC_API_KEY/);
     }
     expect(generateReteachPack).not.toHaveBeenCalled();
+  });
+
+  it("generates a pack without an embedding key, which it never uses", async () => {
+    // A reteach pack is written entirely by Claude. Refusing one because the
+    // embedding key is absent would deny work that would have succeeded.
+    delete process.env.GEMINI_API_KEY;
+    vi.resetModules();
+    generateReteachPack.mockResolvedValue({
+      clusterId: "cluster-1",
+      lesson: [{ heading: "Belief", body: "Name it." }],
+      diagnostics: [],
+    });
+
+    const result = await generate({});
+    expect(result.ok).toBe(true);
+    expect(generateReteachPack).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces a generation failure as a message, not an exception", async () => {
