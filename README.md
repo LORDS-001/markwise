@@ -128,7 +128,7 @@ asks for the lecturer's name, and it is always optional. Linking calls
 
 A course is a folder inside an account, not an identity of its own.
 
-## Develop
+## Develop/Run
 
 ```bash
 npm install
