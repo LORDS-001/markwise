@@ -3,6 +3,51 @@ export interface TuningSample {
   truth: string;
 }
 
+export interface PairwiseScore {
+  precision: number;
+  recall: number;
+  f1: number;
+}
+
+/**
+ * Pairwise precision, recall and F1 against a known grouping.
+ *
+ * Of every pair of answers put together, how many genuinely share a belief;
+ * and of every pair that genuinely shares one, how many were caught. A single
+ * number for "are these clusters right" is what makes the threshold choice
+ * defensible rather than eyeballed — and it is the same question asked of the
+ * signatures upstream, so both measurements use this one implementation.
+ */
+export function pairwiseScore(
+  groups: number[][],
+  truth: string[],
+): PairwiseScore {
+  const assigned = new Array<number>(truth.length).fill(-1);
+  groups.forEach((group, g) => group.forEach((i) => (assigned[i] = g)));
+
+  let truePositive = 0;
+  let falsePositive = 0;
+  let falseNegative = 0;
+
+  for (let i = 0; i < truth.length; i += 1) {
+    for (let j = i + 1; j < truth.length; j += 1) {
+      const together = assigned[i] === assigned[j] && assigned[i] !== -1;
+      // Singletons in the same one-off bucket do not genuinely share a belief,
+      // so pairs inside it are not counted as pairs that should be together.
+      const shouldBeTogether = truth[i] === truth[j] && truth[i] !== "cl-other";
+      if (together && shouldBeTogether) truePositive += 1;
+      else if (together && !shouldBeTogether) falsePositive += 1;
+      else if (!together && shouldBeTogether) falseNegative += 1;
+    }
+  }
+
+  const precision = truePositive / Math.max(1, truePositive + falsePositive);
+  const recall = truePositive / Math.max(1, truePositive + falseNegative);
+  const f1 =
+    precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
+  return { precision, recall, f1 };
+}
+
 interface ExportedAnswer {
   studentId?: unknown;
   isCorrect?: unknown;

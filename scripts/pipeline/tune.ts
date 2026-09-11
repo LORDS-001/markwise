@@ -20,7 +20,11 @@ import { readFile } from "node:fs/promises";
 import { ANSWERS } from "@/lib/mock";
 import { agglomerativeCluster } from "@/lib/pipeline/cluster";
 import { EMBEDDING_MODEL, embedTexts, isEmbeddingConfigured } from "@/lib/pipeline/gemini";
-import { samplesFromExport, type TuningSample } from "@/lib/pipeline/tuning";
+import {
+  pairwiseScore,
+  samplesFromExport,
+  type TuningSample,
+} from "@/lib/pipeline/tuning";
 
 const ESC = "\x1b";
 const BOLD = `${ESC}[1m`;
@@ -63,34 +67,6 @@ async function loadSamples(): Promise<{ samples: Sample[]; source: string }> {
   return { samples, source: "seeded class (authored signatures)" };
 }
 
-/** Pairwise precision, recall and F1 against the known grouping. */
-function score(groups: number[][], truth: string[]) {
-  const assigned = new Array<number>(truth.length).fill(-1);
-  groups.forEach((group, g) => group.forEach((i) => (assigned[i] = g)));
-
-  let truePositive = 0;
-  let falsePositive = 0;
-  let falseNegative = 0;
-
-  for (let i = 0; i < truth.length; i += 1) {
-    for (let j = i + 1; j < truth.length; j += 1) {
-      const together = assigned[i] === assigned[j];
-      // Singletons in the same one-off bucket do not genuinely share a belief,
-      // so pairs inside it are not counted as pairs that should be together.
-      const shouldBeTogether = truth[i] === truth[j] && truth[i] !== "cl-other";
-      if (together && shouldBeTogether) truePositive += 1;
-      else if (together && !shouldBeTogether) falsePositive += 1;
-      else if (!together && shouldBeTogether) falseNegative += 1;
-    }
-  }
-
-  const precision = truePositive / Math.max(1, truePositive + falsePositive);
-  const recall = truePositive / Math.max(1, truePositive + falseNegative);
-  const f1 =
-    precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
-  return { precision, recall, f1 };
-}
-
 function bar(value: number, width = 18) {
   const filled = Math.round(value * width);
   return "█".repeat(filled) + "·".repeat(width - filled);
@@ -127,7 +103,7 @@ async function main() {
   for (let t = 0.04; t <= 0.62001; t += 0.02) {
     const groups = agglomerativeCluster(vectors, t);
     const real = groups.filter((g) => g.length >= 2);
-    const { precision, recall, f1 } = score(real, truth);
+    const { precision, recall, f1 } = pairwiseScore(real, truth);
 
     if (f1 > best.f1) best = { threshold: t, f1, groups: real.length };
 

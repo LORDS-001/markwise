@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "pipeline": "tsx --env-file-if-exists=.env.local scripts/pipeline/run.ts",
     "pipeline:tune": "tsx --env-file-if-exists=.env.local scripts/pipeline/tune.ts",
+    "pipeline:signatures": "tsx --env-file-if-exists=.env.local scripts/pipeline/signatures.ts",
     "pipeline:diagnose": "tsx --env-file-if-exists=.env.local scripts/pipeline/diagnose.ts",
     "pipeline:demo-positions": "tsx --env-file-if-exists=.env.local scripts/pipeline/demo-positions.ts"
   },

@@ -145,6 +145,47 @@ function asClaudeError(error: unknown): ClaudeError {
   return new ClaudeError("Claude request failed.");
 }
 
+export type Effort = "low" | "medium" | "high";
+
+/**
+ * Models that predate adaptive thinking and `output_config.effort`.
+ *
+ * A deny-list, not an allow-list: a model released after this was written
+ * should get the modern parameters rather than be refused by a table nobody
+ * remembered to update. Only the families that actively reject them are named.
+ */
+const LEGACY_THINKING = /^claude-(3[-.]|(haiku|sonnet|opus)-4-5\b)/;
+
+/**
+ * The thinking and effort parameters this model will actually accept.
+ *
+ * ANTHROPIC_MODEL is documented as a per-deployment override, and the obvious
+ * reason to reach for it is cost — which points straight at Haiku 4.5 or
+ * Sonnet 4.5. Both reject adaptive thinking *and* effort with a 400, so the
+ * documented knob would fail on the first request of every batch. These models
+ * take an explicit token budget instead, and no effort at all.
+ */
+export function thinkingShapeFor(
+  model: string,
+  maxTokens: number,
+  effort: Effort,
+):
+  | { thinking: { type: "adaptive" }; effort: Effort }
+  | { thinking: { type: "enabled"; budget_tokens: number }; effort: undefined } {
+  if (LEGACY_THINKING.test(model)) {
+    return {
+      // Must be at least 1024 and strictly below max_tokens, which also has to
+      // leave room for the JSON the thinking precedes.
+      thinking: {
+        type: "enabled",
+        budget_tokens: Math.max(1024, Math.floor(maxTokens / 2)),
+      },
+      effort: undefined,
+    };
+  }
+  return { thinking: { type: "adaptive" }, effort };
+}
+
 export interface ClaudeJsonRequest<T extends z.ZodType> {
   /**
    * The part of the prompt that is identical for every call in a batch — the
@@ -155,9 +196,25 @@ export interface ClaudeJsonRequest<T extends z.ZodType> {
   /** The part that changes per call: one student's answer. */
   variable: string;
   schema: T;
-  effort?: "low" | "medium" | "high";
+  effort?: Effort;
   maxTokens?: number;
   signal?: AbortSignal;
+  /**
+   * Reports what the call cost and how much of it was served from cache.
+   *
+   * Caching is the stated reason the prompt is split in two, and a prefix
+   * that silently stops matching looks exactly like one that works — the
+   * answers still come back, they just cost several times more. Nothing can
+   * confirm the split is earning its keep without reading this back.
+   */
+  onUsage?: (usage: ClaudeUsage) => void;
+}
+
+export interface ClaudeUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
 }
 
 /**
@@ -177,21 +234,26 @@ export async function claudeJson<T extends z.ZodType>(
     throwIfAborted(signal);
     await waitForSlot(signal);
 
+    // Thinking tokens count against this ceiling, so it has to leave room for
+    // the reasoning as well as the JSON. Truncating mid-object fails the parse
+    // and costs the whole call.
+    const maxTokens = request.maxTokens ?? 16_000;
+    const shape = thinkingShapeFor(
+      CLAUDE_MODEL,
+      maxTokens,
+      request.effort ?? "low",
+    );
+
     try {
       const response = await client().messages.parse(
         {
           model: CLAUDE_MODEL,
-          // Thinking tokens count against this ceiling, so it has to leave
-          // room for the reasoning as well as the JSON. Truncating mid-object
-          // fails the parse and costs the whole call.
-          max_tokens: request.maxTokens ?? 16_000,
-          // Explicit rather than implied. Opus 5 thinks by default, but an
-          // ANTHROPIC_MODEL override pointing at an earlier model would
-          // silently stop thinking, and extraction quality would drop with
-          // nothing in the code to explain why.
-          thinking: { type: "adaptive" },
+          max_tokens: maxTokens,
+          thinking: shape.thinking,
           output_config: {
-            effort: request.effort ?? "low",
+            // Omitted entirely on models that reject it, rather than sent and
+            // hoped for — the rejection is a 400, not a fallback.
+            ...(shape.effort ? { effort: shape.effort } : {}),
             format: zodOutputFormat(request.schema),
           },
           system: [
@@ -205,6 +267,13 @@ export async function claudeJson<T extends z.ZodType>(
         },
         { signal },
       );
+
+      request.onUsage?.({
+        inputTokens: response.usage?.input_tokens ?? 0,
+        outputTokens: response.usage?.output_tokens ?? 0,
+        cacheReadTokens: response.usage?.cache_read_input_tokens ?? 0,
+        cacheWriteTokens: response.usage?.cache_creation_input_tokens ?? 0,
+      });
 
       if (response.stop_reason === "refusal") {
         // Not retryable: the same prompt will be declined the same way.

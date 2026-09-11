@@ -50,6 +50,13 @@ export async function generateReteachPack(
     .slice(0, 6);
 
   const raw = await claudeJson({
+    // Short enough that it falls under the minimum cacheable prefix, so the
+    // breakpoint claude.ts puts here earns nothing. The lesson rules inside
+    // reteachPrompt are the part that repeats and could be hoisted — but packs
+    // are generated on demand, one cluster at a time, usually minutes apart,
+    // and the cache lives five. Rewording this prompt for a saving the TTL
+    // would eat is not a trade worth making while nothing measures whether the
+    // lessons got worse.
     stable:
       "You write short, specific reteach lessons that argue against one named misconception.",
     variable: reteachPrompt(input, cluster.label, cluster.why, evidence),

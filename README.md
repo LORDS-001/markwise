@@ -209,10 +209,23 @@ npm run pipeline -- --csv answers.csv  # your own batch
 npm run pipeline -- --json out.json    # dump the full result
 ```
 
-Read the printed signatures first. If they describe answers ("used the wrong
-formula") rather than state beliefs ("believes reactance does not oppose
-current"), fix the prompt in `lib/pipeline/prompts.ts` before touching the
-threshold — descriptions will not cluster no matter what the threshold is.
+Signatures that describe answers ("used the wrong formula") rather than state
+beliefs ("believes reactance does not oppose current") will not cluster at any
+threshold, so that is the first thing to check and the first thing to fix in
+`lib/pipeline/prompts.ts`. `npm run pipeline:signatures` checks it against the
+seeded class instead of by eye:
+
+```bash
+npm run pipeline:signatures   # does extraction still name beliefs?
+npm run pipeline:tune         # which distance threshold groups them best?
+```
+
+It reports the share of signatures that name a belief, how closely they match
+the hand-written ones, whether they still reproduce the known grouping, and
+whether the cached prompt prefix is actually being reused. It exits non-zero
+when extraction has slipped into describing answers, so it can gate a change to
+the prompt. Run it before the sweep: the threshold is only worth tuning once
+the signatures going into it are sound.
 
 ## Demo data
 
